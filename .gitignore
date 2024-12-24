@@ -1,0 +1,11 @@
+# Ignore all log files
+*.log
+
+# Ignore the node_modules directory
+node_modules/
+
+*cypress.config.js
+*cypress.env
+*package-lock.json
+*cypress.env.json
+*package.json
