@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES6",
+    "module": "CommonJS",
+    "lib": [
+      "es2017",
+      "dom"
+    ],
+    "types": [
+      "cypress"
+    ]
+  },
+  "include": [
+    "**/*.ts"
+  ]
+}
