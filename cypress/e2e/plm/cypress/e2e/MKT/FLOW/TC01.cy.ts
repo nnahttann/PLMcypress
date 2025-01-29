@@ -107,7 +107,7 @@ describe('Mobile', () => {
 
     //TC01
     const field: string[] = [
-      '*PO Name', '*Project Name', '*Project Owner', '*Customer Type', '*Price Type', '*Customer Type', '*Price Type', '*Commercial Launch Date', '*Product Class', '*Recurring Fee Deduction', '*Expire Date','*Promotion Level','*Package Duration','Fixed Start Date','*Share Plan','*Package Bill Cycle','Fixed End Date','*Prorate Package Fee','*Bill Period','PO Type','*NRTG/NGCM(WO1044)','*Target Group','PO Type','*NRTG/NGCM(WO1056)','*NRTG/PHX(WO1054)','*NRTG/PHX(WO1055)','Handset','Promotion Group','Promotion Sub Group','Remark','*Multi Duration','*Full Price Excluding VAT','*Full Price Including VAT','Partial Step','*Target Customer','*Product Specification','Selling Location & Channel','Market Segment','SMS Wording','Special Condition','Retry Pattern','PO Relation','Commu Touch Point','Other Privilege','Charge Partner'
+      '*PO Name', '*Project Name', '*Project Owner', '*Customer Type', '*Price Type', '*Customer Type', '*Price Type', '*Commercial Launch Date', '*Product Class', '*Recurring Fee Deduction', '*Expire Date', '*Promotion Level', '*Package Duration', 'Fixed Start Date', '*Share Plan', '*Package Bill Cycle', 'Fixed End Date', '*Prorate Package Fee', '*Bill Period', 'PO Type', '*NRTG/NGCM(WO1044)', '*Target Group', 'PO Type', '*NRTG/NGCM(WO1056)', '*NRTG/PHX(WO1054)', '*NRTG/PHX(WO1055)', 'Handset', 'Promotion Group', 'Promotion Sub Group', 'Remark', '*Multi Duration', '*Full Price Excluding VAT', '*Full Price Including VAT', 'Partial Step', '*Target Customer', '*Product Specification', 'Selling Location & Channel', 'Market Segment', 'SMS Wording', 'Special Condition', 'Retry Pattern', 'PO Relation', 'Commu Touch Point', 'Other Privilege', 'Charge Partner'
     ]
     field.forEach((field: string) => {
       cy.contains(field).should('be.visible');
@@ -158,98 +158,197 @@ describe('Mobile', () => {
     cy.get('.col-md-8 > .btn').click();
     //Charge Excluding VAT 
     cy.get('input[formcontrolname="chargeExcVat"]')
-    .should('have.class', 'form-control') 
-    .and('have.attr', 'maxlength', '13')
-    .and('have.attr', 'type', 'text') 
-    .type('123.45') 
-    .should('have.value', '123.45'); 
+      .should('have.class', 'form-control')
+      .and('have.attr', 'maxlength', '13')
+      .and('have.attr', 'type', 'text')
+      .type('123.45')
+      .should('have.value', '123.45');
 
-  cy.get('input[formcontrolname="chargeExcVat"]')
-    .clear() 
-    .type('abc123.45!@#') 
-    .should('have.value', '123.45'); 
+    cy.get('input[formcontrolname="chargeExcVat"]')
+      .clear()
+      .type('abc123.45!@#')
+      .should('have.value', '123.45');
 
-  //add buttom
-  cy.get('.col-md-6 > .btn').click();
+    //add buttom
+    cy.get('.col-md-6 > .btn').click();
 
-  //*Target group
-  //value Change Charge Type (Convert)
-  // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-  // .contains('Change Charge Type (Convert)')
-  // .dblclick(); 
+    //*Target group
+    //value Change Charge Type (Convert)
+    // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+    // .contains('Change Charge Type (Convert)')
+    // .dblclick(); 
 
-  // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-  // .contains('Existing')
-  // .dblclick(); 
+    // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+    // .contains('Existing')
+    // .dblclick(); 
 
-  // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-  // .contains('New')
-  // .dblclick(); 
+    // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+    // .contains('New')
+    // .dblclick(); 
 
-  // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-  // .contains('Port In (Mobile Number Port)')
-  // .dblclick(); 
+    // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+    // .contains('Port In (Mobile Number Port)')
+    // .dblclick(); 
 
-  // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-  // .contains('Renew / Recall from Terminate')
-  // .dblclick(); 
+    // cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+    // .contains('Renew / Recall from Terminate')
+    // .dblclick(); 
 
-const optionsToSelectTargetgroup = [
-  'Change Charge Type (Convert)',
-  'Existing',
-  'New',
-  'Port In (Mobile Number Port)',
-  'Renew / Recall from Terminate'
-];
+    const optionsToSelectTargetgroup = [
+      'Change Charge Type (Convert)',
+      'Existing',
+      'New',
+      'Port In (Mobile Number Port)',
+      'Renew / Recall from Terminate'
+    ];
 
-optionsToSelectTargetgroup.forEach(option => {
-  cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-    .contains(option) 
-    .dblclick(); 
-});
-//ProductSpec
-// const optionsToSelectProductSpec= [
-//   // "AI IP Camera",
-//   // "AIS Secure Net",
-//   // "Apple Care",
-//   // "Cloud Game",
-//   // "Cloud PC",
-//   // "Content VDO",
-//   // "Flowaccount",
-//   // "Internet",
-//   // "MMS",
-//   // "Mobile Care",
-//   // "SMS",
-//   // "Vertical App",
-//   // "Voice",
-//   // "WiFi",
-//   // "Youtube Premium"
+    optionsToSelectTargetgroup.forEach(option => {
+      cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+        .contains(option)
+        .dblclick();
+    });
+    //ProductSpec
+    // const optionsToSelectProductSpec= [
+    //   // "AI IP Camera",
+    //   // "AIS Secure Net",
+    //   // "Apple Care",
+    //   // "Cloud Game",
+    //   // "Cloud PC",
+    //   // "Content VDO",
+    //   // "Flowaccount",
+    //   // "Internet",
+    //   // "MMS",
+    //   // "Mobile Care",
+    //   // "SMS",
+    //   // "Vertical App",
+    //   // "Voice",
+    //   // "WiFi",
+    //   // "Youtube Premium"
 
-// ];
+    // ];
 
-// optionsToSelectProductSpec.forEach(option => {
-//   cy.get(':nth-child(8) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-//     .contains(option) 
-//     .dblclick(); 
-// });
+    // optionsToSelectProductSpec.forEach(option => {
+    //   cy.get(':nth-child(8) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+    //     .contains(option) 
+    //     .dblclick(); 
+    // });
 
-//Nav Internet
-cy.get('.scrollmenu > .nav').contains('Internet').should('be.visible').click();
+    //Nav Internet
+    cy.scrollTo('bottom')
+    cy.get('.scrollmenu > .nav').contains('Internet').should('be.visible').click();
 
-//button add
-cy.get('[style="width:60px"]').click();
+    //button add
+    cy.get('[style="width:60px"]').click();
 
-//Intternet Quota type 
-cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
-  .select('Limited Data (Pay per use)')
-  .should('have.value', 'Limited Data (Pay per use)');
-  
+    //Intternet Quota type 
+    // Limited Data (Pay per use)
+    cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+      .select('Limited Data (Pay per use)')
+      .should('have.value', 'Limited Data (Pay per use)');
 
-//Intternet Quota
-cy.get('#mat-select-2 > .mat-select-trigger > .mat-select-value').click({ force: true, multiple: true });
-cy.get('#mat-option-4 > .mat-option-text').click();
+    // Limited Data (Stop Net)
+  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //     .select('Limited Data (Stop Net)')
+  //     .should('have.value', 'Limited Data (Stop Net)');
 
-//Internet speed
-cy.get(':nth-child(6) > .row > .form-group > .col-md-12 > .col-md-4 > .form-control').select('').should('have.value', 'Limited Data (Pay per use)');
-});
+  //      // Pay per use only
+  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //   .select('Pay per use only')
+  //   .should('have.value', 'Pay per use only');
+
+  //   // Unlimited Data (Throttling Speed)
+  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //   .select('Unlimited Data (Throttling Speed)')
+  //   .should('have.value', 'Unlimited Data (Throttling Speed)');
+
+  // // Limited Data Only
+  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  // .select('Limited Data Only')
+  // .should('have.value', 'Limited Data Only');
+
+  // // Unlimited Data (Fixed Speed
+  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  // .select('Limited Data Only')
+  // .should('have.value', 'Limited Data Only');
+
+    //Intternet Quota
+    // cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true }); 
+    // cy.get('mat-option').contains('5G/4G/3G 10 GB').click();
+    const IntternetQuota = [
+      '5G/4G/3G 10 GB',
+      '5G/4G/3G 20 GB',
+      '5G/4G/3G 150 GB',
+      '5G/4G/3G 350 GB',
+      '4G/3G 10 GB',
+      '4G/3G 20 GB',
+      '5G/4G/3G 30 GB'
+    ];
+    
+    IntternetQuota.forEach(option => {
+      cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true }); 
+    
+      cy.get('.mat-select-panel mat-option')
+        .should('be.visible') 
+        .contains(option)
+        .click({ force: true });
+    });
+    
+    //Internet speed
+    const speeds = [
+      '4Gbps/4Gbps',
+      '3Gbps/3Gbps',
+      'Max Speed (5G 2Gbps/2Gbps)',
+      'Max Speed (5G Default 1Gbps/1Gbps)',
+      '450 Mbps',
+      '300 Mbps',
+      '150 Mbps',
+      '50 Mbps',
+      '42 Mbps',
+      '30 Mbps',
+      '21 Mbps',
+      '20 Mbps',
+      '15 Mbps',
+      '12 Mbps',
+      '11 Mbps',
+      '10 Mbps',
+      '8 Mbps',
+      '7.2 Mbps',
+      '6 Mbps',
+      '5 Mbps',
+      '4 Mbps',
+      '3 Mbps',
+      '2 Mbps',
+      '1 Mbps',
+      '512 Kbps',
+      '384 Kbps',
+      '256 Kbps',
+      '128 Kbps',
+      '64 Kbps',
+      '10 Kbps',
+      '0 Kbps',
+      'Max Speed (5G 2Gbps/2Gbps)'
+    ];
+    
+    speeds.forEach(speed => {
+      cy.get('select[formcontrolname="internetSpeed"]')
+        .select(speed)  
+        .should('have.value', speed); 
+    });
+
+    //Internet Exceed Rate 
+        const InternetExceedRate  = [
+      '0.963 Baht per',
+      '149 Baht per GB'
+    ];
+    
+    InternetExceedRate.forEach(option => {
+      cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true }); 
+    
+      cy.get('.mat-select-panel mat-option')
+        .should('be.visible') 
+        .contains(option)
+        .click({ force: true });
+    });
+    cy.get(':nth-child(1) > .btn').click();
+  });
 });
