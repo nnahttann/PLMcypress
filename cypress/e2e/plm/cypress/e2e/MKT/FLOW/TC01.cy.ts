@@ -7,7 +7,30 @@ beforeEach(() => {
   cy.visit(urlsit);
   cy.viewport(1920, 1080);
 });
+const verify = () => {
+  const field: string[] = [
+    '*PO Name', '*Project Name', '*Project Owner', '*Customer Type', '*Price Type', '*Customer Type', '*Price Type', '*Commercial Launch Date', '*Product Class', '*Recurring Fee Deduction', '*Expire Date', '*Promotion Level', '*Package Duration', 'Fixed Start Date', '*Share Plan', '*Package Bill Cycle', 'Fixed End Date', '*Prorate Package Fee', '*Bill Period', 'PO Type', '*NRTG/NGCM(WO1044)', '*Target Group', 'PO Type', '*NRTG/NGCM(WO1056)', '*NRTG/PHX(WO1054)', '*NRTG/PHX(WO1055)', 'Handset', 'Promotion Group', 'Promotion Sub Group', 'Remark', '*Multi Duration', '*Full Price Excluding VAT', '*Full Price Including VAT', 'Partial Step', '*Target Customer', '*Product Specification', 'Selling Location & Channel', 'Market Segment', 'SMS Wording', 'Special Condition', 'Retry Pattern', 'PO Relation', 'Commu Touch Point', 'Other Privilege', 'Charge Partner'
+  ]
+  field.forEach((field: string) => {
+    cy.contains(field).should('be.visible');
+  });
+}
 
+const targetgroup = () => {
+  const optionsToSelectTargetgroup = [
+    // 'Change Charge Type (Convert)',
+    // 'Existing',
+    'New',
+    // 'Port In (Mobile Number Port)',
+    // 'Renew / Recall from Terminate'
+  ];
+
+  optionsToSelectTargetgroup.forEach(option => {
+    cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
+      .contains(option)
+      .dblclick();
+  });
+}
 describe('Mobile', () => {
   it.only('MKT Prepaid role', () => {
     // 
@@ -22,11 +45,12 @@ describe('Mobile', () => {
     cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
 
     // create New Project
-    cy.get('.col-md-10 > .btn').click();
+    cy.get('.col-md-10 > .btn').should('be.visible').click();
 
     const now = new Date();
     const formattedDate = `Mobile_Prepaid_${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
+    cy.log(formattedDate);
     //Projectname
     cy.get(':nth-child(2) > :nth-child(1) > .form-group > :nth-child(2) > .form-control').type(formattedDate);
 
@@ -49,19 +73,20 @@ describe('Mobile', () => {
     cy.get(':nth-child(4) > .col-md-3 > .form-group > :nth-child(2) > .form-control').type('0123')
     // cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_PMT/INITIAL_PMT').as('getNRM_PMT');
     // button Save
-    cy.get('.col-md-10 > div > :nth-child(2)').click();
+    cy.get('.col-md-10 > div > :nth-child(2)').should('be.visible').click();
 
     cy.wait(5000)
     // cy.wait('@getNRM_PMT').its('response.statusCode').should('eq', 200);
 
     //button Close
-    cy.get('.ng-star-inserted > div > .btn').click();
+    // Add 
+    cy.get('.ng-star-inserted > div > .btn').should('be.visible').click();
     cy.wait(5000)
 
     // Button Add Project 
     cy.get(':nth-child(4) > .btn').click();
 
-    const formattedDatePONAME = `Mobile_Prepaid_PONAME${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const formattedDatePONAME = `Onetime_Main_${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
     // PO Name 
     cy.get('.modal-body > .ng-star-inserted > .form-control').type(formattedDatePONAME);
@@ -106,12 +131,7 @@ describe('Mobile', () => {
     cy.wait(5000)
 
     //TC01
-    const field: string[] = [
-      '*PO Name', '*Project Name', '*Project Owner', '*Customer Type', '*Price Type', '*Customer Type', '*Price Type', '*Commercial Launch Date', '*Product Class', '*Recurring Fee Deduction', '*Expire Date', '*Promotion Level', '*Package Duration', 'Fixed Start Date', '*Share Plan', '*Package Bill Cycle', 'Fixed End Date', '*Prorate Package Fee', '*Bill Period', 'PO Type', '*NRTG/NGCM(WO1044)', '*Target Group', 'PO Type', '*NRTG/NGCM(WO1056)', '*NRTG/PHX(WO1054)', '*NRTG/PHX(WO1055)', 'Handset', 'Promotion Group', 'Promotion Sub Group', 'Remark', '*Multi Duration', '*Full Price Excluding VAT', '*Full Price Including VAT', 'Partial Step', '*Target Customer', '*Product Specification', 'Selling Location & Channel', 'Market Segment', 'SMS Wording', 'Special Condition', 'Retry Pattern', 'PO Relation', 'Commu Touch Point', 'Other Privilege', 'Charge Partner'
-    ]
-    field.forEach((field: string) => {
-      cy.contains(field).should('be.visible');
-    });
+    verify();
 
     //Flow
     //PriceType 
@@ -194,19 +214,8 @@ describe('Mobile', () => {
     // .contains('Renew / Recall from Terminate')
     // .dblclick(); 
 
-    const optionsToSelectTargetgroup = [
-      'Change Charge Type (Convert)',
-      'Existing',
-      'New',
-      'Port In (Mobile Number Port)',
-      'Renew / Recall from Terminate'
-    ];
+    targetgroup();
 
-    optionsToSelectTargetgroup.forEach(option => {
-      cy.get(':nth-child(7) > .panel-body > :nth-child(1) > .col-md-12 > .form-group > .col-md-6 > ng2-dual-list-box > .row > :nth-child(1) > .list-box')
-        .contains(option)
-        .dblclick();
-    });
     //ProductSpec
     // const optionsToSelectProductSpec= [
     //   // "AI IP Camera",
@@ -247,29 +256,29 @@ describe('Mobile', () => {
       .should('have.value', 'Limited Data (Pay per use)');
 
     // Limited Data (Stop Net)
-  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
-  //     .select('Limited Data (Stop Net)')
-  //     .should('have.value', 'Limited Data (Stop Net)');
+    //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+    //     .select('Limited Data (Stop Net)')
+    //     .should('have.value', 'Limited Data (Stop Net)');
 
-  //      // Pay per use only
-  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
-  //   .select('Pay per use only')
-  //   .should('have.value', 'Pay per use only');
+    //      // Pay per use only
+    //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+    //   .select('Pay per use only')
+    //   .should('have.value', 'Pay per use only');
 
-  //   // Unlimited Data (Throttling Speed)
-  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
-  //   .select('Unlimited Data (Throttling Speed)')
-  //   .should('have.value', 'Unlimited Data (Throttling Speed)');
+    //   // Unlimited Data (Throttling Speed)
+    //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+    //   .select('Unlimited Data (Throttling Speed)')
+    //   .should('have.value', 'Unlimited Data (Throttling Speed)');
 
-  // // Limited Data Only
-  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
-  // .select('Limited Data Only')
-  // .should('have.value', 'Limited Data Only');
+    // // Limited Data Only
+    // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+    // .select('Limited Data Only')
+    // .should('have.value', 'Limited Data Only');
 
-  // // Unlimited Data (Fixed Speed
-  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
-  // .select('Limited Data Only')
-  // .should('have.value', 'Limited Data Only');
+    // // Unlimited Data (Fixed Speed
+    // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+    // .select('Limited Data Only')
+    // .should('have.value', 'Limited Data Only');
 
     //Intternet Quota
     // cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true }); 
@@ -283,16 +292,16 @@ describe('Mobile', () => {
       '4G/3G 20 GB',
       '5G/4G/3G 30 GB'
     ];
-    
+
     IntternetQuota.forEach(option => {
-      cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true }); 
-    
+      cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
+
       cy.get('.mat-select-panel mat-option')
-        .should('be.visible') 
+        .should('be.visible')
         .contains(option)
         .click({ force: true });
     });
-    
+
     //Internet speed
     const speeds = [
       '4Gbps/4Gbps',
@@ -328,27 +337,98 @@ describe('Mobile', () => {
       '0 Kbps',
       'Max Speed (5G 2Gbps/2Gbps)'
     ];
-    
+
     speeds.forEach(speed => {
       cy.get('select[formcontrolname="internetSpeed"]')
-        .select(speed)  
-        .should('have.value', speed); 
+        .select(speed)
+        .should('have.value', speed);
     });
 
     //Internet Exceed Rate 
-        const InternetExceedRate  = [
+    const InternetExceedRate = [
       '0.963 Baht per',
       '149 Baht per GB'
     ];
-    
+
     InternetExceedRate.forEach(option => {
-      cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true }); 
-    
+      cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true });
+
       cy.get('.mat-select-panel mat-option')
-        .should('be.visible') 
+        .should('be.visible')
         .contains(option)
         .click({ force: true });
     });
+    //button Save
     cy.get(':nth-child(1) > .btn').click();
+
+    //Nav SMS Wording
+    cy.scrollTo('bottom')
+    cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
+
+    //Button Generate SMS Wording
+    cy.get(':nth-child(2) > :nth-child(2) > .btn').should('be.visible').click();
+
+    //Send SMS Greeting Flag 
+    cy.get(':nth-child(7) > .collapse-panel > form.ng-untouched > :nth-child(1) > .col-md-12 > .col-md-6 > :nth-child(2) > .form-control').select('Send').should('have.value', 'Send');
+
+    // SMS Confirm Subscription success on CBS(One time/Recurring)
+    cy.get('.row.ng-star-inserted > .col-md-12 > .col-md-6 > :nth-child(2) > .form-control').select('Send').should('have.value', 'Send');
+
+    // Send SMS Delete Flag
+    cy.get(':nth-child(5) > .col-md-12 > .col-md-6 > :nth-child(2) > .form-control').select('Send').should('have.value', 'Send');
+
+    //Save button
+    cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
+
+    //Buttom Close
+    cy.get('.modal-footer', { timeout: 10000 }).should('be.visible');
+    cy.get('.modal-footer').find('button.btn-danger').click();
+
+
+    //Back to Project Basic Information 
+    cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 100000 });
+
+    // Do you want save PO? 
+    cy.get('.modal-body > .col-md-12 > :nth-child(1) > .btn').should('be.visible').click();
+
+    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
+    cy.wait(10000);
+    cy.readFile('D:/PLMcypress/cypress/e2e/plm/cypress/fixtures/file.pdf', 'binary').then((fileContent) => {
+      cy.get('input[type="file"][id="files"]').selectFile(
+        {
+          contents: Cypress.Buffer.from(fileContent, 'binary'),
+          fileName: 'file.pdf',
+          mimeType: 'application/pdf',
+        },
+        { force: true }
+      );
+      //description 
+      cy.get(':nth-child(2) > :nth-child(2) > .form-control').type('Description');
+
+      //Button 
+      cy.get(':nth-child(3) > :nth-child(1) > .btn').click();
+
+      // *Approve memo 
+      cy.get('.row.ng-star-inserted > .col-md-6 > input').click();
+
+      // button Submit
+      cy.get('button.btn.btn-primary.btn-xs.ng-star-inserted')
+        .contains('Submit')
+        .click();
+      cy.wait(10000);
+
+      // Assuming the table is in the "Unassigned Task" section
+      cy.get('h3').contains('Unassigned Task').parent().within(() => {
+        // Iterate through each row in the table
+        cy.get('tbody tr').each(($row) => {
+          // Check if the row contains the formattedDate
+          if ($row.text().includes(formattedDate)) {
+            // If found, click the button within that row
+            cy.wrap($row).find('button.btn.btn-circle.btn-xs.btn-success.claim-top').click();
+            return false; // Exit the loop once the button is clicked
+          }
+        });
+      });
+    });
   });
 });
