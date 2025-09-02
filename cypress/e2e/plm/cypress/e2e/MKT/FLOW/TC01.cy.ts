@@ -35,6 +35,30 @@ const clamProject = (formattedDate: string): void => {
     });
   });
 };
+//Claim Project CKS
+const ClaimProjectCKS = (formattedDate: string): void => {
+  cy.get('h3')
+    .contains('Unassigned Task', { timeout: 100000 })
+    .parent()
+    .within(() => {
+      // รอจนกว่ามีแถวจริง
+      cy.get('tbody tr').should(($rows) => {
+        expect(
+          $rows.text(),
+          'Table should not show loading text'
+        ).not.to.contain('Fetching data');
+      });
+
+      // ค่อยวนหา row
+      cy.get('tbody tr').each(($row) => {
+        cy.log('Row text:', $row.text());
+        if ($row.text().includes(formattedDate)) {
+          cy.wrap($row).find('button.claim-top').click();
+          return false;
+        }
+      });
+    });
+};
 
 const approveProject = (projectName: string): void => {
   cy.get('h3').contains('To Do List').parent().within(() => {
@@ -52,11 +76,11 @@ const approveProject = (projectName: string): void => {
 
 const targetgroup = () => {
   const optionsToSelect = [
-    'Change Charge Type (Convert)',
-    'Existing',
+    // 'Change Charge Type (Convert)',
+    // 'Existing',
     'New',
-    'Port In (Mobile Number Port)',
-    'Renew / Recall from Terminate'
+    // 'Port In (Mobile Number Port)',
+    // 'Renew / Recall from Terminate'
   ];
 
   // Ensure the select element is visible
@@ -75,25 +99,27 @@ const targetgroup = () => {
       });
   });
 }
+
+const login = (username: string, password: string): void => {
+  cy.get('input[name="userId"]').type(username);
+  cy.get('input[name="pwd"]').type(password);
+  cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll').as('getErrorCodes');
+  cy.get(':nth-child(4) > .btn').click();
+  cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+}
+
 describe('Mobile', () => {
-  it.only('MKT Prepaid role', () => {
+
+  it('MKT POSTPAID role', () => {
     // 
-    cy.get('.col-md-10 > :nth-child(2) > .input-group > .form-control', { timeout: 100000 }).type(MKTpost);
-
-    cy.get('[style="margin-bottom:5px;"] > .input-group > .form-control', { timeout: 100000 }).type(MKTpost1);
-
-    cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll', { timeout: 100000 }).as('getErrorCodes');
-
-    cy.get(':nth-child(4) > .btn').click();
-
-    cy.wait('@getErrorCodes').its('response.statusCode', { timeout: 100000 }).should('eq', 200);
+    login(MKTpost, MKTpost1);
 
     // create New Project
     cy.get('.col-md-10 > .btn').should('be.visible').click();
 
     cy.log(formattedDate);
     //Projectname
-    cy.get(':nth-child(2) > :nth-child(1) > .form-group > :nth-child(2) > .form-control').type(formattedDate);
+    cy.get('input[formcontrolname="projectName"]').type(formattedDate);
 
     // Date
     const date = new Date();
@@ -106,22 +132,23 @@ describe('Mobile', () => {
       year: 'numeric',
     });
 
-    cy.get('.selection').type(formattedDate1);
+    //PLM1
+    cy.get('input[aria-label="Date input field"]').type(formattedDate1);
+    //PLM2
+    // cy.get('input[name="expectedDate"]').type(formattedDate1);
 
     cy.wait(2000)
 
     // phone 
-    cy.get(':nth-child(4) > .col-md-3 > .form-group > :nth-child(2) > .form-control', { timeout: 100000 }).type('0123')
+    cy.get('input[formcontrolname="phoneNo"]').type('0123')
     // button Save
-    cy.get('.col-md-10 > div > :nth-child(2)', { timeout: 100000 }).should('be.visible').click();
+    cy.get('button[type="button"]').contains('Save').click();
 
     cy.wait(5000)
     // cy.wait('@getNRM_PMT').its('response.statusCode').should('eq', 200);
 
     //button Close
-    // Add 
-    cy.get('.ng-star-inserted > div > .btn').should('be.visible', { timeout: 100000 }).click();
-    cy.wait(5000)
+    cy.get('.modal-body > :nth-child(1) > div > .btn').click();
 
     // Button Add Project 
     cy.get(':nth-child(4) > .btn').click();
@@ -129,23 +156,24 @@ describe('Mobile', () => {
     const formattedDatePONAME = `Onetime_Main_${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
 
     // PO Name 
-    cy.get('.modal-body > .ng-star-inserted > .form-control').type(formattedDatePONAME);
+    cy.get('input[formcontrolname="productName"]').type(formattedDatePONAME);
 
     //PO Sub group
     // Product Offering
-    cy.get('.col-md-4 > .form-control').select('Product Offering').should('have.value', 'Product Offering', { timeout: 100000 });
+    cy.get('select[formcontrolname="promotionSubGroupFrom"]').select('Product Offering').should('have.value', 'Product Offering');;
     // Order Fee
     // cy.get('.col-md-4 > .form-control').select('Order Fee').should('have.value', 'Order Fee');
     //Service
     // cy.get('.col-md-4 > .form-control').select('Service').should('have.value', 'Service');
 
+
     //button create 
     cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+    // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
     // Trigger the button click action
     cy.get('.modal-footer > :nth-child(2) > .btn-primary').click();
     cy.wait('@postRequest');
-    cy.wait('@getRequest');
+    // cy.wait('@getRequest');
 
     // Wait for URL change (wait for the page reload or redirection)
     cy.url().should('include', '/#/project-home/project-basic-information');  // Update to match the actual URL or part of it
@@ -156,7 +184,7 @@ describe('Mobile', () => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
 
     // Wait for the new requests after URL change
-    cy.wait('@getPoRowId', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+    // cy.wait('@getPoRowId', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@getProject', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
     cy.url({ timeout: 30000 }).should('include', '/project-home/mass-mkt/mass-mkt-product-offering');
     cy.wait('@postRequest');
@@ -174,7 +202,7 @@ describe('Mobile', () => {
 
     // Select "Usage" option
     // cy.get('select[formcontrolname="priceType"]').select('3: Usage', { force: true }).should('have.value', '3: Usage');
-    cy.wait(5000);
+    cy.wait(15000);
     //Product class
     // Select "Main" option
     cy.get('select[formcontrolname="productClass"]').select('1: Main').should('have.value', '1: Main');
@@ -252,14 +280,19 @@ describe('Mobile', () => {
           cy.wrap($option).dblclick();
         });
     });
-    //Nav Internet
-    cy.scrollTo('bottom')
-    cy.get('.scrollmenu > .nav').contains('Internet').should('be.visible').click();
 
-    //button add
-    cy.get('div.collapse-panel').within(() => {
-      cy.get('button.btn.btn-primary.btn-xs[style="width:60px"]').should('be.visible').click();
-    });
+    // Nav Internet
+    // ใช้ .scrollIntoView() เพื่อเลื่อนหาปุ่ม 'Internet' ในแถบเมนูแนวนอน
+    cy.get('.scrollmenu > .nav')
+      .contains('Internet')
+      .scrollIntoView()
+      .should('be.visible')
+      .click();
+
+    cy.scrollTo('bottom');
+    // button add
+    // cy.get('[style="width: 60px;"]').click();
+    cy.get('button.btn.btn-primary.btn-xs').eq(3).click();
 
     //Intternet Quota type 
     // Limited Data (Pay per use)
@@ -295,7 +328,6 @@ describe('Mobile', () => {
     // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
     // .select('Limited Data Only')
     // .should('have.value', 'Limited Data Only');
-
     //Intternet Quota
     // cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true }); 
     // cy.get('mat-option').contains('5G/4G/3G 10 GB').click();
@@ -384,81 +416,39 @@ describe('Mobile', () => {
     //Button Generate SMS Wording
     // cy.get(':nth-child(2) > :nth-child(2) > .btn').should('be.visible').click();
 
-    // Short Promotion Name& Marketing Name
-    cy.get('textarea[formcontrolname="shortPromotionName"]').first()
-      .type('Sample Promotion Name ENG')
-      .should('have.value', 'Sample Promotion Name ENG');
+    // กำหนดข้อมูลที่ต้องการกรอกในแต่ละฟิลด์
+    const fields = [
+      { selector: 'textarea[formcontrolname="shortPromotionName"]', values: ['Sample Promotion Name ENG', 'ตัวอย่างชื่อโปรโมชั่น THA'] },
+      { selector: 'textarea[formcontrolname="marketingName"]', values: ['Marketing Name EN Only'] },
+      { selector: 'textarea[formcontrolname="cmsDisplay"]', values: ['Sample CMS Display ENG', 'ตัวอย่าง CMS Display THA'] },
+      { selector: 'textarea[formcontrolname="promotionDescription"]', values: ['Sample Promotion Description in English', 'ตัวอย่างรายละเอียดโปรโมชั่นภาษาไทย'] },
+      { selector: 'textarea[formcontrolname="greetingLetter"]', values: ['Sample Greeting Letter in English', 'ตัวอย่างจดหมายทักทายภาษาไทย'] },
+      { selector: 'textarea[formcontrolname="yourPackage"]', values: ['Sample Billing Description in English', 'ตัวอย่างคำอธิบายบิลภาษาไทย'] },
+      { selector: 'textarea[formcontrolname="smsGreeting"]', values: ['Sample SMS Greeting in English', 'ตัวอย่าง SMS ทักทายภาษาไทย'] },
+      { selector: 'textarea[formcontrolname="smsDelete"]', values: ['Sample SMS Delete in English', 'ตัวอย่าง SMS ลบแพ็กภาษาไทย'] },
+    ];
 
-    cy.get('textarea[formcontrolname="shortPromotionName"]').eq(1)
-      .type('ตัวอย่างชื่อโปรโมชั่น THA')
-      .should('have.value', 'ตัวอย่างชื่อโปรโมชั่น THA');
+    // กำหนดข้อมูลสำหรับ dropdown
+    const dropdowns = [
+      { selector: 'select[formcontrolname="smsGreetingSendFlag"]', value: 'Send' },
+      { selector: 'select[formcontrolname="smsDeleteSendFlag"]', value: 'Send' },
+    ];
 
-    cy.get('textarea[formcontrolname="marketingName"]')
-      .type('Marketing Name EN Only')
-      .should('have.value', 'Marketing Name EN Only');
+    // วนลูปเพื่อกรอกข้อมูลในฟิลด์ต่าง ๆ
+    fields.forEach((field) => {
+      field.values.forEach((value, index) => {
+        cy.get(field.selector).eq(index)
+          .type(value)
+          .should('have.value', value);
+      });
+    });
 
-    // CMS Display Wording in myAIS 2.0
-
-    cy.get('textarea[formcontrolname="cmsDisplay"]').first()
-      .type('Sample CMS Display ENG')
-      .should('have.value', 'Sample CMS Display ENG');
-
-    cy.get('textarea[formcontrolname="cmsDisplay"]').eq(1)
-      .type('ตัวอย่าง CMS Display THA')
-      .should('have.value', 'ตัวอย่าง CMS Display THA');
-
-    //Promotion Description 
-    cy.get('textarea[formcontrolname="promotionDescription"]').first()
-      .type('Sample Promotion Description in English')
-      .should('have.value', 'Sample Promotion Description in English');
-
-    cy.get('textarea[formcontrolname="promotionDescription"]').eq(1)
-      .type('ตัวอย่างรายละเอียดโปรโมชั่นภาษาไทย')
-      .should('have.value', 'ตัวอย่างรายละเอียดโปรโมชั่นภาษาไทย');
-
-    //Greeting Letter
-    cy.get('textarea[formcontrolname="greetingLetter"]').first()
-      .type('Sample Greeting Letter in English')
-      .should('have.value', 'Sample Greeting Letter in English');
-
-    cy.get('textarea[formcontrolname="greetingLetter"]').eq(1)
-      .type('ตัวอย่างจดหมายทักทายภาษาไทย')
-      .should('have.value', 'ตัวอย่างจดหมายทักทายภาษาไทย');
-
-    //Billing Description (Your Package Name)
-    cy.get('textarea[formcontrolname="yourPackage"]').first()
-      .type('Sample Billing Description in English')
-      .should('have.value', 'Sample Billing Description in English');
-
-    cy.get('textarea[formcontrolname="yourPackage"]').eq(1)
-      .type('ตัวอย่างคำอธิบายบิลภาษาไทย')
-      .should('have.value', 'ตัวอย่างคำอธิบายบิลภาษาไทย');
-
-    //SMS Greeting & Delete
-    cy.get('select[formcontrolname="smsGreetingSendFlag"]').select('Send')
-      .should('have.value', 'Send');
-
-    cy.get('select[formcontrolname="smsGreetingSendFlag"]').select('Send')
-      .should('have.value', 'Send');
-
-    cy.get('textarea[formcontrolname="smsGreeting"]').first()
-      .type('Sample SMS Greeting in English')
-      .should('have.value', 'Sample SMS Greeting in English');
-
-    cy.get('textarea[formcontrolname="smsGreeting"]').eq(1)
-      .type('ตัวอย่าง SMS ทักทายภาษาไทย')
-      .should('have.value', 'ตัวอย่าง SMS ทักทายภาษาไทย');
-
-    cy.get('select[formcontrolname="smsDeleteSendFlag"]').select('Send')
-      .should('have.value', 'Send');
-
-    cy.get('textarea[formcontrolname="smsDelete"]').first()
-      .type('Sample SMS Delete in English')
-      .should('have.value', 'Sample SMS Delete in English');
-
-    cy.get('textarea[formcontrolname="smsDelete"]').eq(1)
-      .type('ตัวอย่าง SMS ลบแพ็กภาษาไทย')
-      .should('have.value', 'ตัวอย่าง SMS ลบแพ็กภาษาไทย');
+    // วนลูปเพื่อเลือกค่าใน dropdown
+    dropdowns.forEach((dropdown) => {
+      cy.get(dropdown.selector)
+        .select(dropdown.value)
+        .should('have.value', dropdown.value);
+    });
 
     cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
     cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
@@ -550,13 +540,11 @@ describe('Mobile', () => {
       cy.get('.loading-spinner', { timeout: 60000 }).should('not.exist');
 
       // Intercept and wait for specific API requests triggered after scrolling
-      cy.intercept('POST', '/PLMSpringBoot/api/po-fbb-view/findPoByPoGroupListAndOnTopCatagoryAndAllowBundleIsYAndStatusNotCancelAndNotHold/*').as('postScrollRequest');
-      cy.intercept('GET', '/PLMSpringBoot/api/flw-common/checkAnswerForMore/*').as('getCheckAnswer');
       cy.intercept('GET', '/PLMSpringBoot/api/getProductInMKT/*').as('getProductInMKT');
       cy.intercept('GET', '/PLMSpringBoot/api/getSubmitDt/*').as('getSubmitDt');
 
       // Wait for API requests triggered after scrolling
-      cy.wait(['@postScrollRequest', '@getCheckAnswer', '@getProductInMKT', '@getSubmitDt'], { timeout: 120000 });
+      cy.wait(['@getProductInMKT', '@getSubmitDt'], { timeout: 120000 });
       // Wait for the "Approve" button to be visible and enabled
       cy.get('button.btn.btn-xs.btn-primary')
         .contains('Approve')
@@ -598,49 +586,122 @@ describe('Mobile', () => {
 
       // Wait for initial API requests to complete
       cy.wait(['@getRequest', '@postRequest'], { timeout: 100000 });
-
-      // Type into the first input field
-      cy.get('.col-md-10 > :nth-child(2) > .input-group > .form-control', { timeout: 100000 })
-        .type(cks);
-
-      // Type into the second input field
-      // พิมพ์ข้อมูลลงในฟิลด์
-      cy.get('[style="margin-bottom:5px;"] > .input-group > .form-control', { timeout: 100000 })
-        .type(ckspass);
-
-      // ดักจับและรอให้ API getErrorCodes เสร็จสิ้น
-      cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll').as('getErrorCodes');
-
-      // คลิกปุ่มเพื่อดำเนินการต่อไป
-      cy.get(':nth-child(4) > .btn').click();
-
-      // รอให้ API getErrorCodes เสร็จสิ้น
-      cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
-
-      // ดักจับและรอให้ API อื่น ๆ เสร็จสิ้น
-      cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
-      cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
-      cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
-
-      // รอให้ API ต่าง ๆ เสร็จสิ้น
-      cy.wait(['@setUserOnline', '@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
-
-      // เรียกใช้ฟังก์ชัน clamProject เพื่อ Claim Project
-      clamProject(formattedDate);
-
-      // Find the "To Do List" section
-      approveProject(formattedDate);
-
-      // รอให้หน้าเว็บโหลดเสร็จสมบูรณ์
-      cy.get('body').should('be.visible'); // ตรวจสอบว่า body ปรากฏบนหน้า
-
-      // ตรวจสอบว่า URL ตรงกับ #/new-flow/home/newcks/cks-doer
-      cy.url().should('include', '#/new-flow/home/newcks/cks-doer');
-
-      // ดำเนินการต่อไป
-      cy.contains('button', 'Enhance PO')
-        .should('be.visible')
-        .click();
     });
+  });
+  it.only('cks role', () => {
+
+    login(cks, ckspass);
+
+    // ดักจับและรอให้ API อื่น ๆ เสร็จสิ้น
+    cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
+    cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
+
+    // รอให้ API ต่าง ๆ เสร็จสิ้น
+    cy.wait(['@setUserOnline', '@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
+    cy.get('body').should('be.visible');
+
+    const formattedDate = 'Mob POST Reg 2608 2352';
+
+    //  ClaimProjectCKS from Unassigned Task
+    // ClaimProjectCKS(formattedDate);
+
+    // Find the "To Do List" section
+    cy.wait(5000);
+    approveProject(formattedDate);
+
+
+    // ดักจับและรอให้ API ต่าง ๆ เสร็จสิ้น
+    cy.url().should('include', '#/new-flow/home/newcks/cks-doer');
+    // wait API 
+    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+
+    // Wait for initial API requests to complete
+    cy.wait(['@getRequest'], { timeout: 100000 });
+
+    cy.wait(15000);
+    // Click the button
+    //button Enhance PO
+    cy.get('button.btn-sample')
+      .contains('Enhance PO')
+      .scrollIntoView({ ensureScrollable: false })
+      .should('be.visible')
+      .click();
+
+    //Navigate to mass product 
+
+    // wait API 
+    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+
+    // Wait for initial API requests to complete
+    cy.wait(['@getRequest'], { timeout: 100000 });
+
+    // รอจนหน้าเปลี่ยนและ element ปรากฏ
+    cy.url().should('include', 'mass-enh-product-offering-detail');
+    // cy.get('h3.panel-title').should('contain', 'Product Offering Detail');
+
+    // Nav Tariff & dissount
+    cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount').should('be.visible').click();
+    cy.scrollTo('bottom');
+
+    const TariffPlans = [
+      // 'GSM Advance Nationwide Call 1.50 Baht SMS 2.5 Baht',
+      // 'tariff_mass_bfs1_no',
+      'Call AIS Network 5AM-5PM. First-60 Min 0B Next 1.5B. Other Network 1.5B/Min SMS2.5B',
+      // 'GSM Advance Nationwide Call 1 Baht',
+      // 'Mobile_RTMT_110225',
+      // 'Voice Normal AIS 0.5B/M OTH 0.75B/M'
+    ]
+
+    TariffPlans.forEach(option => {
+      cy.get('#mat-select-2 .mat-select-trigger')
+        .click({ force: true });
+
+      cy.get('.mat-select-panel mat-option .mat-option-text')
+        .should('be.visible')
+        .contains(option)
+        .click({ force: true });
+
+      cy.get('#mat-select-2 .mat-select-value-text')
+        .should('contain.text', option);
+    });
+
+    //Button Generate discount
+    cy.contains('button', 'Generate Discount')
+      .should('be.visible')
+      .and('not.be.disabled')
+      .click();
+
+    //Button Save
+    cy.contains('button', 'Save')
+      .should('be.visible')
+      .and('not.be.disabled')
+      .click();
+
+    // Ensure the modal footer is visible
+    cy.get('.modal-footer', { timeout: 20000 }).should('be.visible');
+
+    // Find the Close button, ensure it's visible and enabled, then click it
+    cy.get('.modal-footer')
+      .find('button.btn-danger')
+      .should('be.visible')
+      .and('not.be.disabled')
+      .click();
+
+    //Button Back
+    cy.contains('button', 'Back')
+      .should('be.visible')
+      .and('not.be.disabled')
+      .click();
+
+    //Button yes
+    cy.contains('button', 'Yes')
+      .should('be.visible')
+      .click();
+  // wait API 
+    cy.wait(10000);
+    //Button Approve
+    cy.get(':nth-child(3) > .col-md-4 > :nth-child(3)').click();
+
   });
 });
