@@ -1,11 +1,10 @@
-
 const urlsit: string = Cypress.env('urlsit');
 const MKTpost: string = Cypress.env('MKTpost');
 const MKTpost1: string = Cypress.env('MKTpost1');
 const cks: string = Cypress.env('cks');
 const ckspass: string = Cypress.env('ckspass');
-const cgccbs: string = Cypress.env('cgccbs');
-const cgccbspass: string = Cypress.env('cgccbspass');
+const cgcirb: string = Cypress.env('cgcirb');
+const cgcirbpass: string = Cypress.env('cgcirbpass');
 
 beforeEach(() => {
   cy.clearLocalStorage();
@@ -46,6 +45,85 @@ const clamProject = (formattedDate: string): void => {
     });
 };
 
+export function assignTeamTask(taskIdentifier: string, assignee: string): void {
+  // cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
+
+  cy.window().then((win) => {
+    cy.stub(win, 'alert').as('alertStub');
+  });
+
+  cy.get('h3').contains('Team Task').should('be.visible');
+  // cy.wait('@postRequest').its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest').its('response.statusCode').should('eq', 200);
+  cy.log('✅ APIs for task list have loaded.');
+
+  cy.contains('tr', taskIdentifier).as('taskRow');
+
+  cy.get('@taskRow').within(() => {
+    cy.log(`➡️ Found task row for "${taskIdentifier}". Performing actions...`);
+
+    cy.get('select.form-control.input-sm').as('assigneeDropdown');
+
+    // ⭐ วิธีที่ 1: Click ที่ parent element หรือ container ของ select
+    cy.get('@assigneeDropdown').parent().click();
+
+    // หรือ ⭐ วิธีที่ 2: Simulate native browser interaction
+    cy.get('@assigneeDropdown').then(($select) => {
+      // Create และ dispatch mouse events
+      const selectElement = $select[0];
+
+      // MouseDown event (เหมือนกด mouse ลง)
+      const mouseDownEvent = new MouseEvent('mousedown', {
+        bubbles: true,
+        cancelable: true,
+        view: window
+      });
+      selectElement.dispatchEvent(mouseDownEvent);
+
+      // Focus event
+      const focusEvent = new FocusEvent('focus', {
+        bubbles: true,
+        cancelable: true
+      });
+      selectElement.dispatchEvent(focusEvent);
+    });
+
+    // รอ API
+    cy.wait('@getAssigneeList', { timeout: 10000 })
+      .its('response.statusCode')
+      .should('eq', 200);
+
+    cy.log('✅ Assignee list API loaded');
+
+    // รอให้ Angular render options
+    cy.wait(2000);
+
+    // Debug: ดู options หลัง API load
+    cy.get('@assigneeDropdown')
+      .find('option')
+      .each(($option: JQuery<HTMLOptionElement>) => {
+        cy.log(`📋 Option: "${$option.val()}" = "${$option.text().trim()}"`);
+      });
+
+    // รอจนกว่า option ที่ต้องการจะมี
+    cy.get('@assigneeDropdown')
+      .find(`option[value="${assignee}"]`, { timeout: 10000 })
+      .should('exist');
+
+    // Select
+    cy.get('@assigneeDropdown').select(assignee);
+    cy.get('@assigneeDropdown').should('have.value', assignee);
+
+    cy.log(`✅ Successfully selected: ${assignee}`);
+
+    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+    cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
+    cy.get('button[type="button"]').contains('Set').click();
+    cy.wait(50000)
+  });
+}
 //Claim Project CKS
 const ClaimProjectCKS = (formattedDate: string): void => {
   cy.get('h3')
@@ -120,7 +198,6 @@ const login = (username: string, password: string): void => {
 }
 
 describe('Mobile', () => {
-
   it('MKT POSTPAID role', () => {
     //Logib
     login(MKTpost, MKTpost1);
@@ -205,7 +282,6 @@ describe('Mobile', () => {
     //TC01
     // verify();
 
-    //Flow
     //PriceType 
     // Select "One-Time" option
     cy.get('select[formcontrolname="priceType"]').select('1: One-Time', { force: true }).should('have.value', '1: One-Time');
@@ -295,7 +371,6 @@ describe('Mobile', () => {
     });
 
     // Nav Internet
-    // ใช้ .scrollIntoView() เพื่อเลื่อนหาปุ่ม 'Internet' ในแถบเมนูแนวนอน
     cy.get('.scrollmenu > .nav')
       .contains('Internet')
       .scrollIntoView()
@@ -356,7 +431,6 @@ describe('Mobile', () => {
 
     IntternetQuota.forEach(option => {
       cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
-
       cy.get('.mat-select-panel mat-option')
         .should('be.visible')
         .contains(option)
@@ -413,12 +487,12 @@ describe('Mobile', () => {
 
     InternetExceedRate.forEach(option => {
       cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true });
-
       cy.get('.mat-select-panel mat-option')
         .should('be.visible')
         .contains(option)
         .click({ force: true });
     });
+
     //button Save
     cy.get(':nth-child(1) > .btn').click();
 
@@ -529,7 +603,6 @@ describe('Mobile', () => {
       cy.get('.row.ng-star-inserted > .col-md-6 > input').click();
 
       // button Submit
-      // intercept ต้องอยู่ก่อน click
       cy.intercept('POST', '**/api-mkt/promoteFromMktDoer').as('submitApprove');
 
       cy.get('button.btn.btn-primary.btn-xs.ng-star-inserted')
@@ -823,23 +896,20 @@ describe('Mobile', () => {
     // cy.wait(['@getRequest', '@postRequest'], { timeout: 100000 });
 
   });
-  it.only('CGMD Config CBS role', () => {
+  it.only('CGMD Config IRB role', () => {
 
-    login(cgccbs, cgccbspass);
+    login(cgcirb, cgcirbpass);
 
     // intercept APIs ที่ต้องรอ
     cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
     cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.intercept('POST', '**/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
     cy.intercept('GET', '**/api/flw-cfg-lov/getActiveFlagFlwApi/**').as('getActiveFlag');
 
-    // ทำ action ที่ทำให้ request เหล่านี้ถูกยิง
     cy.visit('/#/workspace-home/workspace');
 
     // รอและตรวจสอบ response
     cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
     cy.wait('@setUserOnline').its('response.statusCode').should('eq', 200);
-    cy.wait('@getCfgLovParam').its('response.statusCode').should('eq', 200);
     cy.wait('@getActiveFlag').its('response.statusCode').should('eq', 200);
 
     cy.contains('span', 'Menu').click();
@@ -850,31 +920,39 @@ describe('Mobile', () => {
     cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
 
     // คลิก Process tracking
-    cy.contains('a.dropdown-item', 'Process tracking', { timeout: 20000 })
-      .should('be.visible')
-      .click();
+    cy.get('a[href="#/new-report/home/tracking"]').click();
 
-   // จับ API หลัก
-cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+    // ตรวจสอบ URL เปลี่ยน
+    cy.url().should('include', '/new-report/home/tracking');
 
-// ตรวจสอบ URL เปลี่ยน
-cy.url().should('include', '/new-report/home/tracking');
+    // รอ table แสดงผล
+    cy.get('table.table.table-condensed', { timeout: 20000 })
+      .should('be.visible');
 
-// รอ API หลักโหลดเสร็จ
-cy.wait('@getBillingSystem', { timeout: 30000 })
-  .its('response.statusCode')
-  .should('eq', 200);
+    // optional: ตรวจสอบว่า table มีข้อมูล
+    cy.get('table.table.table-condensed tbody tr')
+      .should('have.length.greaterThan', 0);
 
-// รอ table แสดงผล
-cy.get('table.table.table-condensed', { timeout: 20000 })
-  .should('be.visible');
+    const projectName = 'Onetime_Main_0610_1721';
+    const assignee = 'cgcirb';
+    // const projectName = Cypress.env('projectName');
+    // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectName);
 
-// optional: ตรวจสอบว่า table มีข้อมูล
-cy.get('table.table.table-condensed tbody tr')
-  .should('have.length.greaterThan', 0);
+    assignTeamTask(projectName, assignee);
 
-      const formattedDate = 'Mob POST Reg 0409 0038';
-      // const projectName = Cypress.env('projectName');
-      // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectName);
+    cy.contains('span', 'Menu').click();
+
+    cy.wait(5000)
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // // คลิก Process tracking
+    // cy.get('a[href="#/workspace-home/workspace"]').click();
+
+    // // จับ API หลัก
+    // cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+
+    // approveProject(formattedDate);
   });
 });
