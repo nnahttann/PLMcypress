@@ -1,215 +1,28 @@
-const urlsit: string = Cypress.env('urlsit');
-const MKTpost: string = Cypress.env('MKTpost');
-const MKTpost1: string = Cypress.env('MKTpost1');
-const cks: string = Cypress.env('cks');
-const ckspass: string = Cypress.env('ckspass');
-const cgcirb: string = Cypress.env('cgcirb');
-const cgcirbpass: string = Cypress.env('cgcirbpass');
-
+import * as Master from '../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
   cy.window().then((win) => {
     win.sessionStorage.clear();
   });
-  cy.visit(urlsit);
+  cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
-// const verify = () => {
-//   const field: string[] = [
-//     '*PO Name', '*Project Name', '*Project Owner', '*Customer Type', '*Price Type', '*Customer Type', '*Price Type', '*Commercial Launch Date', '*Product Class', '*Recurring Fee Deduction', '*Expire Date', '*Promotion Level', '*Package Duration', 'Fixed Start Date', '*Share Plan', '*Package Bill Cycle', 'Fixed End Date', '*Prorate Package Fee', '*Bill Period', 'PO Type', '*NRTG/NGCM(WO1044)', '*Target Group', 'PO Type', '*NRTG/NGCM(WO1056)', '*NRTG/PHX(WO1054)', '*NRTG/PHX(WO1055)', 'Handset', 'Promotion Group', 'Promotion Sub Group', 'Remark', '*Multi Duration', '*Full Price Excluding VAT', '*Full Price Including VAT', 'Partial Step', '*Target Customer', '*Product Specification', 'Selling Location & Channel', 'Market Segment', 'SMS Wording', 'Special Condition', 'Retry Pattern', 'PO Relation', 'Commu Touch Point', 'Other Privilege', 'Charge Partner'
-//   ]
-//   field.forEach((field: string) => {
-//     cy.contains(field).should('be.visible');
-//   });
-// }
-const now = new Date();
-const formattedDate = `Mob POST Reg ${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
-
-const clamProject = (formattedDate: string): void => {
-  // รอ h3 โผล่มา
-  cy.get('h3', { timeout: 100000 }).contains('Unassigned Task')
-    .should('be.visible')
-    .parent()
-    .within(() => {
-
-      cy.get('tbody tr', { timeout: 60000 }).should('exist').each(($row: JQuery<HTMLElement>) => {
-        if ($row.text().includes(formattedDate)) {
-          cy.wrap($row)
-            .find('button.btn.btn-circle.btn-xs.btn-success.claim-top')
-            .should('be.visible')
-            .click();
-          return false;
-        }
-      });
-    });
-};
-
-export function assignTeamTask(taskIdentifier: string, assignee: string): void {
-  // cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
-
-  cy.window().then((win) => {
-    cy.stub(win, 'alert').as('alertStub');
-  });
-
-  cy.get('h3').contains('Team Task').should('be.visible');
-  // cy.wait('@postRequest').its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest').its('response.statusCode').should('eq', 200);
-  cy.log('✅ APIs for task list have loaded.');
-
-  cy.contains('tr', taskIdentifier).as('taskRow');
-
-  cy.get('@taskRow').within(() => {
-    cy.log(`➡️ Found task row for "${taskIdentifier}". Performing actions...`);
-
-    cy.get('select.form-control.input-sm').as('assigneeDropdown');
-
-    // ⭐ วิธีที่ 1: Click ที่ parent element หรือ container ของ select
-    cy.get('@assigneeDropdown').parent().click();
-
-    // หรือ ⭐ วิธีที่ 2: Simulate native browser interaction
-    cy.get('@assigneeDropdown').then(($select) => {
-      // Create และ dispatch mouse events
-      const selectElement = $select[0];
-
-      // MouseDown event (เหมือนกด mouse ลง)
-      const mouseDownEvent = new MouseEvent('mousedown', {
-        bubbles: true,
-        cancelable: true,
-        view: window
-      });
-      selectElement.dispatchEvent(mouseDownEvent);
-
-      // Focus event
-      const focusEvent = new FocusEvent('focus', {
-        bubbles: true,
-        cancelable: true
-      });
-      selectElement.dispatchEvent(focusEvent);
-    });
-
-    // รอ API
-    cy.wait('@getAssigneeList', { timeout: 10000 })
-      .its('response.statusCode')
-      .should('eq', 200);
-
-    cy.log('✅ Assignee list API loaded');
-
-    // รอให้ Angular render options
-    cy.wait(2000);
-
-    // Debug: ดู options หลัง API load
-    cy.get('@assigneeDropdown')
-      .find('option')
-      .each(($option: JQuery<HTMLOptionElement>) => {
-        cy.log(`📋 Option: "${$option.val()}" = "${$option.text().trim()}"`);
-      });
-
-    // รอจนกว่า option ที่ต้องการจะมี
-    cy.get('@assigneeDropdown')
-      .find(`option[value="${assignee}"]`, { timeout: 10000 })
-      .should('exist');
-
-    // Select
-    cy.get('@assigneeDropdown').select(assignee);
-    cy.get('@assigneeDropdown').should('have.value', assignee);
-
-    cy.log(`✅ Successfully selected: ${assignee}`);
-
-    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
-    cy.get('button[type="button"]').contains('Set').click();
-    cy.wait(50000)
-  });
-}
-//Claim Project CKS
-const ClaimProjectCKS = (formattedDate: string): void => {
-  cy.get('h3')
-    .contains('Unassigned Task', { timeout: 100000 })
-    .parent()
-    .within(() => {
-      // รอจนกว่ามีแถวจริง
-      cy.get('tbody tr').should(($rows) => {
-        expect(
-          $rows.text(),
-          'Table should not show loading text'
-        ).not.to.contain('Fetching data');
-      });
-
-      // ค่อยวนหา row
-      cy.get('tbody tr').each(($row) => {
-        cy.log('Row text:', $row.text());
-        if ($row.text().includes(formattedDate)) {
-          cy.wrap($row).find('button.claim-top').click();
-          return false;
-        }
-      });
-    });
-};
-
-const approveProject = (projectName: string): void => {
-  cy.get('h3').contains('To Do List').parent().within(() => {
-    cy.contains('tbody tr', projectName, { timeout: 100000 })
-      .should('be.visible')
-      .within(() => {
-        cy.get('span')
-          // .contains('Approve')
-          // .should('have.attr', 'style', 'color:green')
-          .should('be.visible')
-          .click();
-      });
-  });
-};
-
-const targetgroup = () => {
-  const optionsToSelect = [
-    // 'Change Charge Type (Convert)',
-    // 'Existing',
-    'New',
-    // 'Port In (Mobile Number Port)',
-    // 'Renew / Recall from Terminate'
-  ];
-
-  // Ensure the select element is visible
-  cy.get('select[formcontrolname="availableListBox"]')
-    .should('exist')
-    .and('be.visible');
-
-  // Select each option
-  optionsToSelect.forEach(option => {
-    cy.get('select[formcontrolname="availableListBox"]')
-      .contains('option', option)
-      .should('exist')
-      .and('be.visible')
-      .then($option => {
-        cy.wrap($option).dblclick(); // Click the option to select it
-      });
-  });
-}
-
-const login = (username: string, password: string): void => {
-  cy.get('input[name="userId"]').type(username);
-  cy.get('input[name="pwd"]').type(password);
-  cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll').as('getErrorCodes');
-  cy.get(':nth-child(4) > .btn').click();
-  cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
-}
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
     //Logib
-    login(MKTpost, MKTpost1);
+    // Master.login(MKTpost, MKTpost1);
+    Master.login(Master.MKTpost, Master.MKTpost1);
 
     // create New Project
     cy.get('.col-md-10 > .btn').should('be.visible').click();
 
-    cy.log(formattedDate);
+    cy.log(Master.formattedDate);
     //Projectname
-    cy.get('input[formcontrolname="projectName"]').type(formattedDate);
+    cy.get('input[formcontrolname="projectName"]').type(Master.formattedDate);
 
-    Cypress.env('projectName', formattedDate);
+    Cypress.env('projectName', Master.formattedDate);
 
     // Date
     const date = new Date();
@@ -243,11 +56,11 @@ describe('Mobile', () => {
     // Button Add Project 
     cy.get(':nth-child(4) > .btn').click();
 
-    const formattedDatePONAME = `Onetime_Main_${String(now.getDate()).padStart(2, '0')}${String(now.getMonth() + 1).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`;
+    const formattedDatePONAME = `Onetime_Main_${String(Master.now.getDate()).padStart(2, '0')}${String(Master.now.getMonth() + 1).padStart(2, '0')}_${String(Master.now.getHours()).padStart(2, '0')}${String(Master.now.getMinutes()).padStart(2, '0')}`;
 
     // PO Name 
     cy.get('input[formcontrolname="productName"]').type(formattedDatePONAME);
-
+    Cypress.env('formattedDatePONAME', formattedDatePONAME);
     //PO Sub group
     // Product Offering
     cy.get('select[formcontrolname="promotionSubGroupFrom"]').select('Product Offering').should('have.value', 'Product Offering');;
@@ -341,7 +154,7 @@ describe('Mobile', () => {
     cy.get('.col-md-6 > .btn').click();
 
     //*Target group
-    targetgroup();
+    Master.targetgroup();
 
     //ProductSpec
     const optionsToSelectProductSpec = [
@@ -622,9 +435,10 @@ describe('Mobile', () => {
       cy.wait(5000)
 
       //Find Project Unassigned Task and clam Project
-      clamProject(formattedDate);
+      Master.clamProject(Master.formattedDate);
       // Find the "To Do List" section
-      approveProject(formattedDate);
+      // approveProject(formattedDate);
+      Master.approveProject(Master.formattedDate);
 
       // Intercept all GET and POST requests
       cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
@@ -688,9 +502,9 @@ describe('Mobile', () => {
       cy.wait(['@getRequest', '@postRequest'], { timeout: 100000 });
     });
   });
-  it('cks role', () => {
+  it('CKS role', () => {
 
-    login(cks, ckspass);
+    Master.login(Master.cks, Master.ckspass);
 
     // ดักจับและรอให้ API อื่น ๆ เสร็จสิ้น
     cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
@@ -706,11 +520,11 @@ describe('Mobile', () => {
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectName);
 
     //  ClaimProjectCKS from Unassigned Task
-    ClaimProjectCKS(formattedDate);
+    Master.ClaimProjectCKS(Master.formattedDate);
 
     // Find the "To Do List" section
     cy.wait(5000);
-    approveProject(formattedDate);
+    Master.approveProject(Master.formattedDate);
 
     // intercept API 
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
@@ -841,11 +655,11 @@ describe('Mobile', () => {
     cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
     cy.wait(5000)
 
-    ClaimProjectCKS(formattedDate);
+    Master.ClaimProjectCKS(Master.formattedDate);
 
     // Find the "To Do List" section
     cy.wait(5000);
-    approveProject(formattedDate);
+    Master.approveProject(Master.formattedDate);
 
     // รอให้ URL เปลี่ยนก่อน
     cy.url({ timeout: 30000 }).should('include', '/#/new-flow/home/newcks/cks-checker');
@@ -896,21 +710,18 @@ describe('Mobile', () => {
     // cy.wait(['@getRequest', '@postRequest'], { timeout: 100000 });
 
   });
-  it.only('CGMD Config IRB role', () => {
+  it('CGMD Config IRB role', () => {
 
-    login(cgcirb, cgcirbpass);
+    Master.login(Master.cgcirb, Master.cgcirbpass);
 
     // intercept APIs ที่ต้องรอ
     cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
     cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.intercept('GET', '**/api/flw-cfg-lov/getActiveFlagFlwApi/**').as('getActiveFlag');
-
     cy.visit('/#/workspace-home/workspace');
 
     // รอและตรวจสอบ response
     cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
     cy.wait('@setUserOnline').its('response.statusCode').should('eq', 200);
-    cy.wait('@getActiveFlag').its('response.statusCode').should('eq', 200);
 
     cy.contains('span', 'Menu').click();
 
@@ -925,20 +736,20 @@ describe('Mobile', () => {
     // ตรวจสอบ URL เปลี่ยน
     cy.url().should('include', '/new-report/home/tracking');
 
+
     // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 })
-      .should('be.visible');
+    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
 
     // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr')
-      .should('have.length.greaterThan', 0);
+    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
 
-    const projectName = 'Onetime_Main_0610_1721';
+    // const taskIdentifier = 'Onetime_Main_0910_0951';
+    const projectNamePONAME = Cypress.env('formattedDatePONAME');
+    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
     const assignee = 'cgcirb';
-    // const projectName = Cypress.env('projectName');
-    // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectName);
 
-    assignTeamTask(projectName, assignee);
+    Master.assignTeamTask(projectNamePONAME, assignee);
+    cy.wait(10000)
 
     cy.contains('span', 'Menu').click();
 
@@ -947,12 +758,202 @@ describe('Mobile', () => {
     // ก่อนกดเมนู set intercept
     cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
 
-    // // คลิก Process tracking
-    // cy.get('a[href="#/workspace-home/workspace"]').click();
+    // คลิก Process tracking
+    cy.get('a[href="#/workspace-home/workspace"]').click();
 
-    // // จับ API หลัก
-    // cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+    cy.url().should('include', '/workspace-home/workspace');
 
-    // approveProject(formattedDate);
+    // จับ API หลัก
+    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+    cy.wait(10000)
+    Master.approveProjectCGMD(projectNamePONAME);
+
+    // Click ปุ่ม Approve To CGMD
+    cy.contains('button', 'Approve To CGMD', { timeout: 30000 })
+      .should('be.visible')
+      .click();
+
+    cy.contains('button', 'Yes')
+      .should('be.visible')
+      .click();
+
+
+    // verify alert
+    cy.on('window:alert', (txt) => {
+      expect(txt).to.contain('Approve and Send Mail Notify Success');
+    });
+
+    // verify redirect กลับ workspace
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+    // Click the Logout button
+    cy.contains('button', 'Logout')
+      .should('be.visible')
+      .click();
+
+    // Wait for the URL to change to the login page
+    cy.url().should('include', '/login');
+  });
+  it('CGMD Tester IRB role', () => {
+
+    Master.login(Master.cgtirb, Master.cgtirbpass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+    cy.visit('/#/workspace-home/workspace');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+
+    cy.contains('span', 'Menu').click();
+
+    cy.wait(5000)
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // คลิก Process tracking
+    cy.get('a[href="#/new-report/home/tracking"]').click();
+
+    // ตรวจสอบ URL เปลี่ยน
+    cy.url().should('include', '/new-report/home/tracking');
+
+
+    // รอ table แสดงผล
+    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
+
+    // optional: ตรวจสอบว่า table มีข้อมูล
+    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
+
+    // const taskIdentifier = 'Onetime_Main_0610_2318';
+
+    const projectNamePONAME = Cypress.env('formattedDatePONAME');
+    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    const assignee = 'cgtirb';
+
+    Master.assignTeamTask(projectNamePONAME, assignee);
+    cy.wait(10000)
+
+    cy.contains('span', 'Menu').click();
+
+    cy.wait(5000)
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // คลิก Process tracking
+    cy.get('a[href="#/workspace-home/workspace"]').click();
+
+    cy.url().should('include', '/workspace-home/workspace');
+
+    // จับ API หลัก
+    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+    cy.wait(10000)
+    Master.approveProjectCGMDtester(projectNamePONAME);
+
+    // Click ปุ่ม Approve To CGMD
+    cy.contains('button', 'Promote to ACTM', { timeout: 30000 })
+      .should('be.visible')
+      .click();
+
+    cy.contains('button', 'Yes')
+      .should('be.visible')
+      .click();
+
+
+    // verify alert
+    cy.on('window:alert', (txt) => {
+      expect(txt).to.contain('Approve and Send Mail Notify Success');
+    });
+
+    // verify redirect กลับ workspace
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+    // Click the Logout button
+    cy.contains('button', 'Logout')
+      .should('be.visible')
+      .click();
+
+    // Wait for the URL to change to the login page
+    cy.url().should('include', '/login');
+  });
+  it('ACTM role', () => {
+
+    Master.login(Master.actm, Master.actmpass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+
+    // const taskIdentifier = 'Onetime_Main_3009_1126';
+    const projectNamePONAME = Cypress.env('formattedDatePONAME');
+    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    Master.approveProjectCGMDACTM(projectNamePONAME );
+
+    cy.wait(5000)
+
+    // Click ปุ่ม Approve To CGMD
+    cy.get(':nth-child(3) > :nth-child(4)').click();
+
+    // cy.contains('button', 'Yes')
+    //   .should('be.visible')
+    //   .click();
+    // verify alert
+    cy.on('window:alert', (txt) => {
+      expect(txt).to.contain('Approve and Send Mail Notify Success');
+    });
+
+    // verify redirect กลับ workspace
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+    // Click the Logout button
+    cy.contains('button', 'Logout')
+      .should('be.visible')
+      .click();
+
+    // Wait for the URL to change to the login page
+    cy.url().should('include', '/login');
+  });
+  it('OPER role', () => {
+
+    Master.login(Master.oper, Master.operpass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+
+    // const taskIdentifier = 'Onetime_Main_3009_1126';
+    const projectNamePONAME = Cypress.env('formattedDatePONAME');
+    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    Master.approveProjectCGMDOPER(projectNamePONAME );
+    cy.wait(5000)
+
+    // Click ปุ่ม Approve To PreGolive
+
+    cy.get('.col-md-6 > :nth-child(3)').click();
+
+    // cy.contains('button', 'Yes')
+    //   .should('be.visible')
+    //   .click();
+    // verify alert
+    cy.on('window:alert', (txt) => {
+      expect(txt).to.contain('Approve and Send Mail Notify Success');
+    });
+
+    // verify redirect กลับ workspace
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+    // Click the Logout button
+    cy.contains('button', 'Logout')
+      .should('be.visible')
+      .click();
+
+    // Wait for the URL to change to the login page
+    cy.url().should('include', '/login');
   });
 });
+
