@@ -3,12 +3,14 @@
     "strict": true,
     "target": "ES6",
     "module": "CommonJS",
+    "forceConsistentCasingInFileNames": true,
     "lib": [
       "es2017",
-      "dom"
+      "dom",
+      "es5"
     ],
     "types": [
-      "cypress"
+      "cypress", "node"
     ]
   },
   "include": [
