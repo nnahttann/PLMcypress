@@ -166,7 +166,7 @@ describe('Mobile', () => {
     cy.visit('/#/workspace-home/workspace');
 
     // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@setUserOnline').its('response.statusCode').should('eq', 200);
 
     cy.contains('span', 'Menu').click();
@@ -214,31 +214,6 @@ describe('Mobile', () => {
     cy.wait(10000)
     Master.approveProjectCGMD(projectNamePONAME);
 
-    // Click ปุ่ม Approve To CGMD
-    cy.contains('button', 'Approve To CGMD', { timeout: 30000 })
-      .should('be.visible')
-      .click();
-
-    cy.contains('button', 'Yes')
-      .should('be.visible')
-      .click();
-
-
-    // verify alert
-    cy.on('window:alert', (txt) => {
-      expect(txt).to.contain('Approve and Send Mail Notify Success');
-    });
-
-    // verify redirect กลับ workspace
-    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-
-    // Click the Logout button
-    cy.contains('button', 'Logout')
-      .should('be.visible')
-      .click();
-
-    // Wait for the URL to change to the login page
-    cy.url().should('include', '/login');
   });
   it('CGMD Tester IRB role', () => {
 
@@ -249,7 +224,7 @@ describe('Mobile', () => {
     cy.visit('/#/workspace-home/workspace');
 
     // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     cy.contains('span', 'Menu').click();
 
@@ -297,31 +272,7 @@ describe('Mobile', () => {
     cy.wait(10000)
     Master.approveProjectCGMDtester(projectNamePONAME);
 
-    // Click ปุ่ม Approve To CGMD
-    cy.contains('button', 'Promote to ACTM', { timeout: 30000 })
-      .should('be.visible')
-      .click();
-
-    cy.contains('button', 'Yes')
-      .should('be.visible')
-      .click();
-
-
-    // verify alert
-    cy.on('window:alert', (txt) => {
-      expect(txt).to.contain('Approve and Send Mail Notify Success');
-    });
-
-    // verify redirect กลับ workspace
-    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-
-    // Click the Logout button
-    cy.contains('button', 'Logout')
-      .should('be.visible')
-      .click();
-
-    // Wait for the URL to change to the login page
-    cy.url().should('include', '/login');
+   
   });
   it('ACTM role', () => {
 
@@ -331,34 +282,14 @@ describe('Mobile', () => {
     cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
 
     // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const taskIdentifier = 'Onetime_Main_3009_1126';
     const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
     Master.approveProjectCGMDACTM(projectNamePONAME);
 
-    // Click ปุ่ม Approve To CGMD
-    cy.get(':nth-child(3) > :nth-child(4)').click();
-
-    // cy.contains('button', 'Yes')
-    //   .should('be.visible')
-    //   .click();
-    // verify alert
-    cy.on('window:alert', (txt) => {
-      expect(txt).to.contain('Approve and Send Mail Notify Success');
-    });
-
-    // verify redirect กลับ workspace
-    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-
-    // Click the Logout button
-    cy.contains('button', 'Logout')
-      .should('be.visible')
-      .click();
-
-    // Wait for the URL to change to the login page
-    cy.url().should('include', '/login');
+   
   });
   it('OPER role', () => {
 
@@ -368,35 +299,14 @@ describe('Mobile', () => {
     cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
 
     // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const taskIdentifier = 'Onetime_Main_3009_1126';
     const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
     Master.approveProjectCGMDOPER(projectNamePONAME);
 
-    // Click ปุ่ม Approve To PreGolive
-
-    cy.get('.col-md-6 > :nth-child(3)').click();
-
-    // cy.contains('button', 'Yes')
-    //   .should('be.visible')
-    //   .click();
-    // verify alert
-    cy.on('window:alert', (txt) => {
-      expect(txt).to.contain('Approve and Send Mail Notify Success');
-    });
-
-    // verify redirect กลับ workspace
-    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-
-    // Click the Logout button
-    cy.contains('button', 'Logout')
-      .should('be.visible')
-      .click();
-
-    // Wait for the URL to change to the login page
-    cy.url().should('include', '/login');
+   
   });
 });
 

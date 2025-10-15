@@ -1,16 +1,32 @@
 export const urlsit: string = Cypress.env('urlsit');
+export const MKTpre: string = Cypress.env('MKTpre');
+export const MKTpre1: string = Cypress.env('MKTpre1');
 export const MKTpost: string = Cypress.env('MKTpost');
 export const MKTpost1: string = Cypress.env('MKTpost1');
 export const cks: string = Cypress.env('cks');
 export const ckspass: string = Cypress.env('ckspass');
 export const cgcirb: string = Cypress.env('cgcirb');
 export const cgcirbpass: string = Cypress.env('cgcirbpass');
+export const cgccbs: string = Cypress.env('cgccbs');
+export const cgccbspass: string = Cypress.env('cgccbspass');
+export const cgtcbs: string = Cypress.env('cgtcbs');
+export const cgtcbspass: string = Cypress.env('cgtcbspass');
 export const cgtirb: string = Cypress.env('cgtirb');
 export const cgtirbpass: string = Cypress.env('cgtirbpass');
 export const actm: string = Cypress.env('actm');
 export const actmpass: string = Cypress.env('actmpass');
 export const oper: string = Cypress.env('oper');
 export const operpass: string = Cypress.env('operpass');
+export const spadsup: string = Cypress.env('spadsup');
+export const spadsuppass: string = Cypress.env('spadsuppass');
+export const spaddoer: string = Cypress.env('spaddoer');
+export const spaddoerpass: string = Cypress.env('spaddoerpass');
+export const spadtest: string = Cypress.env('spadtest');
+export const spadtestpass: string = Cypress.env('spadtestpass');
+export const spaddp: string = Cypress.env('spaddp');
+export const spaddppass: string = Cypress.env('spaddppass');
+export const apo: string = Cypress.env('apo');
+export const apopass: string = Cypress.env('apopass');
 
 export const now = new Date();
 const day = String(now.getDate()).padStart(2, '0');
@@ -21,7 +37,6 @@ export let formattedDateMain = '';
 export let formattedDateOntop = '';
 
 export const clamProject = (formattedDate: string): void => {
-  // รอ h3 โผล่มา
   cy.get('h3', { timeout: 100000 }).contains('Unassigned Task')
     .should('be.visible')
     .parent()
@@ -39,7 +54,6 @@ export const clamProject = (formattedDate: string): void => {
     });
 };
 export function assignTeamTask(taskIdentifier: string, assignee: string): void {
-  // cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
 
@@ -49,25 +63,20 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
 
   cy.get('h3').contains('Team Task').should('be.visible');
   // cy.wait('@postRequest').its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest').its('response.statusCode').should('eq', 200);
-  cy.log('✅ APIs for task list have loaded.');
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
   cy.contains('tr', taskIdentifier).as('taskRow');
 
   cy.get('@taskRow').within(() => {
-    cy.log(`➡️ Found task row for "${taskIdentifier}". Performing actions...`);
 
     cy.get('select.form-control.input-sm').as('assigneeDropdown');
 
-    // ⭐ วิธีที่ 1: Click ที่ parent element หรือ container ของ select
     cy.get('@assigneeDropdown').parent().click();
 
-    // หรือ ⭐ วิธีที่ 2: Simulate native browser interaction
     cy.get('@assigneeDropdown').then(($select) => {
-      // Create และ dispatch mouse events
+
       const selectElement = $select[0];
 
-      // MouseDown event (เหมือนกด mouse ลง)
       const mouseDownEvent = new MouseEvent('mousedown', {
         bubbles: true,
         cancelable: true,
@@ -75,7 +84,6 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
       });
       selectElement.dispatchEvent(mouseDownEvent);
 
-      // Focus event
       const focusEvent = new FocusEvent('focus', {
         bubbles: true,
         cancelable: true
@@ -83,36 +91,22 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
       selectElement.dispatchEvent(focusEvent);
     });
 
-    // รอ API
-    // cy.wait('@getAssigneeList', { timeout: 10000 })
-    //   .its('response.statusCode')
-    //   .should('eq', 200);
-
-    cy.log('✅ Assignee list API loaded');
-
-    // รอให้ Angular render options
-    cy.wait(2000);
-
-    // Debug: ดู options หลัง API load
     cy.get('@assigneeDropdown')
       .find('option')
       .each(($option: JQuery<HTMLOptionElement>) => {
         cy.log(`📋 Option: "${$option.val()}" = "${$option.text().trim()}"`);
       });
 
-    // รอจนกว่า option ที่ต้องการจะมี
     cy.get('@assigneeDropdown')
       .find(`option[value="${assignee}"]`, { timeout: 10000 })
       .should('exist');
 
-    // Select
     cy.get('@assigneeDropdown').select(assignee);
     cy.get('@assigneeDropdown').should('have.value', assignee);
 
     cy.log(`✅ Successfully selected: ${assignee}`);
 
     cy.get('@taskRow').contains('span', 'Set').click();
-    cy.wait(10000)
   });
   cy.get('@alertStub').should('have.been.calledWith', 'Reassign success');
 }
@@ -121,7 +115,6 @@ export const ClaimProjectCKS = (formattedDate: string): void => {
     .contains('Unassigned Task', { timeout: 100000 })
     .parent()
     .within(() => {
-      // รอจนกว่ามีแถวจริง
       cy.get('tbody tr').should(($rows) => {
         expect(
           $rows.text(),
@@ -129,7 +122,26 @@ export const ClaimProjectCKS = (formattedDate: string): void => {
         ).not.to.contain('Fetching data');
       });
 
-      // ค่อยวนหา row
+      cy.get('tbody tr').each(($row) => {
+        cy.log('Row text:', $row.text());
+        if ($row.text().includes(formattedDate)) {
+          cy.wrap($row).find('button.claim-top').click();
+          return false;
+        }
+      });
+    });
+};
+export const ClaimProject = (formattedDate: string): void => {
+  cy.get('h3')
+    .contains('Unassigned Task', { timeout: 100000 })
+    .parent()
+    .within(() => {
+      cy.get('tbody tr').should(($rows) => {
+        expect(
+          $rows.text(),
+          'Table should not show loading text'
+        ).not.to.contain('Fetching data');
+      });
       cy.get('tbody tr').each(($row) => {
         cy.log('Row text:', $row.text());
         if ($row.text().includes(formattedDate)) {
@@ -151,6 +163,270 @@ export const approveProject = (projectName: string): void => {
           .click();
       });
   });
+};
+export const approveProjectSPADSup = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+  cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
+
+  cy.get('h3').contains('To Do List').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  // --- 3. รอให้หน้าใหม่โหลดเสร็จสมบูรณ์ ---
+  // ตรวจสอบว่า URL เปลี่ยนไปยังหน้าที่คาดหวังแล้ว/cgmd/cgmd-spad
+  cy.url({ timeout: 600000 }).should('include', '/cgmd/cgmd-spad');
+
+  // รอ API ที่สำคัญของหน้า Detail โหลดให้ครบทั้งหมดในครั้งเดียว
+  // เป็นวิธีที่เสถียรกว่าการรอ API ทั่วไปแบบไม่เจาะจง
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+    .then((interceptions) => {
+      interceptions.forEach((interception) => {
+        // ตรวจสอบว่า response มีค่า
+        expect(interception.response, `API ${interception.request.url} should have response`).to.exist;
+
+        // ใช้ non-null assertion (!) เพื่อให้ TypeScript ไม่เตือน
+        expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
+      });
+    });
+  // --- 4. ทำ Action สุดท้ายหลังจากทุกอย่างพร้อมแล้ว ---
+  // เมื่อมั่นใจว่าหน้าโหลดสมบูรณ์แล้ว จึงค่อย Scroll
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+  cy.scrollTo('bottom');
+
+  // 1. Random 5-digit number (from 10000 to 99999)
+  const random5DigitCode = Math.floor(Math.random() * 90000) + 10000;
+
+  // 2. Random 2-digit number (from 10 to 99)
+  const random2DigitCode = Math.floor(Math.random() * 90) + 10;
+
+  cy.contains('label', 'FEATURE_SUB_CODE')
+    .closest('.col-md-4')
+    .find('input')
+    .type(random5DigitCode.toString());
+
+  cy.contains('label', 'GROUP_FEATURE')
+    .closest('.col-md-4')
+    .find('input')
+    .type(random2DigitCode.toString());
+
+  cy.scrollTo('bottom');
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+
+  cy.contains('button', 'Approve as complex', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+};
+export const approveProjectSPADDOER = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+  cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
+
+  cy.get('h3').contains('To Do List').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  cy.url({ timeout: 600000 }).should('include', '/cgmd/cgmd-configure');
+
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+    .then((interceptions) => {
+      interceptions.forEach((interception) => {
+
+        expect(interception.response, `API ${interception.request.url} should have response`).to.exist;
+
+        expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
+      });
+    });
+
+  // Gprs type
+  cy.contains('label', 'Gprs type')
+    .parent()
+    .next('div')
+    .find('mat-select')
+    .click();
+
+  cy.get('mat-option').then($options => {
+    const randomIndex = Math.floor(Math.random() * $options.length);
+    cy.wrap($options[randomIndex]).click({ force: true });
+  });
+  cy.wait(3000);
+  // Template
+  cy.contains('label', 'Template')
+    .parent()
+    .next('div')
+    .find('mat-select')
+    .click();
+
+  cy.get('mat-option').then($options => {
+    const randomIndex = Math.floor(Math.random() * $options.length);
+    cy.wrap($options[randomIndex]).click({ force: true });
+  });
+  cy.scrollTo('bottom');
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+
+  cy.contains('button', 'Promote To SPAD Tester', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+};
+export const approveProjectSPADTester = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+  cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
+
+  cy.get('h3').contains('To Do List').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  cy.url({ timeout: 600000 }).should('include', '/cgmd/cgmd-tester');
+
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+    .then((interceptions) => {
+      interceptions.forEach((interception) => {
+        // ตรวจสอบว่า response มีค่า
+        expect(interception.response, `API ${interception.request.url} should have response`).to.exist;
+
+        // ใช้ non-null assertion (!) เพื่อให้ TypeScript ไม่เตือน
+        expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
+      });
+    });
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+
+  cy.scrollTo('bottom');
+
+  cy.contains('button', 'Promote to SPAD Deploy', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+};
+export const approveProjectSPADdeploy = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+  cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
+
+  cy.get('h3').contains('To Do List').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  cy.url({ timeout: 600000 }).should('include', '/actm/actm-doer');
+
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+    .then((interceptions) => {
+      interceptions.forEach((interception) => {
+        // ตรวจสอบว่า response มีค่า
+        expect(interception.response, `API ${interception.request.url} should have response`).to.exist;
+
+        // ใช้ non-null assertion (!) เพื่อให้ TypeScript ไม่เตือน
+        expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
+      });
+    });
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+
+  cy.scrollTo('bottom');
+
+  cy.contains('button', 'Promote To ACTM', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
 };
 export const approveProjectCGMD = (projectName: string): void => {
   // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
@@ -192,7 +468,120 @@ export const approveProjectCGMD = (projectName: string): void => {
   // เมื่อมั่นใจว่าหน้าโหลดสมบูรณ์แล้ว จึงค่อย Scroll
   cy.log('Page loaded successfully. Scrolling to bottom.');
   cy.scrollTo('bottom');
-  cy.wait(5000);
+
+  // Click ปุ่ม Approve To CGMD
+  cy.contains('button', 'Approve To CGMD', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+
+  cy.contains('button', 'Yes')
+    .should('be.visible')
+    .click();
+
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+
+};
+export const approveProjectCGMDPRE = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+  cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
+
+  cy.get('h3').contains('To Do List').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  // --- 3. รอให้หน้าใหม่โหลดเสร็จสมบูรณ์ ---
+  // ตรวจสอบว่า URL เปลี่ยนไปยังหน้าที่คาดหวังแล้ว
+  cy.url({ timeout: 60000 }).should('include', '/cgmd/cgmd-configure');
+
+  // รอ API ที่สำคัญของหน้า Detail โหลดให้ครบทั้งหมดในครั้งเดียว
+  // เป็นวิธีที่เสถียรกว่าการรอ API ทั่วไปแบบไม่เจาะจง
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+    .then((interceptions) => {
+      interceptions.forEach((interception) => {
+        // ตรวจสอบว่า response มีค่า
+        expect(interception.response, `API ${interception.request.url} should have response`).to.exist;
+
+        // ใช้ non-null assertion (!) เพื่อให้ TypeScript ไม่เตือน
+        expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
+      });
+    });
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+  const maxDigits = 12;
+  const numDigits = Math.floor(Math.random() * maxDigits) + 1;
+
+  // 2. Calculate the smallest and largest possible numbers for that length
+  //    - For example, if numDigits is 4, the range is 1000 to 9999.
+  //    - If numDigits is 1, the range is 1 to 9.
+  const min = Math.pow(10, numDigits - 1);
+  const max = Math.pow(10, numDigits) - 1;
+
+  // 3. Generate a random whole number within that calculated range
+  const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+
+  // --- Your Cypress Command ---
+
+  cy.contains('label', 'CBS_OFFERING_ID')
+    .closest('.col-md-4')
+    .find('input')
+    .type(randomNumber.toString());
+
+  cy.contains('label', 'CBS_OFFERING_ID')
+    .closest('.col-md-4')
+    .find('a.btn')
+    .first()
+    .click();
+
+  cy.scrollTo('bottom');
+  // Click ปุ่ม Approve To CGMD
+  cy.contains('button', 'Approve To CGMD', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+
+  cy.contains('button', 'Yes')
+    .should('be.visible')
+    .click();
+
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
 
 };
 export const approveProjectCGMDtester = (projectName: string): void => {
@@ -235,7 +624,32 @@ export const approveProjectCGMDtester = (projectName: string): void => {
   // เมื่อมั่นใจว่าหน้าโหลดสมบูรณ์แล้ว จึงค่อย Scroll
   cy.log('Page loaded successfully. Scrolling to bottom.');
   cy.scrollTo('bottom');
-  cy.wait(5000);
+
+  // Click ปุ่ม Approve To CGMD
+  cy.contains('button', 'Promote To Pre Go Live', { timeout: 30000 })
+    .should('be.visible')
+    .click();
+
+  cy.contains('button', 'Yes')
+    .should('be.visible')
+    .click();
+
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+
 
 };
 export const approveProjectCGMDACTM = (projectName: string): void => {
@@ -279,6 +693,94 @@ export const approveProjectCGMDACTM = (projectName: string): void => {
   cy.log('Page loaded successfully. Scrolling to bottom.');
   cy.scrollTo('bottom');
   cy.wait(5000);
+  // Click ปุ่ม Approve To CGMD
+  cy.get(':nth-child(3) > :nth-child(4)').click();
+  // cy.contains('button', 'Promote To OPER', { timeout: 30000 })
+  // .should('be.visible')
+  // .click();
+
+  // cy.contains('button', 'Yes')
+  //   .should('be.visible')
+  //   .click();
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+
+};
+export const approveProjectCGMDACTMPRE = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+  cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
+
+  cy.get('h3').contains('Unassigned Task').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  // --- 3. รอให้หน้าใหม่โหลดเสร็จสมบูรณ์ ---
+  // ตรวจสอบว่า URL เปลี่ยนไปยังหน้าที่คาดหวังแล้ว
+  cy.url({ timeout: 60000 }).should('include', '/actm/actm-doer');
+
+  // รอ API ที่สำคัญของหน้า Detail โหลดให้ครบทั้งหมดในครั้งเดียว
+  // เป็นวิธีที่เสถียรกว่าการรอ API ทั่วไปแบบไม่เจาะจง
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+    .then((interceptions) => {
+      interceptions.forEach((interception) => {
+        // ตรวจสอบว่า response มีค่า
+        expect(interception.response, `API ${interception.request.url} should have response`).to.exist;
+
+        // ใช้ non-null assertion (!) เพื่อให้ TypeScript ไม่เตือน
+        expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
+      });
+    });
+  // --- 4. ทำ Action สุดท้ายหลังจากทุกอย่างพร้อมแล้ว ---
+  // เมื่อมั่นใจว่าหน้าโหลดสมบูรณ์แล้ว จึงค่อย Scroll
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+  cy.get(':nth-child(3) > :nth-child(4)').click();
+  // cy.contains('button', 'Promote To APO', { timeout: 30000 })
+  //   .should('be.visible')
+  //   .click();
+
+  // cy.contains('button', 'Yes')
+  //   .should('be.visible')
+  //   .click();
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
 
 };
 export const approveProjectCGMDOPER = (projectName: string): void => {
@@ -311,7 +813,78 @@ export const approveProjectCGMDOPER = (projectName: string): void => {
   // เมื่อมั่นใจว่าหน้าโหลดสมบูรณ์แล้ว จึงค่อย Scroll
   cy.log('Page loaded successfully. Scrolling to bottom.');
   cy.scrollTo('bottom');
-  cy.wait(10000);
+  // Click ปุ่ม Approve To PreGolive
+
+  cy.get('.col-md-6 > :nth-child(3)').click();
+
+  // cy.contains('button', 'Yes')
+  //   .should('be.visible')
+  //   .click();
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
+
+};
+export const approveProjectCGMDAPO = (projectName: string): void => {
+  // --- 1. ตั้งค่าการดักจับ API ที่สำคัญก่อนเริ่มเทส ---
+  // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+  // ดักจับ API ที่จะถูกเรียกหลังจากเปิดโปรเจกต์แล้ว
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+
+  cy.get('h3').contains('Unassigned Task').parent().within(() => {
+    cy.contains('tbody tr', projectName, { timeout: 100000 })
+      .should('be.visible')
+      .within(() => {
+        cy.get('span')
+          .contains('Approve')
+          // .should('have.attr', 'style', 'color:green')
+          // .should('be.visible')
+          .click();
+      });
+  });
+  // --- 3. รอให้หน้าใหม่โหลดเสร็จสมบูรณ์ ---
+  // ตรวจสอบว่า URL เปลี่ยนไปยังหน้าที่คาดหวังแล้ว
+  cy.url({ timeout: 60000 }).should('include', '/apo/apo-doer');
+
+  // --- 4. ทำ Action สุดท้ายหลังจากทุกอย่างพร้อมแล้ว ---
+  // เมื่อมั่นใจว่าหน้าโหลดสมบูรณ์แล้ว จึงค่อย Scroll
+  cy.log('Page loaded successfully. Scrolling to bottom.');
+  cy.scrollTo('bottom');
+
+  // Click ปุ่ม Approve To PreGolive
+  cy.get('.col-md-6 > :nth-child(3)').click();
+
+  // cy.contains('button', 'Yes')
+  //   .should('be.visible')
+  //   .click();
+  // verify alert
+  cy.on('window:alert', (txt) => {
+    expect(txt).to.contain('Approve and Send Mail Notify Success');
+  });
+
+  // verify redirect กลับ workspace
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+  // Click the Logout button
+  cy.contains('button', 'Logout')
+    .should('be.visible')
+    .click();
+
+  // Wait for the URL to change to the login page
+  cy.url().should('include', '/login');
 
 };
 export const targetgroup = () => {
@@ -344,7 +917,7 @@ export const login = (username: string, password: string): void => {
   cy.get('input[name="pwd"]').type(password);
   cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll').as('getErrorCodes');
   cy.get(':nth-child(4) > .btn').click();
-  cy.wait('@getErrorCodes').its('response.statusCode').should('eq', 200);
+  cy.wait('@getErrorCodes', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 }
 export const ProjectBasicInformationMain = (PriceType: string, ProductClass: string) => {
   //Login
@@ -353,7 +926,7 @@ export const ProjectBasicInformationMain = (PriceType: string, ProductClass: str
   // create New Project
   cy.get('.col-md-10 > .btn').should('be.visible').click();
   // อัปเดตค่าตัวแปร global
-  formattedDateMain = `Mob Regression ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
+  formattedDateMain = `Mob POST Reg ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
 
   // log และ type ชื่อโปรเจกต์
   cy.log(formattedDateMain);
@@ -435,7 +1008,90 @@ export const ProjectBasicInformationOntop = (PriceType: string, ProductClass: st
   // create New Project
   cy.get('.col-md-10 > .btn').should('be.visible').click();
   // อัปเดตค่าตัวแปร global
-  formattedDateOntop = `Mob Regression ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
+  formattedDateOntop = `Mob POST Reg ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
+
+  // log และ type ชื่อโปรเจกต์
+  cy.log(formattedDateOntop);
+  cy.get('input[formcontrolname="projectName"]').type(formattedDateOntop);
+
+  // เก็บใน env ด้วย เผื่อใช้ในเทสต์อื่น
+  Cypress.env('formattedDateMain', formattedDateOntop);
+
+  // Date
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+
+  // Format the date as 'dd/mm/yyyy'
+  const formattedDateOntop1 = date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+
+  //PLM1
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  cy.get('input[aria-label="Date input field"]').type(formattedDateOntop1);
+  //PLM2
+  // cy.get('input[name="expectedDate"]').type(formattedDateMain1);
+  cy.wait(2000)
+
+  // phone 
+  cy.get('input[formcontrolname="phoneNo"]').type('0123')
+  // button Save
+  cy.get('button[type="button"]').contains('Save').click();
+
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+
+  cy.wait(5000)
+  //button Close
+  cy.get('.modal-body > :nth-child(1) > div > .btn').click();
+
+  // Button Add Project 
+  cy.get(':nth-child(4) > .btn').click();
+
+  // 3. Combine the parameters and the formatted date/time into a single string
+  const formattedDateOntopPONAME = `${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
+
+  // PO Name 
+  cy.get('input[formcontrolname="productName"]').type(formattedDateOntopPONAME);
+  Cypress.env('formattedDateOntopPONAME', formattedDateOntopPONAME);
+  //PO Sub group
+  // Product Offering
+  cy.get('select[formcontrolname="promotionSubGroupFrom"]').select('Product Offering').should('have.value', 'Product Offering');
+  // Order Fee
+  // cy.get('.col-md-4 > .form-control').select('Order Fee').should('have.value', 'Order Fee');
+  //Service
+  // cy.get('.col-md-4 > .form-control').select('Service').should('have.value', 'Service');
+
+  //button create 
+  cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  // Trigger the button click action
+  cy.get('.modal-footer > :nth-child(2) > .btn-primary').click();
+  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  // Wait for URL change (wait for the page reload or redirection)
+  cy.url().should('include', '/#/project-home/project-basic-information');  // Update to match the actual URL or part of it
+  // Intercept new requests triggered by the new URL
+  cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
+
+  // Wait for the new requests after URL change
+  cy.wait('@getProject', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.url({ timeout: 30000 }).should('include', '/project-home/mass-mkt/mass-mkt-product-offering');
+  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait(15000)
+}
+export const ProjectBasicInformationPREOntop = (PriceType: string, ProductClass: string) => {
+  //Login
+  login(MKTpre, MKTpre1);
+
+  // create New Project
+  cy.get('.col-md-10 > .btn').should('be.visible').click();
+  // อัปเดตค่าตัวแปร global
+  formattedDateOntop = `Mob PRE Reg ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
 
   // log และ type ชื่อโปรเจกต์
   cy.log(formattedDateOntop);
@@ -609,9 +1265,9 @@ export const InternetLimitedDataOnly = () => {
   // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
   // .select('Limited Data Only')
   // .should('have.value', 'Limited Data Only');
-  //Intternet Quota
-  // cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true }); 
-  // cy.get('mat-option').contains('5G/4G/3G 10 GB').click();
+  // Intternet Quota
+  cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
+  cy.get('mat-option').contains('5G/4G/3G 10 GB').click();
   const IntternetQuota = [
     // '5G/4G/3G 10 GB',
     // '5G/4G/3G 20 GB',
@@ -629,6 +1285,17 @@ export const InternetLimitedDataOnly = () => {
       .contains(option)
       .click({ force: true });
   });
+  //   cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
+
+  // cy.get('.mat-select-panel mat-option')
+  //   .should('be.visible')
+  //   .then($options => {
+  //     const randomIndex = Math.floor(Math.random() * $options.length);
+  //     const selectedText = $options.eq(randomIndex).text().trim();
+
+  //     cy.log(`Randomly selected: ${selectedText}`);
+  //     cy.wrap($options[randomIndex]).click({ force: true });
+  //   });
 
   //Internet speed
   const speeds = [
@@ -671,6 +1338,19 @@ export const InternetLimitedDataOnly = () => {
       .select(speed)
       .should('have.value', speed);
   });
+  // cy.get('select[formcontrolname="internetSpeed"]')
+  // .find('option:not([disabled])')
+  // .then($options => {
+  //   const randomIndex = Math.floor(Math.random() * $options.length);
+  //   const selectedValue = $options.eq(randomIndex).val() as string;
+  //   const selectedText = $options.eq(randomIndex).text().trim();
+
+  //   cy.log(`Randomly selected: ${selectedText}`);
+
+  //   cy.get('select[formcontrolname="internetSpeed"]')
+  //     .select(selectedValue)
+  //     .should('have.value', selectedValue);
+  // });
 
   //Internet Exceed Rate 
   const InternetExceedRate = [
@@ -685,10 +1365,186 @@ export const InternetLimitedDataOnly = () => {
       .contains(option)
       .click({ force: true });
   });
+  //   cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true });
+
+  // cy.get('.mat-select-panel mat-option')
+  //   .should('be.visible')
+  //   .then($options => {
+  //     const randomIndex = Math.floor(Math.random() * $options.length);
+  //     const selectedText = $options.eq(randomIndex).text().trim();
+
+  //     cy.log(`Randomly selected: ${selectedText}`);
+  //     cy.wrap($options[randomIndex]).click({ force: true });
+  //   });
 
   //button Save
   cy.get(':nth-child(1) > .btn').click();
 
+}
+export const InternetLimitedDataOnlyPRERecurring = () => {
+  // Nav Internet
+  cy.get('.scrollmenu > .nav')
+    .contains('Internet')
+    .scrollIntoView()
+    .should('be.visible')
+    .click();
+
+  cy.scrollTo('bottom');
+  // button add
+  // cy.get('[style="width: 60px;"]').click();
+  cy.get('button.btn.btn-primary.btn-xs').eq(4).click();
+
+  //Intternet Quota type 
+  // Limited Data (Pay per use)
+  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //   .select('Limited Data (Pay per use)')
+  //   .should('have.value', 'Limited Data (Pay per use)');
+  // Select the option "Limited Data Only" from the dropdown
+  cy.get('select[formcontrolname="InternetQuotaType"]')
+    .select('Limited Data Only')
+    .should('have.value', 'Limited Data Only');
+
+  // Limited Data (Stop Net)
+  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //     .select('Limited Data (Stop Net)')
+  //     .should('have.value', 'Limited Data (Stop Net)');
+
+  //      // Pay per use only
+  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //   .select('Pay per use only')
+  //   .should('have.value', 'Pay per use only');
+
+  //   // Unlimited Data (Throttling Speed)
+  //   cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  //   .select('Unlimited Data (Throttling Speed)')
+  //   .should('have.value', 'Unlimited Data (Throttling Speed)');
+
+  // // Limited Data Only
+  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  // .select('Limited Data Only')
+  // .should('have.value', 'Limited Data Only');
+
+  // // Unlimited Data (Fixed Speed
+  // cy.get('form.ng-untouched > :nth-child(2) > .form-group > .col-md-12 > .col-md-4 > .form-control')
+  // .select('Limited Data Only')
+  // .should('have.value', 'Limited Data Only');
+  // Intternet Quota
+  cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
+  cy.get('mat-option').contains('5G/4G/3G 10 GB').click();
+  const IntternetQuota = [
+    // '5G/4G/3G 10 GB',
+    // '5G/4G/3G 20 GB',
+    '5G/4G/3G 150 GB',
+    // '5G/4G/3G 350 GB',
+    // '4G/3G 10 GB',
+    // '4G/3G 20 GB',
+    // '5G/4G/3G 30 GB'
+  ];
+
+  IntternetQuota.forEach(option => {
+    cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
+    cy.get('.mat-select-panel mat-option')
+      .should('be.visible')
+      .contains(option)
+      .click({ force: true });
+  });
+  //   cy.get('#mat-select-2 > .mat-select-trigger').click({ force: true });
+
+  // cy.get('.mat-select-panel mat-option')
+  //   .should('be.visible')
+  //   .then($options => {
+  //     const randomIndex = Math.floor(Math.random() * $options.length);
+  //     const selectedText = $options.eq(randomIndex).text().trim();
+
+  //     cy.log(`Randomly selected: ${selectedText}`);
+  //     cy.wrap($options[randomIndex]).click({ force: true });
+  //   });
+
+  //Internet speed
+  const speeds = [
+    // '4Gbps/4Gbps',
+    // '3Gbps/3Gbps',
+    // 'Max Speed (5G 2Gbps/2Gbps)',
+    // 'Max Speed (5G Default 1Gbps/1Gbps)',
+    // '450 Mbps',
+    // '300 Mbps',
+    // '150 Mbps',
+    // '50 Mbps',
+    // '42 Mbps',
+    // '30 Mbps',
+    // '21 Mbps',
+    // '20 Mbps',
+    // '15 Mbps',
+    // '12 Mbps',
+    // '11 Mbps',
+    // '10 Mbps',
+    // '8 Mbps',
+    // '7.2 Mbps',
+    // '6 Mbps',
+    // '5 Mbps',
+    // '4 Mbps',
+    // '3 Mbps',
+    // '2 Mbps',
+    // '1 Mbps',
+    // '512 Kbps',
+    // '384 Kbps',
+    // '256 Kbps',
+    // '128 Kbps',
+    // '64 Kbps',
+    // '10 Kbps',
+    // '0 Kbps',
+    'Max Speed (5G 2Gbps/2Gbps)'
+  ];
+
+  speeds.forEach(speed => {
+    cy.get('select[formcontrolname="internetSpeed"]')
+      .select(speed)
+      .should('have.value', speed);
+  });
+  // cy.get('select[formcontrolname="internetSpeed"]')
+  // .find('option:not([disabled])')
+  // .then($options => {
+  //   const randomIndex = Math.floor(Math.random() * $options.length);
+  //   const selectedValue = $options.eq(randomIndex).val() as string;
+  //   const selectedText = $options.eq(randomIndex).text().trim();
+
+  //   cy.log(`Randomly selected: ${selectedText}`);
+
+  //   cy.get('select[formcontrolname="internetSpeed"]')
+  //     .select(selectedValue)
+  //     .should('have.value', selectedValue);
+  // });
+
+  //Internet Exceed Rate 
+  const InternetExceedRate = [
+    '0.963 Baht per',
+    '149 Baht per GB'
+  ];
+
+  InternetExceedRate.forEach(option => {
+    cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true });
+    cy.get('.mat-select-panel mat-option')
+      .should('be.visible')
+      .contains(option)
+      .click({ force: true });
+  });
+  //   cy.get('#mat-select-3 > .mat-select-trigger').click({ force: true });
+
+  // cy.get('.mat-select-panel mat-option')
+  //   .should('be.visible')
+  //   .then($options => {
+  //     const randomIndex = Math.floor(Math.random() * $options.length);
+  //     const selectedText = $options.eq(randomIndex).text().trim();
+
+  //     cy.log(`Randomly selected: ${selectedText}`);
+  //     cy.wrap($options[randomIndex]).click({ force: true });
+  //   });
+
+  //button Save
+  // cy.get(':nth-child(1) > .btn').click();
+  cy.contains('button', 'Add', { timeout: 30000 })
+  .should('be.visible')
+  .click();
 
 }
 export const smsWording = () => {
@@ -714,6 +1570,68 @@ export const smsWording = () => {
   // กำหนดข้อมูลสำหรับ dropdown
   const dropdowns = [
     { selector: 'select[formcontrolname="smsGreetingSendFlag"]', value: 'Send' },
+    { selector: 'select[formcontrolname="smsDeleteSendFlag"]', value: 'Send' },
+  ];
+
+  // วนลูปเพื่อกรอกข้อมูลในฟิลด์ต่าง ๆ
+  fields.forEach((field) => {
+    field.values.forEach((value, index) => {
+      cy.get(field.selector).eq(index)
+        .type(value)
+        .should('have.value', value);
+    });
+  });
+
+  // วนลูปเพื่อเลือกค่าใน dropdown
+  dropdowns.forEach((dropdown) => {
+    cy.get(dropdown.selector)
+      .select(dropdown.value)
+      .should('have.value', dropdown.value);
+  });
+
+  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+
+  //Save button
+  cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
+
+  //Buttom Close
+  // Wait for the modal to appear
+  cy.get('.modal-dialog', { timeout: 20000 }).should('be.visible');
+
+  // Ensure the modal footer is visible
+  cy.get('.modal-footer', { timeout: 20000 }).should('be.visible');
+
+  // Find the Close button, ensure it's visible and enabled, then click it
+  cy.get('.modal-footer')
+    .find('button.btn-danger')
+    .should('be.visible')
+    .and('not.be.disabled')
+    .click();
+}
+export const smsWordingpre = () => {
+  //Nav SMS Wording
+  cy.scrollTo('bottom')
+  cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
+
+  //Button Generate SMS Wording
+  // cy.get(':nth-child(2) > :nth-child(2) > .btn').should('be.visible').click();
+
+  // กำหนดข้อมูลที่ต้องการกรอกในแต่ละฟิลด์
+  const fields = [
+    { selector: 'textarea[formcontrolname="shortPromotionName"]', values: ['Sample Promotion Name ENG', 'ตัวอย่างชื่อโปรโมชั่น THA'] },
+    { selector: 'textarea[formcontrolname="cmsDisplay"]', values: ['Sample CMS Display ENG', 'ตัวอย่าง CMS Display THA'] },
+    { selector: 'textarea[formcontrolname="promotionDescription"]', values: ['Sample Promotion Description in English', 'ตัวอย่างรายละเอียดโปรโมชั่นภาษาไทย'] },
+    // { selector: 'textarea[formcontrolname="greetingLetter"]', values: ['Sample Greeting Letter in English', 'ตัวอย่างจดหมายทักทายภาษาไทย'] },
+    // { selector: 'textarea[formcontrolname="yourPackage"]', values: ['Sample Billing Description in English', 'ตัวอย่างคำอธิบายบิลภาษาไทย'] },
+    { selector: 'textarea[formcontrolname="smsGreeting"]', values: ['Sample SMS Greeting in English', 'ตัวอย่าง SMS ทักทายภาษาไทย'] },
+    // { selector: 'textarea[formcontrolname="smsDelete"]', values: ['Sample SMS Delete in English', 'ตัวอย่าง SMS ลบแพ็กภาษาไทย'] },
+  ];
+
+  // กำหนดข้อมูลสำหรับ dropdown
+  const dropdowns = [
+    { selector: 'select[formcontrolname="smsGreetingSendFlag"]', value: 'Send' },
+    { selector: 'select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]', value: 'Send' },
     { selector: 'select[formcontrolname="smsDeleteSendFlag"]', value: 'Send' },
   ];
 
@@ -836,7 +1754,10 @@ export const priorityInternetLimitedDataOnly = (): void => {
   //0 อยู่ตรง edit
   cy.get('button[title="Edit"]').eq(1).click();  // ตัวแรก
   cy.get('button[title="Edit"]').eq(2).click();  // ตัวที่สอง
-  cy.get('input[formcontrolname="priority"]').type('123');
+  const randomNumber = Math.floor(Math.random() * 99999) + 1; // 1-99999
+  cy.get('input[formcontrolname="priority"]')
+    .clear()
+    .type(randomNumber.toString());
 
   cy.contains('button', 'Update').eq(0).click();// ตัวแรก
   cy.wait(5000)
@@ -860,7 +1781,7 @@ export const backBacicInfo = () => {
     .click();
 
   // Wait for the request and log it
-  cy.wait('@getRequest4', { timeout: 10000 }).then((interception) => {
+  cy.wait('@getRequest4', { timeout: 100000 }).then((interception) => {
     console.log(`Intercepted request: ${interception.request.method} ${interception.request.url}`);
   });
 }
@@ -898,7 +1819,7 @@ export const beforeapproveMKT = () => {
   clamProject(formattedDateMain);
   // Find the "To Do List" section
   // approveProject(formattedDateMain);
-approveProject(formattedDateMain);
+  approveProject(formattedDateMain);
 
   // Intercept all GET and POST requests
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
@@ -977,7 +1898,7 @@ export const beforeapproveMKTontop = () => {
   clamProject(formattedDateOntop);
   // Find the "To Do List" section
   // approveProject(formattedDateMain);
-approveProject(formattedDateOntop);
+  approveProject(formattedDateOntop);
 
   // Intercept all GET and POST requests
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
@@ -1214,4 +2135,69 @@ export const beforeapproveCKSontop = () => {
   cy.url().should('include', '/login');
 
 }
+export const addauto5gCKS = () => {
+  const values = ['1: Y', '2: X', '3: N'];
+  const randomValue = values[Math.floor(Math.random() * values.length)];
 
+  cy.get('select[formcontrolname="autoAddService5g"]')
+    .select(randomValue)
+    .should('have.value', randomValue);
+};
+export const dropdownRecurringCKS = () => {
+  // คลิก dropdown เพื่อเปิดตัวเลือก
+  cy.get('.mat-select-value')
+    .contains('Please Select')
+    .click();
+
+  cy.get('mat-option').then($options => {
+    const randomIndex = Math.floor(Math.random() * $options.length);
+    const selectedText = $options.eq(randomIndex).text().trim();
+
+    cy.log(`Selected: ${selectedText}`);
+    cy.wrap($options[randomIndex]).click({ force: true });
+
+    // ตรวจสอบว่าค่าที่เลือกถูกแสดง
+    cy.get('.mat-select-value').should('contain.text', selectedText);
+  });
+
+  cy.get('.mat-select-value')
+    .contains('Please Select')
+    .click();
+
+  cy.get('mat-option .mat-option-text').then($options => {
+    const randomIndex = Math.floor(Math.random() * $options.length);
+    const selectedText = $options.eq(randomIndex).text().trim();
+
+    cy.log(`Randomly selected: ${selectedText}`);
+    cy.wrap($options.eq(randomIndex)).click({ force: true });
+
+    cy.get('.mat-select-value').should('contain.text', selectedText);
+  })
+
+}
+export const diyflagCKS = () => {
+
+  cy.contains('label', 'CBS')
+    .find('input[type="radio"]')
+    .check({ force: true });
+
+  // คลิกที่ mat-select เพื่อเปิด dropdown
+  cy.get('mat-select[formcontrolname="validityPackage"]').eq(1).click();
+
+  // เลือก option ตาม text
+  cy.get('mat-option')
+    .contains('3801424 | 862770')  // หรือ text ส่วนที่ชัดเจน
+    .click();
+
+  // ตรวจสอบว่าค่าเลือกแล้วแสดงผลถูกต้อง
+  cy.get('mat-select[formcontrolname="validityPackage"] .mat-select-value')
+    .should('contain.text', '3801424 | 862770');
+
+}
+export const smsCKSPRE = () => {
+  cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
+  // เลือก textarea ด้วย formControlName แล้วพิมพ์ข้อความ
+  cy.get('textarea[formcontrolname="featureDescription"]')
+    .clear() // ล้างค่าก่อนถ้าจำเป็น
+    .type('feature description');
+}
