@@ -11,25 +11,10 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT PRE-PAID role', () => {
-    Master.ProjectBasicInformationPREOntop("Onetime", "Ontop");
+    Master.ProjectBasicInformationPREMain("Onetime", "Main");
     Master.selectPriceType('onetime');
-    Master.selectProductClass('ontop');
-    //Duration 
-    cy.get('input[formcontrolname="packageDuration"]').clear().type('12')
-
-    //Duration unit
-    // ✅ เสถียรและอ่านง่ายกว่า
-    cy.get('select[formcontrolname="packageDurationUnit"]').select('Months');
-
-    // การตรวจสอบ (Assertion) ที่ดีกว่า
-    // คือการตรวจสอบว่าข้อความที่ถูกเลือกอยู่นั้นถูกต้อง
-    cy.get('select[formcontrolname="packageDurationUnit"]')
-      .find('option:selected') // หา option ที่ถูกเลือก
-      .should('have.text', 'Months'); // ตรวจสอบ text ของมัน
-
-    // 'Months' คือ option ลำดับที่ 3 (index = 2)
-    // เพราะ "Please Select" คือ 0, "Days" คือ 1
-    // cy.get('select[formcontrolname="packageDurationUnit"]').select(2);
+    Master.selectProductClass('main');
+    Master.durationUnit();
 
     //targetgroup
     Master.selectTargetGroup('mass');
@@ -51,7 +36,7 @@ describe('Mobile', () => {
       // "Cloud PC",
       // "Content VDO",
       // "Flowaccount",
-      "Internet",
+      // "Internet",
       // "MMS",
       // "Mobile Care",
       // "SMS",
@@ -70,7 +55,7 @@ describe('Mobile', () => {
     });
     cy.scrollTo('top');
     //allowMvpn
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    // cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     // Auto Add Service 5G Select the second option ('Auto Add')
     // cy.get('#service-options').select(1);
 
@@ -94,7 +79,7 @@ describe('Mobile', () => {
         },
         { force: true }
       );
-      Master.beforeapproveMKTontop();
+      Master.beforeapproveMKT();
     });
   });
   it('CKS role', () => {
@@ -110,16 +95,15 @@ describe('Mobile', () => {
     cy.wait(['@setUserOnline', '@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
     cy.get('body').should('be.visible');
 
-    // const formattedDate = 'Mob PRE Reg Onetime Ontop 1310 1625';
+    // const formattedDateMainPONAME = 'Mob POST Reg 0409 0038';
     const projectName = Cypress.env('projectName');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectName);
 
-    //  ClaimProjectCKS from Unassigned Task
-    Master.ClaimProjectCKS(Master.formattedDateOntop);
+    // ClaimProject from Unassigned Task
+    Master.ClaimProjectCKS(Master.formattedDateMain);
 
     // Find the "To Do List" section
-    cy.wait(5000);
-    Master.approveProject(Master.formattedDateOntop);
+    Master.approveProject(Master.formattedDateMain);
 
     // intercept API 
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
@@ -150,127 +134,118 @@ describe('Mobile', () => {
     // รอ url
     cy.url().should('include', 'mass-enh-product-offering-detail')
 
-    Master.addauto5gCKS();
-
     //Group package
-    cy.get('select[formcontrolname="groupPackage"]')
-      .select('5G Hot Deal Max Speed Offset')
-
-    Master.dropdownRecurringCKS();
-    Master.diyflagCKS();
-    // Master.Tariff();
-    cy.wait(5000)
+    // cy.get('select[formcontrolname="groupPackage"]')
+    // .select('5G Hot Deal Max Speed Offset')
+    //grouppackage();
+    Master.dropdownRecurringCKSMain();
+    Master.addauto5gCKS();
     Master.priorityInternetLimitedDataOnly();
-
-    cy.scrollTo('bottom')
-
-    Master.smsCKSPRE();
-
-    Master.beforeapproveCKSontop();
+    Master.beforeapproveCKS();
   });
-  it('CGMD Config cbs role', () => {
+  // it('CGMD Config cbs role', () => {
 
-    Master.login(Master.cgccbs, Master.cgccbspass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
+  //   Master.login(Master.cgccbs, Master.cgccbspass);
+  //   // intercept APIs ที่ต้องรอ
+  //   cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+  //   cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
+  //   cy.visit('/#/workspace-home/workspace');
 
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline').its('response.statusCode').should('eq', 200);
-    cy.url().should('include', '/workspace-home/workspace');
-    cy.contains('span', 'Menu').click();
+  //   // รอและตรวจสอบ response
+  //   cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+  //   cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+  //   cy.url().should('include', '/workspace-home/workspace');
+  //   cy.contains('span', 'Menu').click();
 
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+  //   // ก่อนกดเมนู set intercept
+  //   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
 
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
+  //   // คลิก Process tracking
+  //   cy.get('a[href="#/new-report/home/tracking"]').click();
 
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url().should('include', '/new-report/home/tracking');
+  //   // ตรวจสอบ URL เปลี่ยน
+  //   cy.url().should('include', '/new-report/home/tracking');
 
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
+  //   // รอ table แสดงผล
+  //   cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
 
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
+  //   // optional: ตรวจสอบว่า table มีข้อมูล
+  //   cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
 
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgccbs';
+  //   // const taskIdentifier = 'Onetime_Main_0910_0951';
+  //   // const projectNamePONAME = 'Onetime Ontop 1510 0013'
+  //   const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
+  //   cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+  //   const assignee = 'cgccbs';
 
-    Master.assignTeamTask(projectNamePONAME, assignee);
+  //   Master.assignTeamTask(projectNamePONAME, assignee);
 
-    cy.contains('span', 'Menu').click();
+  //   cy.contains('span', 'Menu').click();
 
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+  //   // ก่อนกดเมนู set intercept
+  //   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
 
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
+  //   // คลิก Process tracking
+  //   cy.get('a[href="#/workspace-home/workspace"]').click();
 
-    cy.url().should('include', '/workspace-home/workspace');
+  //   cy.url().should('include', '/workspace-home/workspace');
 
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+  //   // จับ API หลัก
+  //   cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
 
-    Master.approveProjectCGMDPRE(projectNamePONAME);
-  });
-  it('CGMD Tester CBS role', () => {
+  //   Master.approveProjectCGMDPRE(projectNamePONAME);
+  // });
+  // it('CGMD Tester CBS role', () => {
 
-    Master.login(Master.cgtcbs, Master.cgtcbspass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
+  //   Master.login(Master.cgtcbs, Master.cgtcbspass);
+  //   // intercept APIs ที่ต้องรอ
+  //   cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+  //   cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
+  //   cy.visit('/#/workspace-home/workspace');
 
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline').its('response.statusCode').should('eq', 200);
-    cy.url().should('include', '/workspace-home/workspace');
-    cy.contains('span', 'Menu').click();
+  //   // รอและตรวจสอบ response
+  //   cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+  //   cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+  //   cy.url().should('include', '/workspace-home/workspace');
+  //   cy.contains('span', 'Menu').click();
 
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+  //   // ก่อนกดเมนู set intercept
+  //   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
 
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
+  //   // คลิก Process tracking
+  //   cy.get('a[href="#/new-report/home/tracking"]').click();
 
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url().should('include', '/new-report/home/tracking');
+  //   // ตรวจสอบ URL เปลี่ยน
+  //   cy.url().should('include', '/new-report/home/tracking');
 
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
+  //   // รอ table แสดงผล
+  //   cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
 
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
+  //   // optional: ตรวจสอบว่า table มีข้อมูล
+  //   cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
 
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgtcbs';
+  //   // const taskIdentifier = 'Onetime_Main_0910_0951';
+  //   // const projectNamePONAME = 'Onetime Ontop 1510 0013'
+  //   const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
+  //   cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+  //   const assignee = 'cgtcbs';
 
-    Master.assignTeamTask(projectNamePONAME, assignee);
+  //   Master.assignTeamTask(projectNamePONAME, assignee);
 
-    cy.contains('span', 'Menu').click();
+  //   cy.contains('span', 'Menu').click();
 
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+  //   // ก่อนกดเมนู set intercept
+  //   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
 
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
+  //   // คลิก Process tracking
+  //   cy.get('a[href="#/workspace-home/workspace"]').click();
 
-    cy.url().should('include', '/workspace-home/workspace');
+  //   cy.url().should('include', '/workspace-home/workspace');
 
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-    Master.approveProjectCGMDtester(projectNamePONAME);
-  });
+  //   // จับ API หลัก
+  //   cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+  //   Master.approveProjectCGMDtesterProPRE(projectNamePONAME);
+  // });
   it('Spadsup role', () => {
 
     Master.login(Master.spadsup, Master.spadsuppass);
@@ -282,12 +257,13 @@ describe('Mobile', () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const projectNamePONAME = 'Onetime Ontop 1510 1024';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
 
     Master.ClaimProjectCKS(projectNamePONAME);
 
     Master.approveProjectSPADSup(projectNamePONAME);
+
   });
   it('Spaddoer role', () => {
 
@@ -301,15 +277,15 @@ describe('Mobile', () => {
 
     // const projectNamePONAME = 'Onetime Ontop 1510 1352';
 
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
     // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
 
     Master.ClaimProjectCKS(projectNamePONAME);
 
     // Find the "To Do List" section
-    Master.approveProjectSPADDOER(projectNamePONAME);
+    Master.approveProjectSPADDOERMain(projectNamePONAME);
   });
-  it('Spadtester role', () => {
+  it.only('Spadtester role', () => {
 
     Master.login(Master.spadtest, Master.spadtestpass);
 
@@ -319,14 +295,14 @@ describe('Mobile', () => {
     // รอและตรวจสอบ response
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    Master.ClaimProjectCKS(projectNamePONAME);
+    const projectNamePONAME = 'Onetime Main 1710 1409_NEW';
+    // const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
+    // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    // Master.ClaimProjectCKS(projectNamePONAME);
 
     // Find the "To Do List" section
-    Master.approveProjectSPADTester(projectNamePONAME);
-  }); 
+    Master.approveProjectSPADTesterMain(projectNamePONAME);
+  });
   it('Spaddeploy role', () => {
 
     Master.login(Master.spaddp, Master.spaddppass);
@@ -338,7 +314,7 @@ describe('Mobile', () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const projectNamePONAME = 'Onetime Ontop 1310 1838';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
     Master.ClaimProjectCKS(projectNamePONAME);
 
@@ -357,11 +333,11 @@ describe('Mobile', () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const projectNamePONAME = 'Onetime Ontop 1510 1712';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
     Master.approveProjectCGMDACTMPRE(projectNamePONAME);
   });
-  it('Oper role', () => {
+  it('APO role', () => {
 
     Master.login(Master.apo, Master.apopass);
 
@@ -372,7 +348,7 @@ describe('Mobile', () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const projectNamePONAME = 'Onetime Ontop 1510 1712';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
     cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
     Master.approveProjectCGMDAPO(projectNamePONAME);
   });
