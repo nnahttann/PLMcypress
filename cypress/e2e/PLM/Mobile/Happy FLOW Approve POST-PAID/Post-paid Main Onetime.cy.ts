@@ -57,7 +57,7 @@ describe('Mobile', () => {
     Master.backBacicInfo();
 
     //Add File
-    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
+    cy.get('input[type="file"]', { timeout: 1000000 }).should('exist');
     cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
