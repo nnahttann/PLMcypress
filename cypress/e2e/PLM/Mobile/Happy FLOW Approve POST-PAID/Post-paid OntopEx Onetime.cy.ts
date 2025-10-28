@@ -1,4 +1,4 @@
-import * as Master from '../Master';
+import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -11,37 +11,12 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationOntop("Onetime", "OntopExtra");
-    Master.selectPriceType('onetime');
-    Master.selectProductClass('ontopExtra');
-    //Duration 
-    function randomInRange(min: number, max: number) {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-const randomMonth = randomInRange(3, 24);
-
-cy.get('input[formcontrolname="packageDuration"]')
-  .clear()
-  .type(randomMonth.toString());
-
-
-    //Duration unit
-    // ✅ เสถียรและอ่านง่ายกว่า
-    cy.get('select[formcontrolname="packageDurationUnit"]').select('Months');
-
-    // การตรวจสอบ (Assertion) ที่ดีกว่า
-    // คือการตรวจสอบว่าข้อความที่ถูกเลือกอยู่นั้นถูกต้อง
-    cy.get('select[formcontrolname="packageDurationUnit"]')
-      .find('option:selected') // หา option ที่ถูกเลือก
-      .should('have.text', 'Months'); // ตรวจสอบ text ของมัน
-
-    // 'Months' คือ option ลำดับที่ 3 (index = 2)
-    // เพราะ "Please Select" คือ 0, "Days" คือ 1
-    // cy.get('select[formcontrolname="packageDurationUnit"]').select(2);
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { type: 'OntopExtra', segment: 'POST', autoSetDuration: true });
+    //targetgroup
+    Master.selectTargetGroup('random');
 
     //targetgroup
-    Master.selectTargetGroup('mass');
+    Master.selectTargetGroup('random');
 
     //Remark 
     cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');

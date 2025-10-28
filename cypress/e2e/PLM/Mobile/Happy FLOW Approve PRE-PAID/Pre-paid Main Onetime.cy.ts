@@ -1,4 +1,4 @@
-import * as Master from '../Master';
+import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -10,11 +10,8 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT PRE-PAID role', () => {
-    Master.ProjectBasicInformationPREMain("Onetime", "Main");
-    Master.selectPriceType('onetime');
-    Master.selectProductClass('main');
-    Master.durationUnit();
+  it('MKT POSTPAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'main', { type: 'Main', segment: 'PRE', autoSetDuration: true });
 
     //targetgroup
     Master.selectTargetGroup('mass');

@@ -1,4 +1,4 @@
-import * as Master from '../Master';
+import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -10,14 +10,11 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT PRE-PAID role', () => {
-    Master.ProjectBasicInformationPREOntop("Usage", "Ontop");
-    Master.selectPriceType('usage');
-    Master.selectProductClass('ontop');
-    Master.durationUnit();
+  it('MKT POSTPAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { type: 'Ontop', segment: 'PRE', autoSetDuration: true });
+    
     //targetgroup
-    Master.selectTargetGroup('mass');
-
+    Master.selectTargetGroup('random');
     //Remark 
     cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
 

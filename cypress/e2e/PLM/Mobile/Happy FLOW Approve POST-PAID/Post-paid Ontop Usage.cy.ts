@@ -13,7 +13,7 @@ describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
     Master.ProjectBasicInformationComplete('usage', 'ontop', { type: 'Ontop', segment: 'POST', autoSetDuration: true });
     //targetgroup
-    Master.selectTargetGroup('mass');
+    Master.selectTargetGroup('random');
 
     //Remark 
     cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');

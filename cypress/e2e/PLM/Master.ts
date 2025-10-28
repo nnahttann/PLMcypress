@@ -2726,6 +2726,9 @@ export const afterMKTMAINPOST = () => {
 
     beforeapproveCKS();
   });
+  afterCKSPOST();
+}
+export const afterCKSPOST = () => {
   it('CGMD Config IRB role', () => {
 
     login(cgcirb, cgcirbpass);
@@ -2762,12 +2765,10 @@ export const afterMKTMAINPOST = () => {
     cy.get('table.table.table-condensed tbody tr', { timeout: 20000 }).should('have.length.greaterThan', 0);
 
     // const projectNamePONAME = 'onetime main 2710 1749';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
     const assignee = 'cgcirb';
-
     assignTeamTask(projectNamePONAME, assignee);
-
 
     cy.contains('span', 'Menu', { timeout: 100000 }).click();
 
@@ -2821,13 +2822,10 @@ export const afterMKTMAINPOST = () => {
     // optional: ตรวจสอบว่า table มีข้อมูล
     cy.get('table.table.table-condensed tbody tr', { timeout: 20000 }).should('have.length.greaterThan', 0);
     // const projectNamePONAME = 'Ontop Onetime 1010 1727';
-
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
     const assignee = 'cgtirb';
-
     assignTeamTask(projectNamePONAME, assignee);
-
 
     cy.contains('span', 'Menu', { timeout: 100000 }).click();
 
@@ -2857,8 +2855,8 @@ export const afterMKTMAINPOST = () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
     approveProjectCGMDACTM(projectNamePONAME);
   });
   it('OPER role', () => {
@@ -2872,8 +2870,8 @@ export const afterMKTMAINPOST = () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
     approveProjectCGMDOPER(projectNamePONAME);
   });
 }
@@ -2943,151 +2941,7 @@ export const afterMKTMainUsagePOST = () => {
     priorityInternetLimitedDataOnly();
     beforeapproveCKS();
   });
-  it('CGMD Config IRB role', () => {
-
-    login(cgcirb, cgcirbpass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    // wait API 
-    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    // cy.intercept('POST', '/PLMSpringBoot/api/**').as('POSTRequest');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    // Wait for initial API requests to complete
-    cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-    // cy.wait(['@POSTRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Ontop Onetime 1010 1727';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgcirb';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveProjectCGMD(projectNamePONAME);
-
-  });
-  it('CGMD Tester IRB role', () => {
-
-    login(cgtirb, cgtirbpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0610_2318';
-
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgtirb';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveProjectCGMDtesterProACTM(projectNamePONAME);
-  });
-  it('ACTM role', () => {
-
-    login(actm, actmpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDACTM(projectNamePONAME);
-
-  });
-  it('OPER role', () => {
-
-    login(oper, operpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDOPER(projectNamePONAME);
-
-
-  });
+  afterCKSPOST();
 }
 export const afterMKTontopPOST = () => {
   it('CKS role', () => {
@@ -3155,150 +3009,7 @@ export const afterMKTontopPOST = () => {
 
     beforeapproveCKSontop();
   });
-  it('CGMD Config IRB role', () => {
-
-    login(cgcirb, cgcirbpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgcirb';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveProjectCGMD(projectNamePONAME);
-
-  });
-  it('CGMD Tester IRB role', () => {
-
-    login(cgtirb, cgtirbpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0610_2318';
-
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgtirb';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveProjectCGMDtesterProACTM(projectNamePONAME);
-
-  });
-  it('ACTM role', () => {
-
-    login(actm, actmpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDACTM(projectNamePONAME);
-
-
-  });
-  it('OPER role', () => {
-
-    login(oper, operpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDOPER(projectNamePONAME);
-
-
-  });
+afterCKSPOST();
 }
 export const afterMKTontopPRE = () => {
   it('CKS role', () => {
