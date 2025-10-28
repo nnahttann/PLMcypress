@@ -2765,7 +2765,7 @@ export const afterCKSPOST = () => {
     cy.get('table.table.table-condensed tbody tr', { timeout: 20000 }).should('have.length.greaterThan', 0);
 
     // const projectNamePONAME = 'onetime main 2710 1749';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
     cy.log('Project Name: ' + projectNamePONAME);
     const assignee = 'cgcirb';
     assignTeamTask(projectNamePONAME, assignee);
@@ -2822,7 +2822,7 @@ export const afterCKSPOST = () => {
     // optional: ตรวจสอบว่า table มีข้อมูล
     cy.get('table.table.table-condensed tbody tr', { timeout: 20000 }).should('have.length.greaterThan', 0);
     // const projectNamePONAME = 'Ontop Onetime 1010 1727';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
     cy.log('Project Name: ' + projectNamePONAME);
     const assignee = 'cgtirb';
     assignTeamTask(projectNamePONAME, assignee);
@@ -2855,7 +2855,7 @@ export const afterCKSPOST = () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
     cy.log('Project Name: ' + projectNamePONAME);
     approveProjectCGMDACTM(projectNamePONAME);
   });
@@ -2870,7 +2870,7 @@ export const afterCKSPOST = () => {
     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
     // const taskIdentifier = 'Onetime_Main_3009_1126';
-    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') ||Cypress.env('formattedDateOntopPONAME');
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
     cy.log('Project Name: ' + projectNamePONAME);
     approveProjectCGMDOPER(projectNamePONAME);
   });
@@ -3009,7 +3009,216 @@ export const afterMKTontopPOST = () => {
 
     beforeapproveCKSontop();
   });
-afterCKSPOST();
+  afterCKSPOST();
+}
+export const afterCKSPREontop = () => {
+  it('CGMD Config cbs role', () => {
+
+    login(cgccbs, cgccbspass);
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
+    cy.visit('/#/workspace-home/workspace');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
+    cy.contains('span', 'Menu', { timeout: 100000 }).click();
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // คลิก Process tracking
+    cy.get('a[href="#/new-report/home/tracking"]').click();
+
+    // ตรวจสอบ URL เปลี่ยน
+    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
+
+
+    // รอ table แสดงผล
+    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
+
+    // optional: ตรวจสอบว่า table มีข้อมูล
+    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
+
+    // const taskIdentifier = 'Onetime_Main_0910_0951';
+    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+    const assignee = 'cgccbs';
+
+    assignTeamTask(projectNamePONAME, assignee);
+
+    cy.contains('span', 'Menu', { timeout: 100000 }).click();
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // คลิก Process tracking
+    cy.get('a[href="#/workspace-home/workspace"]').click();
+
+    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
+
+    // จับ API หลัก
+    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+
+    approveProjectCGMDPRE(projectNamePONAME);
+  });
+  it('CGMD Tester CBS role', () => {
+
+    login(cgtcbs, cgtcbspass);
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
+    cy.visit('/#/workspace-home/workspace');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
+    cy.contains('span', 'Menu', { timeout: 100000 }).click();
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // คลิก Process tracking
+    cy.get('a[href="#/new-report/home/tracking"]').click();
+
+    // ตรวจสอบ URL เปลี่ยน
+    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
+
+    // รอ table แสดงผล
+    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
+
+    // optional: ตรวจสอบว่า table มีข้อมูล
+    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
+
+    // const taskIdentifier = 'Onetime_Main_0910_0951';
+    const projectNamePONAME = 'Onetime Ontop 1510 0013'
+    // const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+    const assignee = 'cgtcbs';
+
+    assignTeamTask(projectNamePONAME, assignee);
+
+    cy.contains('span', 'Menu', { timeout: 100000 }).click();
+
+    // ก่อนกดเมนู set intercept
+    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
+
+    // คลิก Process tracking
+    cy.get('a[href="#/workspace-home/workspace"]').click();
+
+    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
+
+    // จับ API หลัก
+    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+    approveProjectCGMDtesterProPRE(projectNamePONAME);
+  });
+  it('Spadsup role', () => {
+
+    login(spadsup, spadsuppass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+    // const projectNamePONAME = 'Onetime Ontop 1510 1024';
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+
+    ClaimProjectCKS(projectNamePONAME);
+
+    approveProjectSPADSup(projectNamePONAME);
+  });
+  it('Spaddoer role', () => {
+
+    login(spaddoer, spaddoerpass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+    // const projectNamePONAME = 'Onetime Ontop 1510 1352';
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+
+    ClaimProjectCKS(projectNamePONAME);
+
+    // Find the "To Do List" section
+    approveProjectSPADDOER(projectNamePONAME);
+  });
+  it('Spadtester role', () => {
+
+    login(spadtest, spadtestpass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+    ClaimProjectCKS(projectNamePONAME);
+
+    // Find the "To Do List" section
+    approveProjectSPADTester(projectNamePONAME);
+  });
+  it('Spaddeploy role', () => {
+
+    login(spaddp, spaddppass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+    ClaimProjectCKS(projectNamePONAME);
+
+    // Find the "To Do List" section
+    cy.wait(2000);
+    approveProjectSPADdeploy(projectNamePONAME);
+  });
+  it('ACTM role', () => {
+
+    login(actm, actmpass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+    approveProjectCGMDACTMPRE(projectNamePONAME);
+  });
+  it('APO role', () => {
+
+    login(apo, apopass);
+
+    // intercept APIs ที่ต้องรอ
+    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+
+    // รอและตรวจสอบ response
+    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+    // const projectNamePONAME = 'Onetime Ontop 1510 1712';
+    const projectNamePONAME = Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+    cy.log('Project Name: ' + projectNamePONAME);
+    approveProjectCGMDAPO(projectNamePONAME);
+  });
 }
 export const afterMKTontopPRE = () => {
   it('CKS role', () => {
@@ -3089,215 +3298,7 @@ export const afterMKTontopPRE = () => {
 
     beforeapproveCKSontop();
   });
-  it('CGMD Config cbs role', () => {
-
-    login(cgccbs, cgccbspass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgccbs';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveProjectCGMDPRE(projectNamePONAME);
-  });
-  it('CGMD Tester CBS role', () => {
-
-    login(cgtcbs, cgtcbspass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgtcbs';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-    approveProjectCGMDtesterProPRE(projectNamePONAME);
-  });
-  it('Spadsup role', () => {
-
-    login(spadsup, spadsuppass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1024';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-
-    ClaimProjectCKS(projectNamePONAME);
-
-    approveProjectSPADSup(projectNamePONAME);
-  });
-  it('Spaddoer role', () => {
-
-    login(spaddoer, spaddoerpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1352';
-
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-
-    ClaimProjectCKS(projectNamePONAME);
-
-    // Find the "To Do List" section
-    approveProjectSPADDOER(projectNamePONAME);
-  });
-  it('Spadtester role', () => {
-
-    login(spadtest, spadtestpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    ClaimProjectCKS(projectNamePONAME);
-
-    // Find the "To Do List" section
-    approveProjectSPADTester(projectNamePONAME);
-  });
-  it('Spaddeploy role', () => {
-
-    login(spaddp, spaddppass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    ClaimProjectCKS(projectNamePONAME);
-
-    // Find the "To Do List" section
-    cy.wait(2000);
-    approveProjectSPADdeploy(projectNamePONAME);
-  });
-  it('ACTM role', () => {
-
-    login(actm, actmpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1712';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDACTMPRE(projectNamePONAME);
-  });
-  it('APO role', () => {
-
-    login(apo, apopass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1712';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDAPO(projectNamePONAME);
-  });
+  afterCKSPREontop();
 }
 export const afterMKTontopPREUsage = () => {
   it('CKS role', () => {
@@ -3382,211 +3383,5 @@ export const afterMKTontopPREUsage = () => {
 
     beforeapproveCKSontop();
   });
-  it('CGMD Config cbs role', () => {
-
-    login(cgccbs, cgccbspass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgccbs';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveProjectCGMDPRE(projectNamePONAME);
-  });
-  it('CGMD Tester CBS role', () => {
-
-    login(cgtcbs, cgtcbspass);
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
-    cy.visit('/#/workspace-home/workspace');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/new-report/home/tracking"]').click();
-
-    // ตรวจสอบ URL เปลี่ยน
-    cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
-
-    // รอ table แสดงผล
-    cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-
-    // optional: ตรวจสอบว่า table มีข้อมูล
-    cy.get('table.table.table-condensed tbody tr').should('have.length.greaterThan', 0);
-
-    // const taskIdentifier = 'Onetime_Main_0910_0951';
-    // const projectNamePONAME = 'Onetime Ontop 1510 0013'
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    const assignee = 'cgtcbs';
-
-    assignTeamTask(projectNamePONAME, assignee);
-
-    cy.contains('span', 'Menu', { timeout: 100000 }).click();
-
-    // ก่อนกดเมนู set intercept
-    cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
-
-    // คลิก Process tracking
-    cy.get('a[href="#/workspace-home/workspace"]').click();
-
-    cy.url({ timeout: 3000000 }).should('include', '/workspace-home/workspace', { timeout: 100000 });
-
-    // จับ API หลัก
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-    approveProjectCGMDtesterProPRE(projectNamePONAME);
-  });
-  it('Spadsup role', () => {
-
-    login(spadsup, spadsuppass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1024';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-
-    ClaimProjectCKS(projectNamePONAME);
-
-    approveProjectSPADSup(projectNamePONAME);
-  });
-  it('Spaddoer role', () => {
-
-    login(spaddoer, spaddoerpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1352';
-
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    // cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-
-    ClaimProjectCKS(projectNamePONAME);
-
-    // Find the "To Do List" section
-    approveProjectSPADDOER(projectNamePONAME);
-  });
-  it('Spadtester role', () => {
-
-    login(spadtest, spadtestpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    ClaimProjectCKS(projectNamePONAME);
-
-    // Find the "To Do List" section
-    approveProjectSPADTester(projectNamePONAME);
-  });
-  it('Spaddeploy role', () => {
-
-    login(spaddp, spaddppass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1310 1838';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    ClaimProjectCKS(projectNamePONAME);
-
-    approveProjectSPADdeploy(projectNamePONAME);
-  });
-  it('ACTM role', () => {
-
-    login(actm, actmpass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1712';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDACTMPRE(projectNamePONAME);
-  });
-  it('APO role', () => {
-
-    login(apo, apopass);
-
-    // intercept APIs ที่ต้องรอ
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-
-    // รอและตรวจสอบ response
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-    // const projectNamePONAME = 'Onetime Ontop 1510 1712';
-    const projectNamePONAME = Cypress.env('formattedDateOntopPONAME');
-    cy.log('ใช้ค่าเดิมจาก it(1): ' + projectNamePONAME);
-    approveProjectCGMDAPO(projectNamePONAME);
-  });
+  afterCKSPREontop();
 }

@@ -12,6 +12,8 @@ beforeEach(() => {
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
     Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { type: 'OntopExtra', segment: 'PRE', autoSetDuration: true });
+    // Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { type: 'OntopExtra', segment: 'ENTER', subSegment: 'PRE', autoSetDuration: true });
+    // Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { type: 'OntopExtra', segment: 'MUSIC', subSegment: 'PRE', autoSetDuration: true });
     
     //targetgroup
     Master.selectTargetGroup('random');
