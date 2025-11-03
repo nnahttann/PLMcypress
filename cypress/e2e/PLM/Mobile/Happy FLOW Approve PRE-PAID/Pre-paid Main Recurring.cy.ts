@@ -11,12 +11,10 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('recurring', 'ontop', { type: 'Ontop', segment: 'PRE', autoSetDuration: true });
+    Master.ProjectBasicInformationComplete('recurring', 'main', { type: 'Main', segment: 'PRE', autoSetDuration: true });
 
-    // Master.ProjectBasicInformationComplete('recurring', 'ontop', { type: 'Ontop', segment: 'ENTER', subSegment: 'PRE', autoSetDuration: true });
-    // Master.ProjectBasicInformationComplete('recurring', 'ontop', { type: 'Ontop', segment: 'MUSIC', subSegment: 'PRE', autoSetDuration: true });
     //targetgroup
-    Master.selectTargetGroup('random');
+    Master.selectTargetGroup('mass');
 
     //Remark 
     cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
@@ -35,7 +33,7 @@ describe('Mobile', () => {
       // "Cloud PC",
       // "Content VDO",
       // "Flowaccount",
-      "Internet",
+      // "Internet",
       // "MMS",
       // "Mobile Care",
       // "SMS",
@@ -54,7 +52,7 @@ describe('Mobile', () => {
     });
     cy.scrollTo('top');
     //allowMvpn
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    // cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     // Auto Add Service 5G Select the second option ('Auto Add')
     // cy.get('#service-options').select(1);
 
@@ -81,6 +79,6 @@ describe('Mobile', () => {
       Master.beforeapproveMKT();
     });
   });
-  Master.afterMKTontopPRE();
+  Master.afterMKTMainPRE_FullSpadFlow();
 });
 

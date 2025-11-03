@@ -12,8 +12,8 @@ beforeEach(() => {
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
     Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'PRE', autoSetDuration: true });
-    // Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'ENTER', subSegment: 'POST', autoSetDuration: true });
-    // Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'MUSIC', subSegment: 'POST', autoSetDuration: true });
+    // Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'ENTER', subSegment: 'PRE', autoSetDuration: true });
+    // Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'MUSIC', subSegment: 'PRE', autoSetDuration: true });
     //targetgroup
     Master.selectTargetGroup('random');
     //Remark 
@@ -27,7 +27,7 @@ describe('Mobile', () => {
     //ProductSpec
     const optionsToSelectProductSpec = [
       // "AI IP Camera",
-      "AIS Secure Net",
+      // "AIS Secure Net",
       // "Apple Care",
       // "Cloud Game",
       // "Cloud PC",

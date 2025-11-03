@@ -1,4 +1,6 @@
+// ไฟล์ test.cy.ts
 import * as Master from '../../Master';
+
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -9,73 +11,83 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
-describe('Mobile', () => {
-  it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'POST', autoSetDuration: true });
-        // Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'ENTER', subSegment: 'POST', autoSetDuration: true });
-        // Master.ProjectBasicInformationComplete('onetime', 'ontop', { type: 'Ontop', segment: 'MUSIC', subSegment: 'POST', autoSetDuration: true });
-    
-    //targetgroup
-    Master.selectTargetGroup('random');
+// Helper function สำหรับรัน test flow ทั้งหมด
+const runMKTPostpaidFlow = (segment: 'POST' | 'ENTER' | 'MUSIC', subSegment?: string) => {
+  const config: any = {
+    type: 'Ontop',
+    segment: segment,
+    autoSetDuration: true
+  };
 
-    //Remark 
-    cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
+  if (subSegment) {
+    config.subSegment = subSegment;
+  }
 
-    Master.PriceExcluding();
+  Master.ProjectBasicInformationComplete('onetime', 'ontop', config);
 
-    //*Target group
-    Master.targetgroup();
+  // Target group
+  Master.selectTargetGroup('random');
 
-    //ProductSpec
-    const optionsToSelectProductSpec = [
-      // "AI IP Camera",
-      "AIS Secure Net",
-      // "Apple Care",
-      // "Cloud Game",
-      // "Cloud PC",
-      // "Content VDO",
-      // "Flowaccount",
-      "Internet",
-      // "MMS",
-      // "Mobile Care",
-      // "SMS",
-      // "Vertical App",
-      // "Voice",
-      // "WiFi",
-      // "Youtube Premium"
-    ];
+  // Remark
+  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
 
-    optionsToSelectProductSpec.forEach(option => {
-      cy.get('select[formcontrolname="availableListBox"]')
-        .contains(option)
-        .then($option => {
-          cy.wrap($option).dblclick();
-        });
-    });
+  Master.PriceExcluding();
 
-    Master.InternetLimitedDataOnly();
+  // Target group
+  Master.targetgroup();
 
-    Master.smsWording();
+  // ProductSpec
+  const optionsToSelectProductSpec = ["Internet"];
 
-    Master.backBacicInfo();
-
-    //Add File
-    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-    cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-
-    cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
-      cy.get('input[type="file"][id="files"]').selectFile(
-        {
-          contents: Cypress.Buffer.from(fileContent, 'binary'),
-          fileName: 'file.pdf',
-          mimeType: 'application/pdf',
-        },
-        { force: true }
-      );
-      Master.beforeapproveMKT();
-    });
+  optionsToSelectProductSpec.forEach(option => {
+    cy.get('select[formcontrolname="availableListBox"]')
+      .contains(option)
+      .then($option => {
+        cy.wrap($option).dblclick();
+      });
   });
-  Master.afterMKTontopPOST();
-});
 
+  Master.InternetLimitedDataOnly();
+  Master.smsWording();
+  Master.backBacicInfo();
+
+  // Add File
+  cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
+  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+
+  cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
+    cy.get('input[type="file"][id="files"]').selectFile(
+      {
+        contents: Cypress.Buffer.from(fileContent, 'binary'),
+        fileName: 'file.pdf',
+        mimeType: 'application/pdf',
+      },
+      { force: true }
+    );
+    Master.beforeapproveMKT();
+  });
+};
+
+describe('PLM', () => {
+  describe('Scenario: Mob POST', () => {
+    it('MKT POSTPAID role', () => {
+      runMKTPostpaidFlow('POST');
+    });
+    Master.afterMKTontopPOST();
+  });
+
+  describe('Scenario: ENTER', () => {
+    it('MKT POSTPAID role', () => {
+      runMKTPostpaidFlow('ENTER', 'POST');
+    });
+    Master.afterMKTontopENTER();
+  });
+
+  describe.only('Scenario: MUSIC', () => {
+    it('MKT POSTPAID role', () => {
+      runMKTPostpaidFlow('MUSIC', 'POST');
+    });
+    Master.afterMKTontopMUSIC();
+  });
+});
