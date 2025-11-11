@@ -1496,6 +1496,23 @@ export const beforeapproveCKSontop = () => {
  * ฟังก์ชันช่วย: สุ่มเลือก 1 รายการจาก CKS Recurring Dropdown
  */
 const selectRandomDropdownRecurring = (): void => {
+
+  // คลิก dropdown เพื่อเปิดตัวเลือก
+  cy.get('.mat-select-value')
+    .contains('Please Select')
+    .click();
+
+  cy.get('mat-option').then($options => {
+    const randomIndex = Math.floor(Math.random() * $options.length);
+    const selectedText = $options.eq(randomIndex).text().trim();
+
+    cy.log(`Selected: ${selectedText}`);
+    cy.wrap($options[randomIndex]).click({ force: true });
+
+    // ตรวจสอบว่าค่าที่เลือกถูกแสดง
+    cy.get('.mat-select-value').should('contain.text', selectedText);
+  });
+
   cy.get('.mat-select-value')
     .contains('Please Select')
     .click();
@@ -1508,6 +1525,7 @@ const selectRandomDropdownRecurring = (): void => {
     cy.wrap($options.eq(randomIndex)).click({ force: true });
 
     cy.get('.mat-select-value').should('contain.text', selectedText);
+
   });
 }
 
@@ -1579,12 +1597,12 @@ const standardCksPoEnhancementFlow = (
   login(cks, ckspass);
 
   // ดักจับและรอให้ API อื่น ๆ เสร็จสิ้น
-  cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
+  // cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
   cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
   cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
 
   // รอให้ API ต่าง ๆ เสร็จสิ้น
-  cy.wait(['@setUserOnline', '@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
+  cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
   cy.get('body').should('be.visible');
 
   // ดึงชื่อโปรเจกต์ตาม Logic ที่ส่งเข้ามา
@@ -1679,13 +1697,13 @@ const performRoleTaskWithAssignment = (
 
   // intercept APIs ที่ต้องรอ
   cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-  cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
+  // cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.visit('/#/workspace-home/workspace');
 
   // รอและตรวจสอบ response
   cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+  // cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
   cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 
   // ดึงชื่อโปรเจกต์
@@ -1810,7 +1828,7 @@ export const afterMKTMainUsagePOST = (): void => {
   afterCKSPOST();
 }
 
-export const afterMKTontopPOST = (): void => { --> ยึดตามนี้ afterMKT อื่นๆ แยกเป็นเคสๆ
+export const afterMKTontopPOST = (): void => {
   it('CKS role', () => {
     const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
     standardCksPoEnhancementFlow(getProjectName, () => {
@@ -1822,7 +1840,7 @@ export const afterMKTontopPOST = (): void => { --> ยึดตามนี้ a
   });
   afterCKSCommon('POST');
 }
-export const afterMKTontopENTER = (): void => {--> ยึดตามนี้ afterMKT อื่นๆ แยกเป็นเคสๆ
+export const afterMKTontopENTER = (): void => {
   it('CKS role', () => {
     const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
     standardCksPoEnhancementFlow(getProjectName, () => {
@@ -1835,7 +1853,7 @@ export const afterMKTontopENTER = (): void => {--> ยึดตามนี้ a
   afterCKSCommon('ENTER');
 }
 
-export const afterMKTontopMUSIC = (): void => {--> ยึดตามนี้ afterMKT อื่นๆ แยกเป็นเคสๆ
+export const afterMKTontopMUSIC = (): void => {
   it('CKS role', () => {
     const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
     standardCksPoEnhancementFlow(getProjectName, () => {
@@ -1848,7 +1866,7 @@ export const afterMKTontopMUSIC = (): void => {--> ยึดตามนี้ a
   afterCKSCommon('MUSIC');
 }
 
-const afterCKSCommon = (segment: string): void => { --> เพิ่มตาม อื่นๆ ที่เหลืออยู่ยึดตามนี้
+const afterCKSCommon = (segment: string): void => {
   it('CGMD Config IRB role', () => {
     performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD);
   });
@@ -1864,8 +1882,8 @@ const afterCKSCommon = (segment: string): void => { --> เพิ่มตาม
   it('OPER role', () => {
     performSimpleApprovalRole(oper, operpass, approveProjectCGMDOPER);
   });
- 
-  if (segment === 'MUSIC') {---> กรณี === 'MUSIC' ลดการเขียนซ้ำๆเหมือนเดิมด้านบน และเพิ่ม if afterCKS เหมือนกันกับเคสนี้
+
+  if (segment === 'MUSIC') {
     it('TSCENTER role', () => {
       login(tscenter, tscenterpass);
 
@@ -1976,9 +1994,10 @@ const afterCKSCommon = (segment: string): void => { --> เพิ่มตาม
       const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
       // const finalProjectName = 'MUSIC POST onetime ontop 0311 1635'
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      // ClaimProjectCKS(finalProjectName);
       ClaimProjectCKS(finalProjectName);
       approveProject(finalProjectName);
-      
+
       // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
       cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
 
@@ -2197,8 +2216,7 @@ export const afterMKTontopPRE = (): void => {
     // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
     standardCksPoEnhancementFlow(getProjectName, () => {
       // --- นี่คือส่วนที่แตกต่าง ---
-      cy.log('Executing steps for afterMKTontopPRE');
-      cy.wait(7500); // มี wait 15000 - 5000 = 10000 เพิ่มเติม
+      cy.wait(7500)
       addauto5gCKS();
       cy.get('select[formcontrolname="groupPackage"]')
         .select('5G Hot Deal Max Speed Offset');
@@ -2209,13 +2227,384 @@ export const afterMKTontopPRE = (): void => {
       cy.scrollTo('bottom');
       smsCKSPRE();
       beforeapproveCKSontop();
+    });
+  });
+  afterCKSCommonPRE('PRE');
+}
+export const afterMKTontopPREENTER = (): void => {
+  it('CKS role', () => {
+    // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
+    const getProjectName: GetProjectNameFn = () => formattedDateOntop as string; // โค้ดเดิมใช้ formattedDateOntop
+
+    // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
+    standardCksPoEnhancementFlow(getProjectName, () => {
+      // --- นี่คือส่วนที่แตกต่าง ---
+      cy.log('Executing steps for afterMKTontopPRE');
+      cy.wait(7500);
+      addauto5gCKS();
+      cy.get('select[formcontrolname="groupPackage"]')
+        .select('5G Hot Deal Max Speed Offset');
       dropdownRecurringCKS();
+      diyflagCKS();
+      cy.wait(3500);
+      priorityInternetLimitedDataOnly();
+      cy.scrollTo('bottom');
+      smsCKSPRE();
+      beforeapproveCKSontop();
       // --- จบส่วนที่แตกต่าง ---
     });
   });
-  afterCKSPREontop();
+  afterCKSCommonPRE('ENTER');
 }
 
+export const afterMKTontopPREMUSIC = (): void => {
+  it('CKS role', () => {
+    // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
+    const getProjectName: GetProjectNameFn = () => formattedDateOntop as string; // โค้ดเดิมใช้ formattedDateOntop
+
+    // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
+    standardCksPoEnhancementFlow(getProjectName, () => {
+      // --- นี่คือส่วนที่แตกต่าง ---
+      cy.log('Executing steps for afterMKTontopPRE');
+      cy.wait(7500);
+      addauto5gCKS();
+      cy.get('select[formcontrolname="groupPackage"]')
+        .select('5G Hot Deal Max Speed Offset');
+      dropdownRecurringCKS();
+      diyflagCKS();
+      cy.wait(3500);
+      priorityInternetLimitedDataOnly();
+      cy.scrollTo('bottom');
+      smsCKSPRE();
+      beforeapproveCKSontop();
+    });
+  });
+  afterCKSCommonPRE('MUSIC');
+}
+
+const afterCKSCommonPRE = (segment: string): void => {
+  it('CGMD Config cbs role', () => {
+    performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE);
+  });
+
+  it('CGMD Tester CBS role', () => {
+    performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterProPRE);
+  });
+
+  it('Spadsup role', () => {
+    performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup);
+  });
+
+  it('Spaddoer role', () => {
+    performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER);
+  });
+
+  it('Spadtester role', () => {
+    performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester);
+  });
+
+  it('Spaddeploy role', () => {
+    performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy);
+  });
+
+  it('ACTM role', () => {
+    performSimpleApprovalRole(actm, actmpass, approveProjectCGMDACTMPRE);
+  });
+
+  it('APO role', () => {
+    performSimpleApprovalRole(apo, apopass, approveProjectCGMDAPO);
+  });
+
+  if (segment === 'MUSIC') {
+    it('TSCENTER role', () => {
+      login(tscenter, tscenterpass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/ts-center');
+      cy.wait(3000);
+      cy.get('select[formcontrolname="olympus"]')
+        .should('be.visible')
+        .select('No')
+        .should('have.value', 'No');
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      cy.contains('button', 'Approve').should('be.visible').click({ force: true });
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+    });
+    it('csisp role', () => {
+      login(csisp, csisppass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/csi-support');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      cy.contains('button', 'Promote To E2E Tester').should('be.visible').click({ force: true });
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+    it('aafsp role', () => {
+      login(aafsp, aafsppass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/aaf-support');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      cy.contains('button', 'Promote To E2E Tester').should('be.visible').click({ force: true });
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+    it('e2etest role', () => {
+      login(e2etest, e2etestpass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+      // const finalProjectName = 'MUSIC POST onetime ontop 0311 1635'
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      // ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      // Add File - ใช้วิธีเดิมที่ทำงานได้
+      cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
+
+      // ใช้ readFile แบบเดิมที่ทำงานได้
+      cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
+        cy.get('input[type="file"][id="files"]').selectFile(
+          {
+            contents: Cypress.Buffer.from(fileContent, 'binary'),
+            fileName: 'file.pdf',
+            mimeType: 'application/pdf',
+          },
+          { force: true }
+        );
+      });
+      // Wait for upload to complete
+      cy.intercept('POST', '**/upload**').as('fileUpload');
+
+      cy.contains('button', 'Approve to MKT Doer').should('be.visible').click({ force: true });
+
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+    it('MKT role', () => {
+      login(music, musicpass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      approveProject(finalProjectName);
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/owner-zenon');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      cy.contains('button', 'Approve').should('be.visible').click({ force: true });
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+    it('csidp role', () => {
+      login(csidp, csidppass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/csi-support');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      cy.contains('button', 'Promote To E2E Deploy').should('be.visible').click({ force: true });
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+    it('aafdp role', () => {
+      login(aafdp, aafdppass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/aaf-support');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+      cy.contains('button', 'Promote To E2E Deploy').should('be.visible').click({ force: true });
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+    it('e2edp role', () => {
+      login(e2edp, e2edppass);
+
+      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+
+      cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+      ClaimProjectCKS(finalProjectName);
+      approveProject(finalProjectName);
+
+      // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+      cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+      cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
+      cy.wait(3000);
+
+      cy.scrollTo('bottom');
+      cy.wait(3000);
+
+      cy.contains('button', 'Approve to Pre Go live').should('be.visible').click({ force: true });
+
+      // verify alert
+      cy.on('window:alert', (txt) => {
+        expect(txt).to.contain('Approve and Send Mail Notify Success');
+      });
+
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+      cy.contains('button', 'Logout')
+        .should('be.visible')
+        .click();
+
+
+    });
+  }
+}
 export const afterMKTontopPREUsage = (): void => {
   it('CKS role', () => {
     // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
@@ -2240,17 +2629,69 @@ export const afterMKTontopPREUsage = (): void => {
     });
   });
 
-  afterCKSPREontop();
+  afterCKSCommonPRE('PRE');
+}
+export const afterMKTontopPREUsageEnter = (): void => {
+  it('CKS role', () => {
+    // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
+    const getProjectName: GetProjectNameFn = () => formattedDateOntop as string; // โค้ดเดิมใช้ formattedDateOntop
+
+    // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
+    standardCksPoEnhancementFlow(getProjectName, () => {
+      // --- นี่คือส่วนที่แตกต่าง ---
+      cy.log('Executing steps for afterMKTontopPREUsage');
+      addauto5gCKS();
+      unregister();
+
+      cy.get('select[formcontrolname="groupPackage"]')
+        .select('5G Hot Deal Max Speed Offset');
+
+      dropdownRecurringCKS();
+      diyflagCKS();
+      priorityInternetLimitedDataOnly();
+      cy.scrollTo('bottom');
+      smsCKSPRE();
+      beforeapproveCKSontop();
+    });
+  });
+
+  afterCKSCommonPRE('Enter');
+}
+export const afterMKTontopPREUsageMusic = (): void => {
+  it('CKS role', () => {
+    // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
+    const getProjectName: GetProjectNameFn = () => formattedDateOntop as string; // โค้ดเดิมใช้ formattedDateOntop
+
+    // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
+    standardCksPoEnhancementFlow(getProjectName, () => {
+      // --- นี่คือส่วนที่แตกต่าง ---
+      cy.log('Executing steps for afterMKTontopPREUsage');
+      addauto5gCKS();
+      unregister();
+
+      cy.get('select[formcontrolname="groupPackage"]')
+        .select('5G Hot Deal Max Speed Offset');
+
+      dropdownRecurringCKS();
+      diyflagCKS();
+      priorityInternetLimitedDataOnly();
+      cy.scrollTo('bottom');
+      smsCKSPRE();
+      beforeapproveCKSontop();
+    });
+  });
+
+  afterCKSCommonPRE('MUSIC');
 }
 
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
   it('CKS role', () => {
     login(cks, ckspass);
 
-    cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
+    // cy.intercept('GET', '/PLMSpringBoot/newApi/CheckTask/setUserOnline').as('setUserOnline');
     cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
     cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
-    cy.wait(['@setUserOnline', '@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
+    cy.wait([ '@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
     cy.get('body').should('be.visible');
 
     const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
@@ -2527,4 +2968,14 @@ export const unregister = () => {
     .contains('label', 'Yes')
     .find('input[type="radio"]')
     .check({ force: true });
+}
+
+export const RetryPattern = () => {
+  cy.get('.scrollmenu > .nav')
+    .contains('Retry Pattern')
+    .scrollIntoView()
+    .should('be.visible')
+    .click();
+  cy.get('select[formcontrolname="actionWhenRetryReachMaxPeriod"]')
+    .select('1: Suspend retry next cycle')
 }

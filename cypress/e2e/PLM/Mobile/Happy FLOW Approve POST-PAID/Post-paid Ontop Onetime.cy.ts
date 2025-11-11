@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 // Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTPostpaidFlow = (segment: 'POST' | 'ENTER' | 'MUSIC', subSegment?: string) => {
+const runMKTPostpaidFlow = (segment: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subSegment?: string) => {
   const config: any = {
     type: 'Ontop',
     segment: segment,
@@ -84,7 +84,7 @@ describe('PLM', () => {
     Master.afterMKTontopENTER();
   });
 
-  describe.only('Scenario: MUSIC', () => {
+  describe('Scenario: MUSIC', () => {
     it('MKT POSTPAID role', () => {
       runMKTPostpaidFlow('MUSIC', 'POST');
     });

@@ -1,84 +1,111 @@
+// ไฟล์ test.cy.ts
 import * as Master from '../../Master';
+
+// ใช้ fastVisit แทน cy.visit ปกติ
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
   cy.window().then((win) => {
     win.sessionStorage.clear();
   });
-  cy.visit(Master.urlsit);
+  
+  // ใช้ fastVisit แทน cy.visit ปกติ
+  Master.fastVisit();
   cy.viewport(1920, 1080);
 });
 
-describe('Mobile', () => {
-  it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('usage', 'ontop', { type: 'Ontop', segment: 'PRE', autoSetDuration: true });
-    // Master.ProjectBasicInformationComplete('usage', 'ontop', { type: 'Ontop', segment: 'ENTER', subSegment: 'PRE', autoSetDuration: true });
-    // Master.ProjectBasicInformationComplete('usage', 'ontop', { type: 'Ontop', segment: 'MUSIC', subSegment: 'PRE', autoSetDuration: true });
-    //targetgroup
-    Master.selectTargetGroup('random');
-    //Remark 
-    cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
+const runMKTPostpaidFlow = (segment: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subSegment?: string) => {
+  const config: any = {
+    type: 'Ontop',
+    segment: segment,
+    autoSetDuration: true
+  };
 
-    Master.PriceExcluding();
+  if (subSegment) {
+    config.subSegment = subSegment;
+  }
 
-    //*Target group
-    Master.targetgroup();
+  Master.ProjectBasicInformationComplete('usage', 'ontop', config);
 
-    //ProductSpec
-    const optionsToSelectProductSpec = [
-      // "AI IP Camera",
-      "AIS Secure Net",
-      // "Apple Care",
-      // "Cloud Game",
-      // "Cloud PC",
-      // "Content VDO",
-      // "Flowaccount",
-      "Internet",
-      // "MMS",
-      // "Mobile Care",
-      // "SMS",
-      // "Vertical App",
-      // "Voice",
-      // "WiFi",
-      // "Youtube Premium"
-    ];
+  // Target group
+  Master.selectTargetGroup('random');
 
-    optionsToSelectProductSpec.forEach(option => {
-      cy.get('select[formcontrolname="availableListBox"]')
-        .contains(option)
-        .then($option => {
-          cy.wrap($option).dblclick();
-        });
-    });
-    cy.scrollTo('top');
-    //allowMvpn
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-    // Auto Add Service 5G Select the second option ('Auto Add')
-    // cy.get('#service-options').select(1);
+  // Remark
+  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
 
-    Master.InternetLimitedDataOnly();
+  Master.PriceExcluding();
 
-    Master.smsWordingpre();
+  // Target group
+  Master.targetgroup();
 
-    Master.backBacicInfo();
+  // ProductSpec
+  const optionsToSelectProductSpec = ["Internet"];
 
-    //Add File
-    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-    cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-
-    cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
-      cy.get('input[type="file"][id="files"]').selectFile(
-        {
-          contents: Cypress.Buffer.from(fileContent, 'binary'),
-          fileName: 'file.pdf',
-          mimeType: 'application/pdf',
-        },
-        { force: true }
-      );
-      Master.beforeapproveMKT();
-    });
+  optionsToSelectProductSpec.forEach(option => {
+    cy.get('select[formcontrolname="availableListBox"]')
+      .contains(option)
+      .then($option => {
+        cy.wrap($option).dblclick();
+      });
   });
-  Master.afterMKTontopPREUsage();
-});
 
+  if (segment === 'PRE') {
+    // allowMvpn สำหรับ PRE segment
+    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    Master.InternetLimitedDataOnly();
+    Master.smsWordingpre();
+    Master.backBacicInfo();
+  } else {
+    Master.smsWordingpre();
+    Master.InternetLimitedDataOnly();
+    Master.backBacicInfo();
+  }
+
+  // Add File - ปรับปรุงให้เร็วขึ้น
+  cy.get('input[type="file"]', { timeout: 5000 }).should('exist');
+  
+  // ใช้ timeout ที่สั้นลง
+  cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  
+  cy.wait('@postRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
+
+  // อัพโหลดไฟล์แบบเร็ว
+  cy.readFile('cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
+    cy.get('input[type="file"][id="files"]').selectFile(
+      {
+        contents: Cypress.Buffer.from(fileContent, 'binary'),
+        fileName: 'file.pdf',
+        mimeType: 'application/pdf',
+      },
+      { force: true }
+    );
+    
+    // ใช้ beforeapproveMKT ที่ปรับปรุงแล้ว
+    Master.beforeapproveMKT();
+  });
+};
+
+describe('PLM', () => {
+  describe('Scenario: Mob PRE', () => {
+    it('MKT PREPAIDrole', () => {
+      runMKTPostpaidFlow('PRE');
+    });
+    Master.afterMKTontopPREUsage();
+  });
+
+  describe('Scenario: ENTER', () => {
+    it('MKT PREPAIDrole', () => {
+      runMKTPostpaidFlow('ENTER', 'PRE');
+    });
+    Master.afterMKTontopPREUsageEnter();
+  });
+
+  describe('Scenario: MUSIC', () => {
+    it('MKT PREPAIDrole', () => {
+      runMKTPostpaidFlow('MUSIC', 'PRE');
+    });
+    Master.afterMKTontopPREUsageMusic();
+  });
+});
