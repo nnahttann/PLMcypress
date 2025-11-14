@@ -14,7 +14,7 @@ beforeEach(() => {
 // Helper function สำหรับรัน test flow ทั้งหมด
 const runMKTPostpaidFlow = (segment: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subSegment?: string) => {
   const config: any = {
-    type: 'Ontop',
+    type: 'OntopExtra',
     segment: segment,
     autoSetDuration: true
   };
@@ -47,9 +47,22 @@ const runMKTPostpaidFlow = (segment: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subSegme
       });
   });
 
-  Master.InternetLimitedDataOnly();
-  Master.smsWordingpre();
-  Master.backBacicInfo();
+  if (segment === 'PRE') {
+    // allowMvpn สำหรับ PRE segment
+    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    Master.dropdownPromotionGroup();
+    Master.InternetLimitedDataOnlyPRERecurring();
+    Master.smsWordingpre();
+    Master.RetryPattern();
+    Master.backBacicInfo();
+  } else {
+    Master.dropdownPromotionGroup();
+    Master.InternetLimitedDataOnly();
+    Master.smsWordingpre();
+    Master.RetryPattern();
+    Master.backBacicInfo();
+  }
+
 
   // Add File
   cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
@@ -69,7 +82,7 @@ const runMKTPostpaidFlow = (segment: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subSegme
   });
 };
 
-describe.only('PLM', () => {
+describe('PLM', () => {
   describe('Scenario: Mob PRE', () => {
     it('MKT PREPAIDrole', () => {
       runMKTPostpaidFlow('PRE');

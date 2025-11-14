@@ -49,7 +49,7 @@ describe('Mobile', () => {
           cy.wrap($option).dblclick();
         });
     });
-
+    Master.dropdownPromotionGroup();
     Master.InternetLimitedDataOnly();
 
     Master.smsWording();

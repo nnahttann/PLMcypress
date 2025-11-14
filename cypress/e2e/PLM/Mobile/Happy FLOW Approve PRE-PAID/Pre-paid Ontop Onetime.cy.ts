@@ -48,10 +48,12 @@ const runMKTprepaidFlow = (segment: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subSegmen
   if (segment === 'PRE') {
     // allowMvpn สำหรับ PRE segment
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    Master.dropdownPromotionGroup();
     Master.InternetLimitedDataOnly();
     Master.smsWordingpre();
     Master.backBacicInfo();
   } else {
+    Master.dropdownPromotionGroup();
     Master.smsWordingpre();
     Master.InternetLimitedDataOnly();
     Master.backBacicInfo();

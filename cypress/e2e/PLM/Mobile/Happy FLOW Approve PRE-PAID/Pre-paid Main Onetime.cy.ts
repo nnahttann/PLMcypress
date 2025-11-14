@@ -55,7 +55,7 @@ describe('Mobile', () => {
     // cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     // Auto Add Service 5G Select the second option ('Auto Add')
     // cy.get('#service-options').select(1);
-
+    Master.dropdownPromotionGroup();
     Master.InternetLimitedDataOnly();
 
     Master.smsWordingpre();
