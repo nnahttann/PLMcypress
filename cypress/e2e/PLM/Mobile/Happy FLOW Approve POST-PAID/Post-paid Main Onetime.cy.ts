@@ -2,16 +2,19 @@ import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
-  cy.window().then((win) => {
-    win.sessionStorage.clear();
-  });
+  Cypress.env('formattedDateMain', undefined);
+  Cypress.env('formattedDateOntop', undefined);
+  Cypress.env('formattedDateOntopExtra', undefined);
+  Cypress.env('formattedDateMainPONAME', undefined);
+  Cypress.env('formattedDateOntopPONAME', undefined);
+  Cypress.env('formattedDateOntopExtraPONAME', undefined);
   cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { type:'Main', segment:'POST', autoSetDuration:true });
+    Master.ProjectBasicInformationComplete('onetime', 'main', { type:'Main', Module:'POST', autoSetDuration:true });
     //targetgroup
     Master.selectTargetGroup('random');
 
@@ -74,6 +77,5 @@ describe('Mobile', () => {
     });
   });
   Master.afterMKTMAINPOST();
-  
 });
 

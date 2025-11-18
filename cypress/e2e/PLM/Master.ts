@@ -45,6 +45,9 @@ export const csidp: string = Cypress.env('csidp');
 export const csidppass: string = Cypress.env('csidppass');
 export const e2edp: string = Cypress.env('e2edp');
 export const e2edppass: string = Cypress.env('e2edppass');
+export const sasff: string = Cypress.env('sasff');
+export const sasffpass: string = Cypress.env('sasffpass');
+
 
 
 export const now = new Date();
@@ -55,6 +58,7 @@ const minutes = String(now.getMinutes()).padStart(2, '0');
 export let formattedDateMain = '';
 export let formattedDateOntop = '';
 
+
 /*
 ============================================================================
 === 
@@ -62,6 +66,56 @@ export let formattedDateOntop = '';
 === 
 ============================================================================
 */
+
+export const setProjectName = (type: 'Main' | 'Ontop' | 'OntopExtra', name: string): void => {
+  const envKey = `formattedDate${type}`;
+  Cypress.env(envKey, name);
+  cy.log(`✅ Saved to ${envKey}: ${name}`);
+};
+
+export const setPOName = (type: 'Main' | 'Ontop' | 'OntopExtra', name: string): void => {
+  const envKey = `formattedDate${type}PONAME`;
+  Cypress.env(envKey, name);
+  cy.log(`✅ Saved to ${envKey}: ${name}`);
+};
+
+export const getProjectName = (type: 'Main' | 'Ontop' | 'OntopExtra'): string => {
+  const envKey = `formattedDate${type}`;
+  const name = Cypress.env(envKey);
+  if (!name) {
+    throw new Error(`❌ Project name for ${type} not found in Cypress.env(). Please create project first.`);
+  }
+  return name;
+};
+
+export const getPOName = (type: 'Main' | 'Ontop' | 'OntopExtra'): string => {
+  const envKey = `formattedDate${type}PONAME`;
+  const name = Cypress.env(envKey);
+  if (!name) {
+    throw new Error(`❌ PO name for ${type} not found in Cypress.env(). Please create PO first.`);
+  }
+  return name;
+};
+
+export const debugProjectNames = (): void => {
+  cy.log('=== 📋 Debug Project Names in Cypress.env() ===');
+  const keys = [
+    'formattedDateMain',
+    'formattedDateOntop',
+    'formattedDateOntopExtra',
+    'formattedDateMainPONAME',
+    'formattedDateOntopPONAME',
+    'formattedDateOntopExtraPONAME',
+    'projectName',
+    'poName'
+  ];
+
+  keys.forEach(key => {
+    const value = Cypress.env(key);
+    cy.log(`${key}: ${value || '❌ NOT SET'}`);
+  });
+  cy.log('=== ✅ End Debug ===');
+};
 
 export const login = (username: string, password: string): void => {
   cy.get('input[name="userId"]').type(username);
@@ -71,72 +125,115 @@ export const login = (username: string, password: string): void => {
   cy.wait('@getErrorCodes', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 }
 
+// claim-functions.ts
 export const clamProject = (formattedDate: string): void => {
-  cy.get('h3', { timeout: 100000 }).contains('Unassigned Task')
+
+  cy.log(`🔍 [clamProject] Searching for: "${formattedDate}"`);
+
+  cy.get('h3', { timeout: 100000 })
+    .contains('Unassigned Task')
     .should('be.visible')
     .parent()
     .within(() => {
-
+      // Debug: Show all rows
       cy.get('tbody tr').then(($rows) => {
-        cy.log(`📊 Total rows: ${$rows.length}`);
+        cy.log(`📊 Total rows found: ${$rows.length}`);
+        let matchFound = false;
+
         $rows.each((index, row) => {
           const text = Cypress.$(row).text().trim();
-          cy.log(`Row ${index}: ${text.substring(0, 100)}`);
+          const displayText = text.substring(0, 100);
+          cy.log(`Row ${index}: ${displayText}${text.length > 100 ? '...' : ''}`);
+
           if (text.includes(formattedDate)) {
-            cy.log(`✅✅✅ MATCH at row ${index}`);
+            cy.log(`✅✅✅ EXACT MATCH at row ${index}`);
+            matchFound = true;
           }
         });
-      });
 
-      cy.get('tbody tr', { timeout: 60000 }).should('exist').each(($row: JQuery<HTMLElement>) => {
-        if ($row.text().includes(formattedDate)) {
-          cy.wrap($row)
-            .find('button.btn.btn-circle.btn-xs.btn-success.claim-top')
-            .should('be.visible')
-            .click();
-          return false;
+        if (!matchFound) {
+          cy.log(`❌ No row contains: "${formattedDate}"`);
         }
       });
+
+      // Actual claim process
+      cy.get('tbody tr', { timeout: 60000 })
+        .should('exist')
+        .each(($row: JQuery<HTMLElement>) => {
+          const rowText = $row.text().trim();
+          if (rowText.includes(formattedDate)) {
+            cy.log(`🎯 Clicking claim button for: "${formattedDate}"`);
+            cy.wrap($row)
+              .find('button.btn.btn-circle.btn-xs.btn-success.claim-top')
+              .should('be.visible')
+              .click();
+            cy.log(`✅ Successfully claimed project: ${formattedDate}`);
+            return false; // Break loop
+          }
+        })
+        .then(($rows) => {
+          // Check if any row was processed
+          if ($rows.length === 0) {
+            cy.log('❌ No rows found in table');
+          }
+        });
     });
 };
 
 export const ClaimProjectCKS = (formattedDate: string): void => {
+
+  cy.log(`🔍 [ClaimProjectCKS] Searching for: "${formattedDate}"`);
+
   cy.get('h3')
     .contains('Unassigned Task', { timeout: 100000 })
     .parent()
     .within(() => {
+      // Wait for data to load
       cy.get('tbody tr').should(($rows) => {
         expect($rows.text()).not.to.contain('Fetching data');
       });
 
-      cy.log(`🔍 Searching for: "${formattedDate}"`);
-
-      // Debug: แสดงทุก row
+      // Debug: Show all rows
       cy.get('tbody tr').then(($rows) => {
-        cy.log(`📊 Total rows: ${$rows.length}`);
+        cy.log(`📊 Total rows found: ${$rows.length}`);
+        let matchFound = false;
+
         $rows.each((index, row) => {
           const text = Cypress.$(row).text().trim();
-          cy.log(`Row ${index}: ${text.substring(0, 100)}`);
+          const displayText = text.substring(0, 100);
+          cy.log(`Row ${index}: ${displayText}${text.length > 100 ? '...' : ''}`);
+
           if (text.includes(formattedDate)) {
-            cy.log(`✅✅✅ MATCH at row ${index}`);
+            cy.log(`✅✅✅ EXACT MATCH at row ${index}`);
+            matchFound = true;
           }
         });
+
+        if (!matchFound) {
+          cy.log(`❌ No row contains: "${formattedDate}"`);
+        }
       });
 
-      // ทำงานจริง
+      // Actual claim process
       cy.get('tbody tr').each(($row, index) => {
         const rowText = $row.text().trim();
 
         if (rowText.includes(formattedDate)) {
-          cy.log(`🎯 Clicking claim button at row ${index}`);
-          cy.wrap($row).find('button.claim-top').should('be.visible').click();
-          return false;
+          cy.log(`🎯 Clicking claim button at row ${index} for: "${formattedDate}"`);
+          cy.wrap($row)
+            .find('button.claim-top')
+            .should('be.visible')
+            .click();
+          cy.log(`✅ Successfully claimed project: ${formattedDate}`);
+          return false; // Break loop
         }
       });
     });
 };
 
+// assign-functions.ts
 export function assignTeamTask(taskIdentifier: string, assignee: string): void {
+
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
 
@@ -148,17 +245,29 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
   const partialIdentifier = taskIdentifier.split('_')[0];
-  cy.log(`Searching for task using partial identifier: "${partialIdentifier}"`);
+  cy.log(`🔍 Searching for task using partial identifier: "${partialIdentifier}"`);
+
+  // Debug: Show all rows
   cy.get('tbody tr').then(($rows) => {
     cy.log(`📊 Total rows: ${$rows.length}`);
+    let matchFound = false;
+
     $rows.each((index, row) => {
       const text = Cypress.$(row).text().trim();
-      cy.log(`Row ${index}: ${text.substring(0, 100)}`);
+      const displayText = text.substring(0, 100);
+      cy.log(`Row ${index}: ${displayText}${text.length > 100 ? '...' : ''}`);
+
       if (text.includes(partialIdentifier)) {
         cy.log(`✅✅✅ MATCH at row ${index}`);
+        matchFound = true;
       }
     });
+
+    if (!matchFound) {
+      cy.log(`❌ No row contains: "${partialIdentifier}"`);
+    }
   });
+
   cy.contains('tr', partialIdentifier, { timeout: 600000 })
     .should('be.visible')
     .as('taskRow');
@@ -170,7 +279,6 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
 
     cy.get('@assigneeDropdown').then(($select) => {
       const selectElement = $select[0];
-
       const mouseDownEvent = new MouseEvent('mousedown', {
         bubbles: true,
         cancelable: true,
@@ -185,6 +293,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
       selectElement.dispatchEvent(focusEvent);
     });
 
+    // Debug: Show all options
     cy.get('@assigneeDropdown')
       .find('option')
       .each(($option: JQuery<HTMLOptionElement>) => {
@@ -198,11 +307,13 @@ export function assignTeamTask(taskIdentifier: string, assignee: string): void {
     cy.get('@assigneeDropdown').select(assignee);
     cy.get('@assigneeDropdown').should('have.value', assignee);
 
-    cy.log(`✅ Successfully selected: ${assignee}`);
+    cy.log(`✅ Successfully selected assignee: ${assignee}`);
 
     cy.get('@taskRow').contains('span', 'Set').click();
   });
+
   cy.get('@alertStub', { timeout: 100000 }).should('have.been.calledWith', 'Reassign success');
+  cy.log(`✅ Successfully assigned task to: ${assignee}`);
 }
 
 /*
@@ -699,7 +810,7 @@ export const approveProjectCGMDPREPlugin = (projectName: string): void => {
 /**
  * 10. Flow CGMDtesterProACTM (ใช้ Helper หลัก)
  */
-export const approveProjectCGMDtesterProACTM = (projectName: string): void => {
+export const approveProjectCGMDtesterACTM = (projectName: string): void => {
   createFullPageApprovalFlow(
     projectName,
     'To Do List',
@@ -932,21 +1043,22 @@ export const approveProjectCGMDAPO = (projectName: string): void => {
  * ฟังก์ชันเดียวสำหรับสร้างโปรเจกต์ทุกรูปแบบ (POST, PRE, ENTER, MUSIC)
  * และทุกประเภท (Main, Ontop, OntopExtra)
  */
+// project-creation.ts
 export const ProjectBasicInformationComplete = (
   PriceType: 'onetime' | 'recurring' | 'usage',
   ProductClass: 'main' | 'ontop' | 'ontopextra',
   options: {
     type: 'Main' | 'Ontop' | 'OntopExtra',
-    segment: 'POST' | 'PRE' | 'ENTER' | 'MUSIC',
-    subSegment?: 'POST' | 'PRE',
+    Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC',
+    CustomerType?: 'POST' | 'PRE',
     autoSetDuration?: boolean
   }
-) => {
-  const { type, segment, subSegment, autoSetDuration = false } = options;
+): void => {
+  const { type, Module, CustomerType, autoSetDuration = false } = options;
 
   // --- Login ---
   const credentials = (() => {
-    switch (segment) {
+    switch (Module) {
       case 'POST': return { user: MKTpost, pass: MKTpost1 };
       case 'PRE': return { user: MKTpre, pass: MKTpre1 };
       case 'ENTER': return { user: enter, pass: enterpass };
@@ -954,23 +1066,23 @@ export const ProjectBasicInformationComplete = (
       default: return { user: MKTpost, pass: MKTpost1 };
     }
   })();
+
   login(credentials.user, credentials.pass);
 
   // --- Create Project ---
   cy.get('.col-md-10 > .btn').should('be.visible').click();
 
-  const prefix = segment === 'ENTER' ? 'ENTER' : segment === 'MUSIC' ? 'MUSIC' : 'MOB';
-  const segmentPart = (segment === 'ENTER' || segment === 'MUSIC') ? `${prefix} ${subSegment}` : `${prefix} ${segment}`;
+  const prefix = Module === 'ENTER' ? 'ENTER' : Module === 'MUSIC' ? 'MUSIC' : 'MOB';
+  const ModulePart = (Module === 'ENTER' || Module === 'MUSIC')
+    ? `${prefix} ${CustomerType}`
+    : `${prefix} ${Module}`;
 
-
-  const projectName = `${segmentPart} ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
+  // --- Generate Project Name ---
+  const projectName = `${ModulePart} ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
   cy.get('input[formcontrolname="projectName"]').type(projectName);
 
-  const envKey = type === 'Main' ? 'formattedDateMain' : 'formattedDate';
-  Cypress.env(envKey, projectName);
-
-  if (type === 'Main') formattedDateMain = projectName;
-  else formattedDateOntop = projectName;
+  // ✅ เก็บค่า Project Name ใช้ helper function
+  setProjectName(type, projectName);
 
   // --- Date ---
   const date = new Date();
@@ -982,9 +1094,8 @@ export const ProjectBasicInformationComplete = (
   cy.wait(2000);
 
   // --- Customer Type (ENTER/MUSIC) ---
-  if (segment === 'ENTER' || segment === 'MUSIC') {
-    if (!subSegment) throw new Error(`subSegment is required for segment ${segment}`);
-    const customerType = subSegment === 'POST' ? 'Post-paid' : 'Pre-paid';
+  if (Module === 'ENTER' || Module === 'MUSIC') {
+    const customerType = CustomerType === 'POST' ? 'Post-paid' : 'Pre-paid';
     cy.get('select[formcontrolname="customerType"]')
       .select(customerType)
       .should('have.value', customerType);
@@ -1002,10 +1113,11 @@ export const ProjectBasicInformationComplete = (
 
   // --- Add PO ---
   cy.get(':nth-child(4) > .btn').click();
-  const poName = `${segmentPart} ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
+  const poName = `${ModulePart} ${PriceType} ${ProductClass} ${day}${month} ${hours}${minutes}`;
   cy.get('input[formcontrolname="productName"]').type(poName);
-  const poEnvKey = type === 'Main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
-  Cypress.env(poEnvKey, poName);
+
+  // ✅ เก็บค่า PO Name ใช้ helper function
+  setPOName(type, poName);
 
   cy.get('select[formcontrolname="promotionSubGroupFrom"]')
     .select('Product Offering')
@@ -1013,10 +1125,12 @@ export const ProjectBasicInformationComplete = (
 
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+
   // Wait for button to appear
   cy.contains('button', 'Create', { timeout: 10000 })
     .should('be.visible')
-    .click()
+    .click();
+
   cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
@@ -1027,7 +1141,6 @@ export const ProjectBasicInformationComplete = (
   cy.url({ timeout: 3000000 }).should('include', '/project-home/mass-mkt/mass-mkt-product-offering');
   cy.wait(8000);
 
-  // --- Setup PriceType / ProductClass / Duration ---
   (() => {
     // --- PriceType ---
     const priceTypeMap = {
@@ -1041,12 +1154,21 @@ export const ProjectBasicInformationComplete = (
       .should('have.value', priceValue);
 
     // --- ProductClass ---
-    const productClassMapMobile = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
-    const productClassMapEnterMusic = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
+    const productClassMapMobile = {
+      main: '1: Main',
+      ontop: '2: On-Top',
+      ontopextra: '3: On-Top Extra'
+    };
+    const productClassMapEnterMusic = {
+      ontop: '1: On-Top',
+      ontopextra: '2: On-Top Extra'
+    };
 
     let productValue: string;
-    if (segment === 'ENTER' || segment === 'MUSIC') {
-      if (ProductClass === 'main') throw new Error(`Product Class "Main" is not available for segment ${segment}`);
+    if (Module === 'ENTER' || Module === 'MUSIC') {
+      if (ProductClass === 'main') {
+        throw new Error(`Product Class "Main" is not available for Module ${Module}`);
+      }
       productValue = productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra'];
     } else {
       productValue = productClassMapMobile[ProductClass];
@@ -1066,6 +1188,384 @@ export const ProjectBasicInformationComplete = (
       cy.get('select[formcontrolname="packageDurationUnit"]')
         .find('option:selected')
         .should('have.text', 'Months');
+    }
+  })();
+};
+
+export const ProjectBasicInformationCompleteOtherPOSub = (
+  PriceType: 'onetime' | 'recurring' | 'usage',
+  PoSubgroup: 'AccountFee' | 'OrderFee' | 'CashBack' | 'Service' | 'GroupPoFee',
+  Module: 'POST' | 'PRE'
+): void => {
+  // --- Login ---
+  const credentials = (() => {
+    switch (Module) {
+      case 'POST': return { user: MKTpost, pass: MKTpost1 };
+      case 'PRE': return { user: MKTpre, pass: MKTpre1 };
+      default: return { user: MKTpost, pass: MKTpost1 };
+    }
+  })();
+
+  login(credentials.user, credentials.pass);
+
+  // --- Create Project ---
+  cy.get('.col-md-10 > .btn').should('be.visible').click();
+
+  let projectName: string;
+  if (Module === 'PRE' && (PoSubgroup === 'Service' || PoSubgroup === 'OrderFee')) {
+    projectName = `MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes}`;
+  } else {
+    projectName = `MOB ${Module} ${PoSubgroup} ${day}${month} ${hours}${minutes}`;
+  }
+
+  cy.get('input[formcontrolname="projectName"]').type(projectName);
+  Cypress.env('projectName', projectName);
+
+  // ตรวจสอบว่าเก็บค่าถูกต้อง
+  cy.log(`✅ Stored projectName: ${Cypress.env('projectName')}`);
+
+  // --- Date ---
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  cy.get('input[aria-label="Date input field"]').type(formattedDate);
+  cy.wait(2000);
+
+  // --- Phone ---
+  const randomPhone = `0${Math.floor(8 + Math.random() * 2)}${Math.floor(10000000 + Math.random() * 90000000)}`;
+  cy.get('input[formcontrolname="phoneNo"]').type(randomPhone);
+
+  // --- Save & Close ---
+  cy.get('button[type="button"]').contains('Save').click();
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait(2000);
+  cy.get('.modal-body > :nth-child(1) > div > .btn').click();
+
+  // --- Add PO ---
+  cy.get(':nth-child(4) > .btn').click();
+
+  let poName: string;
+  if (Module === 'PRE' && (PoSubgroup === 'Service' || PoSubgroup === 'OrderFee')) {
+    poName = `MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes}`;
+  }
+  else {
+    poName = `MOB ${Module} ${PoSubgroup} ${day}${month} ${hours}${minutes}`;
+  }
+
+  cy.get('input[formcontrolname="productName"]').type(poName);
+  Cypress.env('poName', poName);
+  cy.log(`✅ Stored poName: ${Cypress.env('poName')}`);
+
+  // Handle different PoSubgroup selections
+  const subGroupMap = {
+    AccountFee: 'Account Fee',
+    OrderFee: 'Order Fee',
+    CashBack: 'Cash Back',
+    Service: 'Service',
+    GroupPoFee: 'Group PO Fee'
+  };
+
+  if (subGroupMap[PoSubgroup]) {
+    cy.get('select[formcontrolname="promotionSubGroupFrom"]')
+      .select(subGroupMap[PoSubgroup])
+      .should('contain', subGroupMap[PoSubgroup]);
+  }
+
+  cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+
+  // Wait for button to appear
+  cy.contains('button', 'Create', { timeout: 10000 })
+    .should('be.visible')
+    .click();
+
+  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+
+  // --- Navigate to Product Offering ---
+  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
+  cy.wait('@getProject', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait(8000);
+
+  // --- Fill additional fields ---
+  (() => {
+
+    // Set PriceType for PRE Service/OrderFee
+    if (Module === 'PRE' && (PoSubgroup === 'OrderFee' || PoSubgroup === 'Service')) {
+      const priceTypeMap = {
+        onetime: 'One-Time',
+        recurring: 'Recurring',
+        usage: 'Usage'
+      };
+      const priceValue = priceTypeMap[PriceType];
+      cy.get('select[formcontrolname="priceType"]')
+        .select(priceValue, { force: true })
+        .should('have.value', priceValue);
+    }
+    if (Module === 'POST' && PoSubgroup === 'CashBack') {
+      // For productClass dropdown
+      // cy.get('select[formcontrolname="productClass"]')
+      //   .find('option:not([disabled])')
+      //   .then(($options) => {
+      //     const randomIndex = Math.floor(Math.random() * $options.length);
+      //     const value = $options.eq(randomIndex).val();
+
+      //     // Type guard to ensure value is not undefined
+      //     if (value && value !== '0: null') {
+      //       cy.get('select[formcontrolname="productClass"]').select(value);
+      //     }
+      //   });
+
+      // // For priceType dropdown  
+      // cy.get('select[formcontrolname="priceType"]')
+      //   .find('option:not([disabled])')
+      //   .then(($options) => {
+      //     const randomIndex = Math.floor(Math.random() * $options.length);
+      //     const value = $options.eq(randomIndex).val();
+
+      //     if (value && value !== '0: null') {
+      //       cy.get('select[formcontrolname="priceType"]').select(value);
+      //     }
+      //   });
+
+      // สุ่มตัวเลข 1-999 (เพราะ maxlength="5")
+      const randomDuration = Math.floor(Math.random() * 999) + 1;
+
+      cy.get('input[formcontrolname="duration"]')
+        .clear()
+        .type(randomDuration.toString())
+        .should('have.value', randomDuration.toString());
+
+      // const durationUnits = [
+      //   '1: Bill Cycle',
+      //   '2: Months',
+      //   '3: Month_Midnight'
+      // ];
+
+      // const randomUnit = durationUnits[Math.floor(Math.random() * durationUnits.length)];
+
+      // cy.get('select[formcontrolname="durationUnit"]')
+      //   .select(randomUnit)
+      //   .should('have.value', randomUnit);
+      // cy.wait(2000);
+    }
+    if (!(Module === 'POST' && PoSubgroup === 'CashBack')) {
+
+      function getRandomRealisticCharge(min = 100, max = 2000) {
+        return (Math.random() * (max - min) + min).toFixed(2);
+      }
+      const randomCharge = getRandomRealisticCharge();
+      const priceIncludingVAT = (parseFloat(randomCharge) * 1.07).toFixed(2);
+
+      // Price Excluding VAT
+      cy.get('input[formcontrolname="priceExcludingVAT"]')
+        .clear()
+        .type(randomCharge)
+        .should('have.value', randomCharge);
+
+      // Price Including VAT
+      cy.get('input[formcontrolname="priceIncludingVAT"]')
+        .clear()
+        .type(priceIncludingVAT)
+        .should('have.value', priceIncludingVAT);
+    }
+    // Additional fields based on PoSubgroup
+    if (PoSubgroup === 'Service') {
+      //promotion levels
+      const promotionLevels = ['Mobile', 'Account', 'Non-Mobile'] as const;
+
+      // Select random from known values
+      const randomPromotion = promotionLevels[Math.floor(Math.random() * promotionLevels.length)];
+
+      cy.get('select[formcontrolname="promotionLevel"]')
+        .select(randomPromotion)
+        .should('have.value', randomPromotion);
+
+      // SMS Wording Greeting Letter EN
+      cy.get('textarea[formcontrolname="wordingInStatementEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Greeting Letter Eng`);
+
+      // SMS Wording Greeting Letter TH
+      cy.get('textarea[formcontrolname="wordingInStatementTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Greeting Letter Thai`);
+
+      // SMS Greeting Flag
+      cy.get('select[formcontrolname="smsGreetingSendFlag"]')
+        .select('Send')
+
+      // SMS Greeting EN
+      cy.get('textarea[formcontrolname="smsGreetingEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} SMS Greeting Eng`);
+
+      // SMS Greeting TH
+      cy.get('textarea[formcontrolname="smsGreetingTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} SMS Greeting Thai`);
+
+      // SMS Delete Flag
+      cy.get('select[formcontrolname="smsDeleteSendFlag"]')
+        .select('Send')
+
+      // SMS Delete EN
+      cy.get('textarea[formcontrolname="smsDeleteEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} SMS Delete Eng`);
+
+      // SMS Delete TH
+      cy.get('textarea[formcontrolname="smsDeleteTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} SMS Delete Thai`);
+
+      // Description EN
+      cy.get('textarea[formcontrolname="descriptionEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} description Eng`);
+
+      // Description TH
+      cy.get('textarea[formcontrolname="descriptionTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} description Thai`);
+      // Discount Revenue Code
+      cy.get('input[formcontrolname="discountRevenueCode"]')
+        .type('APCP-009');
+
+      // Matching Product Offering
+      cy.get('select[formcontrolname="availableListBox"]').then(($select) => {
+        const optionCount = $select.find('option').length;
+
+        const maxSelections = Math.min(3, optionCount);
+        const numberOfSelections = Math.floor(Math.random() * maxSelections) + 1;
+
+        const selectedIndices = new Set<number>();
+        while (selectedIndices.size < numberOfSelections) {
+          const randomIndex = Math.floor(Math.random() * optionCount);
+          selectedIndices.add(randomIndex);
+        }
+
+        selectedIndices.forEach((index: number) => {
+          cy.get('select[formcontrolname="availableListBox"] option')
+            .eq(index)
+            .dblclick();
+        });
+      });
+      // Other Condition
+      cy.get('textarea[formcontrolname="otherCondition"]')
+        .type('Other Condition '.repeat(6))
+
+      // Memo Description
+      cy.get('textarea[formcontrolname="memoDescription"]')
+        .type('Memo Description '.repeat(6))
+    } else if (PoSubgroup === 'CashBack') {
+      // shortPromotionName  EN
+      cy.get('textarea[formcontrolname="shortPromotionNameEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Short Promotion Name Eng`);
+
+      // shortPromotionName TH
+      cy.get('textarea[formcontrolname="shortPromotionNameTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Short Promotion Name Thai`);
+
+      // promotionDescriptionEn 
+      cy.get('textarea[formcontrolname="promotionDescriptionEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Promotion Description Eng`);
+
+      // promotionDescription TH
+      cy.get('textarea[formcontrolname="promotionDescriptionTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Promotion Description Thai`);
+
+      // greetingLetterEn 
+      cy.get('textarea[formcontrolname="greetingLetterEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Greeting Letter Eng`);
+
+      // greetingLetter TH
+      cy.get('textarea[formcontrolname="greetingLetterTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Greeting Letter Thai`);
+
+      // yourPackageNameEn 
+      cy.get('textarea[formcontrolname="yourPackageNameEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Your PackageName Eng`);
+
+      // yourPackageNameEn 
+      cy.get('textarea[formcontrolname="yourPackageNameTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Your PackageName  Thai`);
+        // Matching Product Offering
+        cy.get('select[formcontrolname="availableListBox"]').then(($select) => {
+          const optionCount = $select.find('option').length;
+  
+          const maxSelections = Math.min(3, optionCount);
+          const numberOfSelections = Math.floor(Math.random() * maxSelections) + 1;
+  
+          const selectedIndices = new Set<number>();
+          while (selectedIndices.size < numberOfSelections) {
+            const randomIndex = Math.floor(Math.random() * optionCount);
+            selectedIndices.add(randomIndex);
+          }
+  
+          selectedIndices.forEach((index: number) => {
+            cy.get('select[formcontrolname="availableListBox"] option')
+              .eq(index)
+              .dblclick();
+          });
+        });
+        // Memo Description
+        cy.get('textarea[formcontrolname="memoDescription"]')
+          .type('Memo Description '.repeat(6))
+    }
+    else {
+      //productTypes
+      const productTypes = ['FBB', 'Fixline', 'Mobile', 'Non Mobile'] as const;
+
+      cy.get('select[formcontrolname="productType"]')
+        .then(() => {
+          const randomValue = productTypes[Math.floor(Math.random() * productTypes.length)];
+
+          cy.get('select[formcontrolname="productType"]')
+            .select(randomValue)
+            .should('have.value', randomValue);
+        });
+      // SMS Wording Greeting Letter EN
+      cy.get('textarea[formcontrolname="wordingInStatementEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Greeting Letter Eng`);
+
+      // SMS Wording Greeting Letter TH
+      cy.get('textarea[formcontrolname="wordingInStatementTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} Greeting Letter Thai`);
+
+      // Description EN
+      cy.get('textarea[formcontrolname="descriptionEn"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} description Eng`);
+
+      // Description TH
+      cy.get('textarea[formcontrolname="descriptionTh"]')
+        .type(`MOB ${Module} ${PriceType} ${PoSubgroup} ${day}${month} ${hours}${minutes} description Thai`);
+
+      // Discount Revenue Code
+      cy.get('input[formcontrolname="discountRevenueCode"]')
+        .type('APCP-009');
+
+      // Matching Product Offering
+      cy.get('select[formcontrolname="availableListBox"]').then(($select) => {
+        const optionCount = $select.find('option').length;
+
+        const maxSelections = Math.min(3, optionCount);
+        const numberOfSelections = Math.floor(Math.random() * maxSelections) + 1;
+
+        const selectedIndices = new Set<number>();
+        while (selectedIndices.size < numberOfSelections) {
+          const randomIndex = Math.floor(Math.random() * optionCount);
+          selectedIndices.add(randomIndex);
+        }
+
+        selectedIndices.forEach((index: number) => {
+          cy.get('select[formcontrolname="availableListBox"] option')
+            .eq(index)
+            .dblclick();
+        });
+      });
+
+      // Other Condition
+      cy.get('textarea[formcontrolname="otherCondition"]')
+        .type('Other Condition '.repeat(6))
+
+      // Memo Description
+      cy.get('textarea[formcontrolname="memoDescription"]')
+        .type('Memo Description '.repeat(6))
     }
   })();
 };
@@ -1215,7 +1715,6 @@ type SmsDropdown = {
  * จากนั้นค้นหาปุ่ม 'Close' (สีแดง) และคลิกปิด
  */
 const closeSuccessModal = (): void => {
-  cy.log('Waiting for success modal and closing it.');
 
   // Wait for the modal to appear
   cy.get('.modal-dialog', { timeout: 20000 }).should('be.visible');
@@ -1462,7 +1961,7 @@ const standardBeforeApproveCKS = (): void => {
   cy.wait(3500)
 
   // ใช้ global variable ที่ตั้งค่าไว้ตอนสร้างโปรเจกต์
-  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
   cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
 
   //  ClaimProjectCKS from Unassigned Task
@@ -1555,7 +2054,7 @@ export const beforeapproveMKT = () => {
   cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
 
   cy.wait(3500)
-  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
   cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
 
   //  ClaimProjectCKS from Unassigned Task
@@ -1788,7 +2287,7 @@ const standardCksPoEnhancementFlow = (
   cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 
   // รอ url
-  cy.url({ timeout: 3000000 }).should('include', 'mass-enh-product-offering-detail');
+  cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/)
   cy.wait(3500); // Wait คงที่ตามโค้ดเดิม
 
   // *** เรียกใช้ฟังก์ชัน "ขั้นตอนเฉพาะ" ที่ส่งเข้ามา ***
@@ -1887,7 +2386,7 @@ const performSimpleApprovalRole = (
   cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
   cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
+  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) || formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('poName') as string;
   // const projectNamePONAME = 'MUSIC POST onetime ontop 3110 1008';
   cy.log('Project Name: ' + projectNamePONAME);
 
@@ -1909,7 +2408,7 @@ const performSimpleClaimAndApprovalRole = (
   cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
   cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
+  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) || formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('poName') as string;
   cy.log('Project Name: ' + projectNamePONAME);
 
   ClaimProjectCKS(projectNamePONAME); // ใช้ ClaimProjectCKS ตามโค้ดเดิม
@@ -1926,7 +2425,7 @@ const performSimpleClaimAndApprovalRole = (
 export const afterMKTMAINPOST = (): void => {
   it('CKS role', () => {
     // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
-    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
+    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
 
     // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
     standardCksPoEnhancementFlow(getProjectName, () => {
@@ -1940,14 +2439,149 @@ export const afterMKTMAINPOST = (): void => {
 
   afterCKSPOST();
 }
+export const afterMKTothersubgroup = (PoSubgroup: string, Module: string): void => {
+  if (Module === 'POST') {
+    it('CKS role', () => {
+      // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
+      const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
 
-export const afterCKSPOST = (segment?: string): void => {
+      // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
+      standardCksPoEnhancementFlow(getProjectName, () => {
+        beforeapproveCKS();
+        // --- จบส่วนที่แตกต่าง ---
+      });
+    });
+    it('CGMD Config IRB role', () => {
+      performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD);
+    });
+    it('CGMD Tester IRB role', () => {
+      performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtesterACTM);
+    });
+    if (PoSubgroup === 'AccountFee' || PoSubgroup === 'OrderFee') {
+      it('SASFF role', () => {
+        login(sasff, sasffpass);
+        cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+        cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+        const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+
+        cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+        ClaimProjectCKS(finalProjectName);
+        approveProject(finalProjectName);
+        // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+        cy.url({ timeout: 60000 }).should('include', '/cgmd/sasff-tester');
+        cy.wait(3000);
+
+        cy.scrollTo('bottom');
+        cy.wait(3000);
+        cy.contains('button', 'Promote').should('be.visible').click({ force: true });
+
+        // verify alert
+        cy.on('window:alert', (txt) => {
+          expect(txt).to.contain('Approve and Send Mail Notify Success');
+        });
+
+        cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+        cy.contains('button', 'Logout')
+          .should('be.visible')
+          .click();
+      });
+    }
+    it('ACTM role', () => {
+      performSimpleApprovalRole(actm, actmpass, approveProjectCGMDACTM);
+    });
+
+    it('OPER role', () => {
+      performSimpleApprovalRole(oper, operpass, approveProjectCGMDOPER);
+    });
+  } else if (Module === 'PRE') {
+    it('CKS role', () => {
+      // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
+      const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
+
+      // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
+      standardCksPoEnhancementFlow(getProjectName, () => {
+        beforeapproveCKS();
+        // --- จบส่วนที่แตกต่าง ---
+      });
+    });
+    it('CGMD Config cbs role', () => {
+      performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE);
+    });
+
+    it('CGMD Tester CBS role', () => {
+      performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE);
+    });
+    if (PoSubgroup === 'AccountFee' || PoSubgroup === 'OrderFee') {
+      it('SASFF role', () => {
+        login(sasff, sasffpass);
+        cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+        cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+
+        const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+
+        cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+        ClaimProjectCKS(finalProjectName);
+        approveProject(finalProjectName);
+        // ดักจับ API ที่ใช้โหลดข้อมูล To Do List ทั้งหมด
+        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+        cy.url({ timeout: 60000 }).should('include', '/cgmd/sasff-tester');
+        cy.wait(3000);
+
+        cy.scrollTo('bottom');
+        cy.wait(3000);
+        cy.contains('button', 'Promote').should('be.visible').click({ force: true });
+
+        // verify alert
+        cy.on('window:alert', (txt) => {
+          expect(txt).to.contain('Approve and Send Mail Notify Success');
+        });
+
+        cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+
+        cy.contains('button', 'Logout')
+          .should('be.visible')
+          .click();
+      });
+    }
+    it('Spadsup role', () => {
+      performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup);
+    });
+
+    it('Spaddoer role', () => {
+      performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER);
+    });
+
+    it('Spadtester role', () => {
+      performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester);
+    });
+
+    it('Spaddeploy role', () => {
+      performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy);
+    });
+
+    it('ACTM role', () => {
+      performSimpleApprovalRole(actm, actmpass, approveProjectCGMDACTMPRE);
+    });
+
+    it('APO role', () => {
+      performSimpleApprovalRole(apo, apopass, approveProjectCGMDAPO);
+    });
+
+  }
+}
+
+export const afterCKSPOST = (Module?: string): void => {
   it('CGMD Config IRB role', () => {
     performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD);
   });
 
   it('CGMD Tester IRB role', () => {
-    performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtesterProACTM);
+    performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtesterACTM);
   });
 
   it('ACTM role', () => {
@@ -1962,7 +2596,7 @@ export const afterCKSPOST = (segment?: string): void => {
 export const afterMKTMainUsagePOST = (): void => {
   it('CKS role', () => {
     // 1. ระบุฟังก์ชันสำหรับดึงชื่อโปรเจกต์
-    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
+    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
 
     // 2. เรียก Flow CKS มาตรฐาน และส่ง "ขั้นตอนเฉพาะ" เข้าไป
     standardCksPoEnhancementFlow(getProjectName, () => {
@@ -1981,9 +2615,9 @@ export const afterMKTMainUsagePOST = (): void => {
 
 export const afterMKTontopPOST = (): void => {
   it('CKS role', () => {
-    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
+    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
     standardCksPoEnhancementFlow(getProjectName, () => {
-      cy.log('Executing steps for POST segment');
+      cy.log('Executing steps for POST Module');
       cy.get('select[formcontrolname="groupPackage"]').select('5G Hot Deal Max Speed Offset');
       priorityInternetLimitedDataOnly();
       beforeapproveCKSontop();
@@ -1993,9 +2627,9 @@ export const afterMKTontopPOST = (): void => {
 }
 export const afterMKTontopENTER = (): void => {
   it('CKS role', () => {
-    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
+    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
     standardCksPoEnhancementFlow(getProjectName, () => {
-      cy.log('Executing steps for ENTER segment');
+      cy.log('Executing steps for ENTER Module');
       cy.get('select[formcontrolname="groupPackage"]').select('5G Hot Deal Max Speed Offset');
       priorityInternetLimitedDataOnly();
       beforeapproveCKSontop();
@@ -2006,9 +2640,9 @@ export const afterMKTontopENTER = (): void => {
 
 export const afterMKTontopMUSIC = (): void => {
   it('CKS role', () => {
-    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName')) as string;
+    const getProjectName: GetProjectNameFn = () => (formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) as string;
     standardCksPoEnhancementFlow(getProjectName, () => {
-      cy.log('Executing steps for MUSIC segment');
+      cy.log('Executing steps for MUSIC Module');
       cy.get('select[formcontrolname="groupPackage"]').select('5G Hot Deal Max Speed Offset');
       priorityInternetLimitedDataOnly();
       beforeapproveCKSontop();
@@ -2017,13 +2651,13 @@ export const afterMKTontopMUSIC = (): void => {
   afterCKSCommon('MUSIC');
 }
 
-const afterCKSCommon = (segment: string): void => {
+const afterCKSCommon = (Module: string): void => {
   it('CGMD Config IRB role', () => {
     performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD);
   });
 
   it('CGMD Tester IRB role', () => {
-    performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtesterProACTM);
+    performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtesterACTM);
   });
 
   it('ACTM role', () => {
@@ -2034,7 +2668,7 @@ const afterCKSCommon = (segment: string): void => {
     performSimpleApprovalRole(oper, operpass, approveProjectCGMDOPER);
   });
 
-  if (segment === 'MUSIC') {
+  if (Module === 'MUSIC') {
     it('TSCENTER role', () => {
       login(tscenter, tscenterpass);
 
@@ -2109,7 +2743,7 @@ const afterCKSCommon = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProjectCKS(finalProjectName);
@@ -2142,7 +2776,16 @@ const afterCKSCommon = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
+      const finalProjectName =
+        Cypress.env('formattedDateMain') ||
+        Cypress.env('formattedDateOntop') ||
+        Cypress.env('formattedDateOntopExtra') ||
+        Cypress.env('formattedDateMainPONAME') ||
+        Cypress.env('formattedDateOntopPONAME') ||
+        Cypress.env('formattedDateOntopExtraPONAME') ||
+        'default-project-name';
+
+      cy.log('🎯 Project ใช้สำหรับ Claim: ' + finalProjectName);
       // const finalProjectName = 'MUSIC POST onetime ontop 0311 1635'
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       // ClaimProjectCKS(finalProjectName);
@@ -2195,7 +2838,7 @@ const afterCKSCommon = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       approveProject(finalProjectName);
@@ -2260,7 +2903,7 @@ const afterCKSCommon = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProjectCKS(finalProjectName);
@@ -2452,7 +3095,7 @@ export const afterMKTontopPREMUSIC = (): void => {
   afterCKSCommonPRE('MUSIC');
 }
 
-const afterCKSCommonPRE = (segment: string): void => {
+const afterCKSCommonPRE = (Module: string): void => {
   it('CGMD Config cbs role', () => {
     performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE);
   });
@@ -2485,7 +3128,7 @@ const afterCKSCommonPRE = (segment: string): void => {
     performSimpleApprovalRole(apo, apopass, approveProjectCGMDAPO);
   });
 
-  if (segment === 'MUSIC') {
+  if (Module === 'MUSIC') {
     it('TSCENTER role', () => {
       login(tscenter, tscenterpass);
 
@@ -2560,7 +3203,7 @@ const afterCKSCommonPRE = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProjectCKS(finalProjectName);
@@ -2645,7 +3288,7 @@ const afterCKSCommonPRE = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       approveProject(finalProjectName);
@@ -2710,7 +3353,7 @@ const afterCKSCommonPRE = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProjectCKS(finalProjectName);
@@ -2775,7 +3418,7 @@ const afterCKSCommonPRE = (segment: string): void => {
     });
   }
 }
-const afterCKSCommonPREplugin = (segment: string): void => {
+const afterCKSCommonPREplugin = (Module: string): void => {
   it('CGMD Config cbs role', () => {
     performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE);
   });
@@ -2803,7 +3446,7 @@ const afterCKSCommonPREplugin = (segment: string): void => {
     performSimpleApprovalRole(apo, apopass, approveProjectCGMDAPO);
   });
 
-  if (segment === 'MUSIC') {
+  if (Module === 'MUSIC') {
     it('TSCENTER role', () => {
       login(tscenter, tscenterpass);
 
@@ -2878,7 +3521,7 @@ const afterCKSCommonPREplugin = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProjectCKS(finalProjectName);
@@ -2963,7 +3606,7 @@ const afterCKSCommonPREplugin = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       approveProject(finalProjectName);
@@ -3028,7 +3671,7 @@ const afterCKSCommonPREplugin = (segment: string): void => {
       cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
       cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 
-      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+      const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProjectCKS(finalProjectName);
@@ -3182,7 +3825,7 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
     cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
     cy.get('body').should('be.visible');
 
-    const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+    const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
     cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
     ClaimProjectCKS(finalProjectName);
@@ -3202,7 +3845,7 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
 
     cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
     cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-    cy.url().should('include', 'mass-enh-product-offering-detail');
+    cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/)
 
     dropdownRecurringCKSMain();
     unregister();
@@ -3257,7 +3900,7 @@ export const afterMKTMainPRE_PluginCGMD = (): void => {
     cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
     cy.get('body').should('be.visible');
 
-    const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName');
+    const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME');
 
     cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
     ClaimProjectCKS(finalProjectName);
@@ -3277,7 +3920,7 @@ export const afterMKTMainPRE_PluginCGMD = (): void => {
 
     cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
     cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-    cy.url().should('include', 'mass-enh-product-offering-detail');
+    cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/)
 
     dropdownRecurringCKSMain();
     unregister();
