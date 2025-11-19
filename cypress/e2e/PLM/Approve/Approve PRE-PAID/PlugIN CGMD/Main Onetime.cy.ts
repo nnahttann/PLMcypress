@@ -1,4 +1,4 @@
-import * as Master from '../../Master';
+import * as Master from '../../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -11,7 +11,7 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { type: 'Main', Module: 'PRE', autoSetDuration: true });
+    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module : 'PRE', autoSetDuration: true });
 
     //targetgroup
     Master.selectTargetGroup('mass');
@@ -51,11 +51,9 @@ describe('Mobile', () => {
         });
     });
     cy.scrollTo('top');
-    //allowMvpn
-    // cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-    // Auto Add Service 5G Select the second option ('Auto Add')
-    // cy.get('#service-options').select(1);
+    
     Master.dropdownPromotionGroup();
+
     Master.InternetLimitedDataOnly();
 
     Master.smsWordingpre();
@@ -79,6 +77,6 @@ describe('Mobile', () => {
       Master.beforeapproveMKT();
     });
   });
-  Master.afterMKTMainPRE_FullSpadFlow();
+  Master.afterMKTMainPRE_PluginCGMD();
 });
 

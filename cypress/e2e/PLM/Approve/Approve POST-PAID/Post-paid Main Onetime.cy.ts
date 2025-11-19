@@ -1,20 +1,22 @@
-import * as Master from '../../../Master';
+import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
-  cy.window().then((win) => {
-    win.sessionStorage.clear();
-  });
+  Cypress.env('formattedDateMain', undefined);
+  Cypress.env('formattedDateOntop', undefined);
+  Cypress.env('formattedDateOntopExtra', undefined);
+  Cypress.env('formattedDateMainPONAME', undefined);
+  Cypress.env('formattedDateOntopPONAME', undefined);
+  Cypress.env('formattedDateOntopExtraPONAME', undefined);
   cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { type: 'Main', segment: 'PRE', autoSetDuration: true });
-
+    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1:'Main', Module:'POST', autoSetDuration:true });
     //targetgroup
-    Master.selectTargetGroup('mass');
+    Master.selectTargetGroup('random');
 
     //Remark 
     cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
@@ -50,18 +52,15 @@ describe('Mobile', () => {
           cy.wrap($option).dblclick();
         });
     });
-    cy.scrollTo('top');
-    
     Master.dropdownPromotionGroup();
-
     Master.InternetLimitedDataOnly();
 
-    Master.smsWordingpre();
+    Master.smsWording();
 
     Master.backBacicInfo();
 
     //Add File
-    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
+    cy.get('input[type="file"]', { timeout: 1000000 }).should('exist');
     cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
@@ -77,6 +76,6 @@ describe('Mobile', () => {
       Master.beforeapproveMKT();
     });
   });
-  Master.afterMKTMainPRE_PluginCGMD();
+  Master.afterMKTMAINPOST();
 });
 
