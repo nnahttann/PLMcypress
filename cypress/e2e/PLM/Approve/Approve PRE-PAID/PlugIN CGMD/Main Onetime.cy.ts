@@ -11,7 +11,7 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module : 'PRE', autoSetDuration: true });
+    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module: 'PRE', autoSetDuration: true });
 
     //targetgroup
     Master.selectTargetGroup('mass');
@@ -51,7 +51,7 @@ describe('Mobile', () => {
         });
     });
     cy.scrollTo('top');
-    
+
     Master.dropdownPromotionGroup();
 
     Master.InternetLimitedDataOnly();
@@ -60,22 +60,7 @@ describe('Mobile', () => {
 
     Master.backBacicInfo();
 
-    //Add File
-    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-    cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-
-    cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
-      cy.get('input[type="file"][id="files"]').selectFile(
-        {
-          contents: Cypress.Buffer.from(fileContent, 'binary'),
-          fileName: 'file.pdf',
-          mimeType: 'application/pdf',
-        },
-        { force: true }
-      );
-      Master.beforeapproveMKT();
-    });
+    Master.addFile();
   });
   Master.afterMKTMainPRE_PluginCGMD();
 });

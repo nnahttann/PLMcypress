@@ -12,14 +12,14 @@ beforeEach(() => {
 });
 
 // Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTprepaidFlow = (segment: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subSegment?: string) => {
+const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
   const config: any = {
     type: 'OntopExtra',
-    segment: segment,
+    Module: Module,
     autoSetDuration: true
   };
-  if (subSegment) {
-    config.subSegment = subSegment;
+  if (subModule) {
+    config.subModule = subModule;
   }
 
   Master.ProjectBasicInformationComplete('onetime', 'ontopextra', config);
@@ -45,8 +45,8 @@ const runMKTprepaidFlow = (segment: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subSegmen
         cy.wrap($option).dblclick();
       });
   });
-  if (segment === 'PRE') {
-    // allowMvpn สำหรับ PRE segment
+  if (Module === 'PRE') {
+    // allowMvpn สำหรับ PRE Module
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     Master.dropdownPromotionGroup();
     Master.InternetLimitedDataOnly();
@@ -67,17 +67,7 @@ const runMKTprepaidFlow = (segment: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subSegmen
   // cy.wait('@preRequest', { timeout: 10000 }).its('response.statusCode').should('eq', 200);
   cy.wait('@getRequest', { timeout: 10000 }).its('response.statusCode').should('eq', 200);
 
-  cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
-    cy.get('input[type="file"][id="files"]').selectFile(
-      {
-        contents: Cypress.Buffer.from(fileContent, 'binary'),
-        fileName: 'file.pdf',
-        mimeType: 'application/pdf',
-      },
-      { force: true }
-    );
-    Master.beforeapproveMKT();
-  });
+  Master.addFile();
 };
 
 describe('PLM', () => {

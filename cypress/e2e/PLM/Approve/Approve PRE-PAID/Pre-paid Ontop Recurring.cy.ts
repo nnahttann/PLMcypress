@@ -12,15 +12,15 @@ beforeEach(() => {
 });
 
 // Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTPostpaidFlow = (segment: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subSegment?: string) => {
+const runMKTPostpaidFlow = (Module: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
   const config: any = {
     type: 'Ontop',
-    segment: segment,
+    Module: Module,
     autoSetDuration: true
   };
 
-  if (subSegment) {
-    config.subSegment = subSegment;
+  if (subModule) {
+    config.subModule = subModule;
   }
 
   Master.ProjectBasicInformationComplete('recurring', 'ontop', config);
@@ -56,17 +56,7 @@ const runMKTPostpaidFlow = (segment: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subSegme
   cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
-  cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
-    cy.get('input[type="file"][id="files"]').selectFile(
-      {
-        contents: Cypress.Buffer.from(fileContent, 'binary'),
-        fileName: 'file.pdf',
-        mimeType: 'application/pdf',
-      },
-      { force: true }
-    );
-    Master.beforeapproveMKT();
-  });
+Master.addFile();
 };
 
 describe.only('PLM', () => {
