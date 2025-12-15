@@ -4,9 +4,6 @@ import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
-  cy.window().then((win) => {
-    win.sessionStorage.clear();
-  });
   cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
@@ -47,10 +44,9 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule
       });
   });
   Master.dropdownPromotionGroup();
-  Master.InternetLimitedDataOnly();
+  Master.InternetRandom('notrecurring');
   Master.smsWording();
   Master.backBacicInfo();
-
   Master.addFile();
 };
 

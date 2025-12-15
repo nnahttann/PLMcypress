@@ -46,7 +46,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule
       });
   });
   Master.dropdownPromotionGroup();
-  Master.InternetLimitedDataOnly();
+  Master.InternetRandom('notrecurring');
   Master.smsWording();
   Master.backBacicInfo();
 

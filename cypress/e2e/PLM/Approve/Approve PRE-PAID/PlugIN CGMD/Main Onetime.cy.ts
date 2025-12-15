@@ -10,11 +10,11 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT POSTPAID role', () => {
+  it('MKT PREPAID role', () => {
     Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module: 'PRE', autoSetDuration: true });
 
     //targetgroup
-    Master.selectTargetGroup('mass');
+    Master.selectTargetGroup('random');
 
     //Remark 
     cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
@@ -54,7 +54,7 @@ describe('Mobile', () => {
 
     Master.dropdownPromotionGroup();
 
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandom();
 
     Master.smsWordingpre();
 

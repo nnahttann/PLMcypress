@@ -49,24 +49,15 @@ const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?
     // allowMvpn สำหรับ PRE Module
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandom();
     Master.smsWordingpre();
     Master.backBacicInfo();
   } else {
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandom();
     Master.smsWordingpre();
     Master.backBacicInfo();
   }
-
-
-  // Add File
-  cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-
-  // รอ network requests (ต้องมี intercept ก่อนหน้านี้ใน test)
-  // cy.wait('@preRequest', { timeout: 10000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 10000 }).its('response.statusCode').should('eq', 200);
-
   Master.addFile();
 };
 

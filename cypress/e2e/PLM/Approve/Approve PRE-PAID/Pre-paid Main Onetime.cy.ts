@@ -10,7 +10,7 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT POSTPAID role', () => {
+  it('MKT PRE-PAID role', () => {
     Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module: 'PRE', autoSetDuration: true });
 
     //targetgroup
@@ -51,12 +51,8 @@ describe('Mobile', () => {
         });
     });
     cy.scrollTo('top');
-    //allowMvpn
-    // cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-    // Auto Add Service 5G Select the second option ('Auto Add')
-    // cy.get('#service-options').select(1);
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandom('notrecurring');
 
     Master.smsWordingpre();
 

@@ -44,14 +44,14 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule
       });
   });
   Master.dropdownPromotionGroup();
-  Master.InternetLimitedDataOnly();
+  Master.InternetRandom('notrecurring');
   Master.smsWording();
   Master.backBacicInfo();
   Master.addFile();
 };
 
 describe('PLM', () => {
-  describe.only('Scenario: Mob POST', () => {
+  describe('Scenario: Mob POST', () => {
     it('MKT POSTPAID role', () => {
       runMKTPostpaidFlow('POST');
     });
@@ -65,7 +65,7 @@ describe('PLM', () => {
     Master.afterMKTontopENTER();
   });
 
-  describe('Scenario: MUSIC', () => {
+  describe.only('Scenario: MUSIC', () => {
     it('MKT POSTPAID role', () => {
       runMKTPostpaidFlow('MUSIC', 'POST');
     });

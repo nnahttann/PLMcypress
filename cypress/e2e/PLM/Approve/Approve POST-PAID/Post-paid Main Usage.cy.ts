@@ -50,7 +50,7 @@ describe('Mobile', () => {
         });
     });
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandom('notrecurring');
 
     Master.smsWording();
 

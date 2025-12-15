@@ -51,13 +51,13 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModul
     // allowMvpn สำหรับ PRE Module
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnlyPRERecurring();
+    Master.InternetRandom();
     Master.smsWordingpre();
     Master.RetryPattern();
     Master.backBacicInfo();
   } else {
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandomPRERecurring();
     Master.smsWordingpre();
     Master.RetryPattern();
     Master.backBacicInfo();

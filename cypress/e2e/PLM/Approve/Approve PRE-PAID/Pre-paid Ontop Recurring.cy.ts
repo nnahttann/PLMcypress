@@ -12,7 +12,7 @@ beforeEach(() => {
 });
 
 // Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTPostpaidFlow = (Module: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
+const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
   const config: any = {
     type: 'Ontop',
     Module: Module,
@@ -46,20 +46,25 @@ const runMKTPostpaidFlow = (Module: 'POST' |'PRE' | 'ENTER' | 'MUSIC', subModule
         cy.wrap($option).dblclick();
       });
   });
+
+  if (Module === 'PRE') {
+    // allowMvpn สำหรับ PRE Module
+    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    Master.ontopCondition();
+    Master.InternetRandom('recurring');
+  }
+  else {
+    Master.dropdownPromotionGroup();
+    Master.InternetRandom('notrecurring');
+  }
+  Master.RetryPattern();
   Master.dropdownPromotionGroup();
-  Master.InternetLimitedDataOnlyPRERecurring();
   Master.smsWordingpre();
   Master.backBacicInfo();
-
-  // Add File
-  cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-
-Master.addFile();
+  Master.addFile();
 };
 
-describe.only('PLM', () => {
+describe('PLM', () => {
   describe('Scenario: Mob PRE', () => {
     it('MKT PREPAIDrole', () => {
       runMKTPostpaidFlow('PRE');
@@ -74,7 +79,7 @@ describe.only('PLM', () => {
     Master.afterMKTontopPREENTER();
   });
 
-  describe('Scenario: MUSIC', () => {
+  describe.only('Scenario: MUSIC', () => {
     it('MKT PREPAIDrole', () => {
       runMKTPostpaidFlow('MUSIC', 'PRE');
     });

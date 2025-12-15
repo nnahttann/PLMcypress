@@ -48,25 +48,16 @@ const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?
   if (Module === 'PRE') {
     // allowMvpn สำหรับ PRE Module
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    // Master.ontopCondition();
+  } 
+  else if ((Module === 'ENTER')) {
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
-    Master.smsWordingpre();
-    Master.backBacicInfo();
-  } else {
-    Master.dropdownPromotionGroup();
-    Master.smsWordingpre();
-    Master.InternetLimitedDataOnly();
-    Master.backBacicInfo();
   }
-
-
-  // Add File
-  cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-
-  // รอ network requests (ต้องมี intercept ก่อนหน้านี้ใน test)
-  // cy.wait('@preRequest', { timeout: 10000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 10000 }).its('response.statusCode').should('eq', 200);
-
+  // Master.RetryPattern();
+  Master.dropdownPromotionGroup();
+  Master.InternetRandom();
+  Master.smsWordingpre();
+  Master.backBacicInfo();
   Master.addFile();
 };
 
@@ -78,14 +69,14 @@ describe('PLM', () => {
     Master.afterMKTontopPRE();
   });
 
-  describe('Scenario: ENTER', () => {
+  describe.only('Scenario: ENTER', () => {
     it('MKT PREPAIDrole', () => {
       runMKTprepaidFlow('ENTER', 'PRE');
     });
     Master.afterMKTontopPREENTER();
   });
 
-  describe.only('Scenario: MUSIC', () => {
+  describe('Scenario: MUSIC', () => {
     it('MKT PREPAIDrole', () => {
       runMKTprepaidFlow('MUSIC', 'PRE');
     });

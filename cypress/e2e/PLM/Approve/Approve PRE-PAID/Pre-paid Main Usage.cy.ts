@@ -56,7 +56,7 @@ describe('Mobile', () => {
     // Auto Add Service 5G Select the second option ('Auto Add')
     // cy.get('#service-options').select(1);
     Master.dropdownPromotionGroup();
-    Master.InternetLimitedDataOnly();
+    Master.InternetRandom();
 
     Master.smsWordingpre();
 

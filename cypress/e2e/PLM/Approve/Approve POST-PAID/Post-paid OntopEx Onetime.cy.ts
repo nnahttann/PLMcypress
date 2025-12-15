@@ -4,14 +4,10 @@ import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
-  cy.window().then((win) => {
-    win.sessionStorage.clear();
-  });
   cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
 
-// Helper function สำหรับรัน test flow ทั้งหมด
 const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule?: string) => {
   const config: any = {
     type: 'Ontop',
@@ -46,7 +42,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule
       });
   });
   Master.dropdownPromotionGroup();
-  Master.InternetLimitedDataOnly();
+  Master.InternetRandom('recurring');
   Master.smsWording();
   Master.backBacicInfo();
 
