@@ -35,7 +35,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModul
 
   // Target group
   Master.targetgroup();
-
+  Master.RandomProductSpecification();
   // ProductSpec
   const optionsToSelectProductSpec = ["Internet"];
 
@@ -57,7 +57,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModul
     Master.backBacicInfo();
   } else {
     Master.dropdownPromotionGroup();
-    Master.InternetRandomPRERecurring();
+    Master.InternetRandom('recurring');
     Master.smsWordingpre();
     Master.RetryPattern();
     Master.backBacicInfo();

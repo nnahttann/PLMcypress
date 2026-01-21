@@ -17,13 +17,13 @@ describe('Mobile', () => {
     Master.selectTargetGroup('random');
 
     //Remark 
-    cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
+    cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.'.repeat(5));
 
     Master.PriceExcluding();
 
     //*Target group
     Master.targetgroup();
-
+    Master.RandomProductSpecification();
     //ProductSpec
     const optionsToSelectProductSpec = [
       // "AI IP Camera",
@@ -51,11 +51,11 @@ describe('Mobile', () => {
         });
     });
     cy.scrollTo('top');
+
     Master.dropdownPromotionGroup();
     Master.InternetRandom('notrecurring');
-
+    Master.Randomdropdown();
     Master.smsWordingpre();
-
     Master.backBacicInfo();
 
     Master.addFile();

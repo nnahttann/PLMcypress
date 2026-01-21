@@ -35,7 +35,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModul
 
   // Target group
   Master.targetgroup();
-
+  Master.RandomProductSpecification();
   // ProductSpec
   const optionsToSelectProductSpec = ["Internet"];
 
@@ -50,7 +50,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModul
   if (Module === 'PRE') {
     // allowMvpn สำหรับ PRE Module
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-    Master.ontopCondition();
+    // Master.ontopCondition();
     Master.InternetRandom('recurring');
   }
   else {

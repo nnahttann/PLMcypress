@@ -32,7 +32,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule
 
   // Target group
   Master.targetgroup();
-
+  Master.RandomProductSpecification();
   // ProductSpec
   const optionsToSelectProductSpec = ["Internet"];
 

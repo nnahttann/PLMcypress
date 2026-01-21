@@ -11,8 +11,12 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('recurring', 'main', { ProductClass1: 'Main', Module: 'PRE', autoSetDuration: true });
-
+    Master.ProjectBasicInformationComplete('recurring', 'main', { 
+      ProductClass1: 'Main', 
+      Module: 'PRE', 
+      autoSetDuration: true,
+      Plugin: 'Plg'
+    });
     //targetgroup
     Master.selectTargetGroup('random');
 

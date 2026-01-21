@@ -1,4 +1,4 @@
-import * as Master from '../../Master';
+import * as Master from '../../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -10,8 +10,14 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('recurring', 'main', { ProductClass1: 'Main', Module: 'POST', autoSetDuration: true });
+  it('MKT PREPAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'main', { 
+      ProductClass1: 'Main', 
+      Module: 'PRE', 
+      autoSetDuration: true,
+      Plugin: 'Pl'
+    });
+
     //targetgroup
     Master.selectTargetGroup('random');
 
@@ -22,7 +28,7 @@ describe('Mobile', () => {
 
     //*Target group
     Master.targetgroup();
-    Master.RandomProductSpecification();
+
     //ProductSpec
     const optionsToSelectProductSpec = [
       // "AI IP Camera",
@@ -49,15 +55,18 @@ describe('Mobile', () => {
           cy.wrap($option).dblclick();
         });
     });
-    Master.dropdownPromotionGroup();
-    Master.InternetRandom('notrecurring');
-  
+    cy.scrollTo('top');
 
-    Master.smsWording();
+    Master.dropdownPromotionGroup();
+
+    Master.InternetRandom('notrecurring');
+
+    Master.smsWordingpre();
 
     Master.backBacicInfo();
+
     Master.addFile();
   });
-  Master.afterMKTMAINPOST();
+  Master.afterMKTMainPRE_NotComplex();
 });
 

@@ -22,7 +22,7 @@ describe('Mobile', () => {
 
     //*Target group
     Master.targetgroup();
-
+    Master.RandomProductSpecification();
     //ProductSpec
     const optionsToSelectProductSpec = [
       // "AI IP Camera",

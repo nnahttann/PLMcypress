@@ -34,7 +34,7 @@ const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?
 
   // Target group
   Master.targetgroup();
-
+  Master.RandomProductSpecification();
   // ProductSpec
   const optionsToSelectProductSpec = ["Internet"];
 
@@ -49,12 +49,12 @@ const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?
     // allowMvpn สำหรับ PRE Module
     cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
     Master.dropdownPromotionGroup();
-    Master.InternetRandom();
+    Master.InternetRandom('notrecurring');
     Master.smsWordingpre();
     Master.backBacicInfo();
   } else {
     Master.dropdownPromotionGroup();
-    Master.InternetRandom();
+    Master.InternetRandom('notrecurring');
     Master.smsWordingpre();
     Master.backBacicInfo();
   }

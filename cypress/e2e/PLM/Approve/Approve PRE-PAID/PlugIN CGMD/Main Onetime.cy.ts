@@ -11,7 +11,12 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT PREPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module: 'PRE', autoSetDuration: true });
+    Master.ProjectBasicInformationComplete('onetime', 'main', { 
+      ProductClass1: 'Main', 
+      Module: 'PRE', 
+      autoSetDuration: true,
+      Plugin: 'Pl'
+    });
 
     //targetgroup
     Master.selectTargetGroup('random');
@@ -54,7 +59,7 @@ describe('Mobile', () => {
 
     Master.dropdownPromotionGroup();
 
-    Master.InternetRandom();
+    Master.InternetRandom('notrecurring');
 
     Master.smsWordingpre();
 
@@ -62,6 +67,6 @@ describe('Mobile', () => {
 
     Master.addFile();
   });
-  Master.afterMKTMainPRE_PluginCGMD();
+  Master.afterMKTMainPRE_NotComplex();
 });
 

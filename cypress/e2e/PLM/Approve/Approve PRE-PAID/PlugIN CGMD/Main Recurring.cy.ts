@@ -11,8 +11,12 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT PREPAID role', () => {
-    Master.ProjectBasicInformationComplete('recurring', 'main', { ProductClass1: 'Main', Module: 'PRE', autoSetDuration: true });
-
+    Master.ProjectBasicInformationComplete('recurring', 'main', { 
+      ProductClass1: 'Main', 
+      Module: 'PRE', 
+      autoSetDuration: true,
+      Plugin: 'Pl'
+    });
     //targetgroup
     Master.selectTargetGroup('random');
 
@@ -51,17 +55,17 @@ describe('Mobile', () => {
         });
     });
     cy.scrollTo('top');
-
+    //allowMvpn
+    // cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+    // Auto Add Service 5G Select the second option ('Auto Add')
+    // cy.get('#service-options').select(1);
     Master.dropdownPromotionGroup();
-    
-    Master.InternetRandomPRERecurring();
-
+    Master.InternetRandom('recurring');
+    Master.CopyDeductFail();
+    Master.RetryPattern();
     Master.smsWordingpre();
-
     Master.backBacicInfo();
-
     Master.addFile();
   });
-  Master.afterMKTMainPRE_PluginCGMD();
+  Master.afterMKTMainPRE_NotComplex();
 });
-
