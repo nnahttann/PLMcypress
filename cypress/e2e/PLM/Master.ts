@@ -1759,8 +1759,12 @@ const selectRandomExceedRate = (hasTabs: boolean) => {
     .scrollIntoView()
     .click({ force: true });
 
+  // Wait for dropdown panel to appear
+  cy.get('.mat-select-panel', { timeout: 10000 }).should('be.visible');
+  cy.wait(500); // Give panel time to render options
+
   cy.get('.mat-select-panel mat-option', { timeout: 10000 })
-    .should('be.visible')
+    .should('have.length.greaterThan', 0)
     .then(($options) => {
       const randomIndex = Math.floor(Math.random() * $options.length);
       cy.wrap($options.eq(randomIndex)).click({ force: true });
@@ -1842,409 +1846,290 @@ const closeSuccessModal = (): void => {
     .click();
 };
 
-const _smsWordingLogic = (type: 'POST' | 'PRE') => {
-  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME') || Cypress.env('poName');
+type SmsPattern =
+  | 'BALANCED'
+  | 'TRANSACTION_FOCUS'
+  | 'MARKETING_FOCUS'
+  | 'EXPIRY_FLOW'
+  | 'SILENT_USER'
+  | 'THAI_USER'
+  | 'EN_USER'
+  | 'SHORT_ALL'
+  | 'LONG_ALL';
 
-  const limit = (str: string, maxLen: number): string => {
-    return str.length > maxLen ? str.substring(0, maxLen) : str;
+export const _smsWordingLogic = (type: 'POST' | 'PRE') => {
+
+  // --------------------------------------------------
+  // 🎯 PATTERN
+  // --------------------------------------------------
+  const pattern: SmsPattern = Cypress._.sample([
+    'BALANCED',
+    'TRANSACTION_FOCUS',
+    'MARKETING_FOCUS',
+    'EXPIRY_FLOW',
+    'SILENT_USER',
+    'THAI_USER',
+    'EN_USER',
+    'SHORT_ALL',
+    'LONG_ALL'
+  ]);
+
+  cy.log(`🔥 Pattern: ${pattern}`);
+
+  // --------------------------------------------------
+  // 🧠 BASE
+  // --------------------------------------------------
+  const name =
+    Cypress.env('projectName') ||
+    Cypress.env('poName') ||
+    'PACKAGE-A';
+
+  const limit = (str: string, max: number) =>
+    str.length > max ? str.substring(0, max) : str;
+
+  // --------------------------------------------------
+  // 🌏 LANGUAGE
+  // --------------------------------------------------
+  const getLang = (): 'TH' | 'EN' => {
+    if (pattern === 'THAI_USER') return 'TH';
+    if (pattern === 'EN_USER') return 'EN';
+    return Math.random() < 0.7 ? 'TH' : 'EN';
   };
 
-  const getRandomSendFlag = (): string => {
-    const options = ['Send', "Don't Send"];
-    return options[Math.floor(Math.random() * options.length)];
+  // --------------------------------------------------
+  // 🧠 REAL SMS TEXT LIBRARY
+  // --------------------------------------------------
+  const smsLib = {
+    greeting: {
+      TH: `ยินดีต้อนรับสู่แพ็กเกจ ${name}`,
+      EN: `Welcome to ${name}`
+    },
+    success: {
+      TH: `สมัคร ${name} สำเร็จ`,
+      EN: `Subscription to ${name} successful`
+    },
+    fail: {
+      TH: `ไม่สามารถหักค่าบริการ ${name} ได้`,
+      EN: `Payment for ${name} failed`
+    },
+    beforeFee: {
+      TH: `${name} จะหักค่าบริการในอีก 3 วัน`,
+      EN: `${name} will be charged in 3 days`
+    },
+    expireSoon: {
+      TH: `${name} ใกล้หมดอายุ`,
+      EN: `${name} is about to expire`
+    },
+    expired: {
+      TH: `${name} หมดอายุแล้ว`,
+      EN: `${name} has expired`
+    },
+    promo: {
+      TH: `รับสิทธิ์ ${name} วันนี้`,
+      EN: `Enjoy ${name} today`
+    },
+    check: {
+      TH: `เช็คแพ็กเกจ ${name}`,
+      EN: `Check your package ${name}`
+    }
   };
 
-  const getRandomDeductionUnit = (): string => {
-    const units = ['1: Hours', '2: Days', '3: Months', '4: Year'];
-    return units[Math.floor(Math.random() * units.length)];
+  // --------------------------------------------------
+  // 🧠 TEXT GENERATOR
+  // --------------------------------------------------
+  const genText = (key: keyof typeof smsLib, maxLen: number) => {
+    const lang = getLang();
+    let text = smsLib[key][lang];
+
+    if (pattern === 'SHORT_ALL') {
+      text = lang === 'TH' ? `ใช้ ${name}` : `Use ${name}`;
+    }
+
+    if (pattern === 'LONG_ALL') {
+      text =
+        lang === 'TH'
+          ? `ขอบคุณที่ใช้บริการ ${name} สามารถใช้งานได้ตามเงื่อนไขที่กำหนด`
+          : `Thank you for using ${name}, service is active under terms`;
+    }
+
+    return limit(text, maxLen);
   };
 
-  const WAIT_TIME = 500;
+  // --------------------------------------------------
+  // 🎯 SEND FLAG LOGIC (REAL)
+  // --------------------------------------------------
+  const getSend = (section: string) => {
+    switch (pattern) {
 
-  // --- Randomize Flags ---
-  const smsGreetingVal = getRandomSendFlag();
-  const smsDeleteVal = getRandomSendFlag();
-  const promotePackVal = getRandomSendFlag();
+      case 'SILENT_USER':
+        return "Don't Send";
 
-  const isBeforePromoSend = Math.random() < 0.5;
-  const beforePromoVal = isBeforePromoSend ? 'Send' : "Don't Send";
-  const promoExpVal = isBeforePromoSend ? "Don't Send" : 'Send';
+      case 'TRANSACTION_FOCUS':
+        return section.includes('Greeting') ||
+          section.includes('Delete')
+          ? 'Send'
+          : "Don't Send";
 
-  // ---------------------------------------------------------
-  // Open SMS Wording Tab
-  // ---------------------------------------------------------
-  cy.scrollTo('bottom');
-  cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
-  cy.get('textarea, select', { timeout: 15000 }).should('exist');
-  cy.wait(1000);
+      case 'MARKETING_FOCUS':
+        return section.includes('Promote')
+          ? 'Send'
+          : Math.random() < 0.5 ? 'Send' : "Don't Send";
 
-  // Click Generate SMS Wording (if button exists)
-  // cy.get('body').then($body => {
-  //   if ($body.find('button:contains("Generate SMS Wording")').length > 0) {
-  //     cy.contains('button', 'Generate SMS Wording').click();
-  //     cy.wait(2000);
-  //   }
-  // });
+      case 'EXPIRY_FLOW':
+        return section.includes('Exp')
+          ? 'Send'
+          : "Don't Send";
 
-  // ---------------------------------------------------------
-  // Section 1: Short Promotion Name
-  // ---------------------------------------------------------
-  cy.get('textarea[formcontrolname="shortPromotionName"]').should('be.visible').then($els => {
-    cy.wrap($els[0]).clear({ force: true }).type(limit(`Sample ${finalProjectName}`, 50), { delay: 0, force: true });
-    cy.wait(WAIT_TIME);
-
-    if ($els.length > 1) {
-      cy.wrap($els[1]).clear({ force: true }).type(limit(`ตัวอย่าง ${finalProjectName}`, 50), { delay: 0, force: true });
-      cy.wait(WAIT_TIME);
+      default:
+        return Math.random() < 0.75 ? 'Send' : "Don't Send";
     }
-  });
+  };
 
-  // ---------------------------------------------------------
-  // Section 2: CMS Display
-  // ---------------------------------------------------------
-  cy.get('textarea[formcontrolname="cmsDisplay"]').should('be.visible').then($els => {
-    cy.wrap($els[0]).clear({ force: true }).type(limit(`CMS Display for ${finalProjectName}`, 250), { delay: 0, force: true });
-    cy.wait(WAIT_TIME);
+  const getDefault = () => {
+    if (pattern === 'TRANSACTION_FOCUS') return true;
+    if (pattern === 'MARKETING_FOCUS') return false;
+    return Math.random() < 0.5;
+  };
 
-    if ($els.length > 1) {
-      cy.wrap($els[1]).clear({ force: true }).type(limit(`CMS แสดงผล ${finalProjectName}`, 250), { delay: 0, force: true });
-      cy.wait(WAIT_TIME);
-    }
-  });
+  // --------------------------------------------------
+  // 🧩 HELPERS
+  // --------------------------------------------------
+  const fill = (control: string, key: keyof typeof smsLib, len: number) => {
+    cy.get(`textarea[formcontrolname="${control}"]`)
+      .should('exist')
+      .then($el => {
+        const text = genText(key, len);
 
-  // ---------------------------------------------------------
-  // Section 3: Promotion Description
-  // ---------------------------------------------------------
-  cy.get('textarea[formcontrolname="promotionDescription"]').should('be.visible').then($els => {
-    cy.wrap($els[0]).clear({ force: true }).type(limit(`Desc: ${finalProjectName}`, 250), { delay: 0, force: true });
-    cy.wait(WAIT_TIME);
+        cy.wrap($el[0]).clear().type(text, { force: true });
 
-    if ($els.length > 1) {
-      cy.wrap($els[1]).clear({ force: true }).type(limit(`รายละเอียด: ${finalProjectName}`, 250), { delay: 0, force: true });
-      cy.wait(WAIT_TIME);
-    }
-  });
+        if ($el.length > 1) {
+          cy.wrap($el[1]).clear().type(genText(key, len), { force: true });
+        }
+      });
+  };
 
-  // ---------------------------------------------------------
-  // Section 4: SMS Greeting
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="smsGreetingSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(smsGreetingVal);
-      cy.wait(WAIT_TIME);
+  const sendOnly = (
+    flag: string,
+    textarea: string,
+    key: keyof typeof smsLib,
+    len: number
+  ) => {
+    const val = getSend(flag);
 
-      if (smsGreetingVal === 'Send') {
-        cy.get('body').then($body2 => {
-          if ($body2.find('textarea[formcontrolname="smsGreeting"]').length > 0) {
-            cy.get('textarea[formcontrolname="smsGreeting"]').eq(0).clear();
-            cy.wait(WAIT_TIME);
-            cy.get('textarea[formcontrolname="smsGreeting"]').eq(0)
-              .type(limit(`Welcome to the service! ${finalProjectName}. (Max 400 chars)`, 400), { delay: 0 });
-            cy.wait(WAIT_TIME);
+    cy.get('body').then($b => {
+      if ($b.find(`select[formcontrolname="${flag}"]`).length) {
+        cy.get(`select[formcontrolname="${flag}"]`).select(val);
 
-            if ($body2.find('textarea[formcontrolname="smsGreeting"]').length > 1) {
-              cy.get('textarea[formcontrolname="smsGreeting"]').eq(1).clear();
-              cy.wait(WAIT_TIME);
-              cy.get('textarea[formcontrolname="smsGreeting"]').eq(1)
-                .type(limit(`ยินดีต้อนรับสู่บริการ ${finalProjectName} (สูงสุด 400 ตัวอักษร)`, 400), { delay: 0 });
-              cy.wait(WAIT_TIME);
-            }
-          }
-        });
-      }
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 5: SMS Confirm Sub Success CBS (PRE only)
-  // ---------------------------------------------------------
-  if (type === 'PRE') {
-    cy.get('body').then($body => {
-      if ($body.find('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').length > 0) {
-        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(getRandomSendFlag());
-        cy.wait(WAIT_TIME);
+        if (val === 'Send') {
+          fill(textarea, key, len);
+        }
       }
     });
-  }
+  };
 
-  // ---------------------------------------------------------
-  // Section 6: SMS Delete (ทั้ง POST และ PRE)
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="smsDeleteSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(smsDeleteVal);
-      cy.wait(WAIT_TIME);
+  const sendWithDefault = (
+    flag: string,
+    radio: string,
+    textarea: string,
+    key: keyof typeof smsLib,
+    len: number
+  ) => {
+    const val = getSend(flag);
 
-      if (smsDeleteVal === 'Send') {
-        const isDefaultWording = Math.random() < 0.5;
-        cy.wait(WAIT_TIME); // รอให้ fields ปรากฏ
+    cy.get('body').then($b => {
+      if ($b.find(`select[formcontrolname="${flag}"]`).length) {
+        cy.get(`select[formcontrolname="${flag}"]`).select(val);
 
-        // Default Wording Radio
-        cy.get('body').then($body2 => {
-          if ($body2.find('input[formcontrolname="SmsDeletedefaultWordingFlag"]').length > 0) {
-            cy.get('input[formcontrolname="SmsDeletedefaultWordingFlag"]')
-              .eq(isDefaultWording ? 0 : 1)
-              .check({ force: true });
-            cy.wait(WAIT_TIME);
+        if (val === 'Send') {
+          const isDefault = getDefault();
+
+          cy.get(`input[formcontrolname="${radio}"]`)
+            .eq(isDefault ? 0 : 1)
+            .check({ force: true });
+
+          if (!isDefault) {
+            fill(textarea, key, len);
           }
-        });
-
-        // Custom Wording
-        if (!isDefaultWording) {
-          cy.wait(WAIT_TIME); // รอให้ textarea ปรากฏ
-          cy.get('body').then($body2 => {
-            if ($body2.find('textarea[formcontrolname="smsDelete"]').length > 0) {
-              cy.get('textarea[formcontrolname="smsDelete"]').eq(0).clear();
-              cy.wait(WAIT_TIME);
-              cy.get('textarea[formcontrolname="smsDelete"]').eq(0)
-                .type(limit(`Delete SMS ENG: ${finalProjectName}`, 250), { delay: 0 });
-              cy.wait(WAIT_TIME);
-
-              if ($body2.find('textarea[formcontrolname="smsDelete"]').length > 1) {
-                cy.get('textarea[formcontrolname="smsDelete"]').eq(1).clear();
-                cy.wait(WAIT_TIME);
-                cy.get('textarea[formcontrolname="smsDelete"]').eq(1)
-                  .type(limit(`ลบ SMS THA: ${finalProjectName}`, 250), { delay: 0 });
-                cy.wait(WAIT_TIME);
-              }
-            }
-          });
         }
       }
-    }
-  });
+    });
+  };
 
-  // ---------------------------------------------------------
-  // Section 7: Last Minute Alert
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="lastMinuteAlertSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="lastMinuteAlertSendFlag"]').select(getRandomSendFlag());
-      cy.wait(WAIT_TIME);
-    }
-  });
+  // --------------------------------------------------
+  // 🚀 FLOW
+  // --------------------------------------------------
+  cy.contains('SMS Wording').click();
 
-  // ---------------------------------------------------------
-  // Section 8: Before Promotion Expired
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="beforePromotionExpAlertSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="beforePromotionExpAlertSendFlag"]').select(beforePromoVal);
-      cy.wait(WAIT_TIME);
+  fill('shortPromotionName', 'promo', 50);
+  fill('cmsDisplay', 'promo', 250);
+  fill('promotionDescription', 'promo', 250);
 
-      if (beforePromoVal === 'Send') {
-        const deductionVal = Math.floor(Math.random() * 25) + 1;
-        const isDefaultWording = Math.random() < 0.5;
-
-        cy.wait(WAIT_TIME); // รอให้ fields ปรากฏ
-
-        // Deduction Value
-        cy.get('body').then($body2 => {
-          if ($body2.find('input[formcontrolname="beforePromotionExpAlertDeduction"]').length > 0) {
-            cy.get('input[formcontrolname="beforePromotionExpAlertDeduction"]').clear();
-            cy.wait(WAIT_TIME);
-            cy.get('input[formcontrolname="beforePromotionExpAlertDeduction"]').type(deductionVal.toString());
-            cy.wait(WAIT_TIME);
-          }
-        });
-
-        // Deduction Unit
-        cy.get('body').then($body2 => {
-          if ($body2.find('select[formcontrolname="beforePromotionExpAlertDeductionUnit"]').length > 0) {
-            cy.get('select[formcontrolname="beforePromotionExpAlertDeductionUnit"]').select(getRandomDeductionUnit());
-            cy.wait(WAIT_TIME);
-          }
-        });
-
-        // Default Wording Radio
-        cy.get('body').then($body2 => {
-          if ($body2.find('input[formcontrolname="beforePromotionExpAlertDefaultWordingFlag"]').length > 0) {
-            cy.get('input[formcontrolname="beforePromotionExpAlertDefaultWordingFlag"]')
-              .eq(isDefaultWording ? 0 : 1)
-              .check({ force: true });
-            cy.wait(WAIT_TIME);
-          }
-        });
-
-        // Custom Wording
-        if (!isDefaultWording) {
-          cy.wait(WAIT_TIME); // รอให้ textarea ปรากฏ
-          cy.get('body').then($body2 => {
-            if ($body2.find('textarea[formcontrolname="beforePromotionExpAlert"]').length > 0) {
-              cy.get('textarea[formcontrolname="beforePromotionExpAlert"]').eq(0).clear();
-              cy.wait(WAIT_TIME);
-              cy.get('textarea[formcontrolname="beforePromotionExpAlert"]').eq(0)
-                .type(limit(`Alert Before Expire ENG: ${finalProjectName}`, 250), { delay: 0 });
-              cy.wait(WAIT_TIME);
-
-              if ($body2.find('textarea[formcontrolname="beforePromotionExpAlert"]').length > 1) {
-                cy.get('textarea[formcontrolname="beforePromotionExpAlert"]').eq(1).clear();
-                cy.wait(WAIT_TIME);
-                cy.get('textarea[formcontrolname="beforePromotionExpAlert"]').eq(1)
-                  .type(limit(`แจ้งเตือนก่อนหมดอายุ THA: ${finalProjectName}`, 250), { delay: 0 });
-                cy.wait(WAIT_TIME);
-              }
-            }
-          });
-        }
-      }
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 9: Promotion Expired
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="promotionExpAlertSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="promotionExpAlertSendFlag"]').select(promoExpVal);
-      cy.wait(WAIT_TIME);
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 10: SMS Promote Package
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="smsPromotePackSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="smsPromotePackSendFlag"]').select(promotePackVal);
-      cy.wait(WAIT_TIME);
-
-      if (promotePackVal === 'Send') {
-        cy.get('body').then($body2 => {
-          if ($body2.find('textarea[formcontrolname="smsPromotePack"]').length > 0) {
-            cy.get('textarea[formcontrolname="smsPromotePack"]').eq(0).clear();
-            cy.wait(WAIT_TIME);
-            cy.get('textarea[formcontrolname="smsPromotePack"]').eq(0)
-              .type(limit(`Promote Alert ENG: ${finalProjectName}`, 250), { delay: 0 });
-            cy.wait(WAIT_TIME);
-
-            if ($body2.find('textarea[formcontrolname="smsPromotePack"]').length > 1) {
-              cy.get('textarea[formcontrolname="smsPromotePack"]').eq(1).clear();
-              cy.wait(WAIT_TIME);
-              cy.get('textarea[formcontrolname="smsPromotePack"]').eq(1)
-                .type(limit(`แจ้งเตือนโปรโมท THA: ${finalProjectName}`, 250), { delay: 0 });
-              cy.wait(WAIT_TIME);
-            }
-          }
-        });
-      }
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 11: SMS Check Current (Always fill if exists)
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('textarea[formcontrolname="smsCheckCurrent"]').length > 0) {
-      cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(0).clear();
-      cy.wait(WAIT_TIME);
-      cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(0)
-        .type(limit(`Check Cur ${finalProjectName}`, 50), { delay: 0 });
-      cy.wait(WAIT_TIME);
-
-      if ($body.find('textarea[formcontrolname="smsCheckCurrent"]').length > 1) {
-        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(1).clear();
-        cy.wait(WAIT_TIME);
-        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(1)
-          .type(limit(`เช็คโปร ${finalProjectName}`, 50), { delay: 0 });
-        cy.wait(WAIT_TIME);
-      }
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 12: SMS Before Fee Deduct
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="smsBeforeFeeDeductSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="smsBeforeFeeDeductSendFlag"]').select(getRandomSendFlag());
-      cy.wait(WAIT_TIME);
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 13: Recurring Deduct Success
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="recurringDeductSuccessAlertSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="recurringDeductSuccessAlertSendFlag"]').select(getRandomSendFlag());
-      cy.wait(WAIT_TIME);
-    }
-  });
-
-  // ---------------------------------------------------------
-  // Section 14: Recurring Deduct Fail
-  // ---------------------------------------------------------
-  cy.get('body').then($body => {
-    if ($body.find('select[formcontrolname="recurringDeductFailAlertSendFlag"]').length > 0) {
-      cy.get('select[formcontrolname="recurringDeductFailAlertSendFlag"]').select(getRandomSendFlag());
-      cy.wait(WAIT_TIME);
-    }
-  });
-
-  // ---------------------------------------------------------
-  // POST Only Fields
-  // ---------------------------------------------------------
   if (type === 'POST') {
-    // Marketing Name
-    cy.get('body').then($body => {
-      if ($body.find('textarea[formcontrolname="marketingName"]').length > 0) {
-        cy.get('textarea[formcontrolname="marketingName"]').clear();
-        cy.wait(WAIT_TIME);
-        cy.get('textarea[formcontrolname="marketingName"]')
-          .type(limit(`MKT Name ${finalProjectName}`, 40), { delay: 0 });
-        cy.wait(WAIT_TIME);
-      }
-    });
-
-    // Greeting Letter
-    cy.get('body').then($body => {
-      if ($body.find('textarea[formcontrolname="greetingLetter"]').length > 0) {
-        cy.get('textarea[formcontrolname="greetingLetter"]').eq(0).clear();
-        cy.wait(WAIT_TIME);
-        cy.get('textarea[formcontrolname="greetingLetter"]').eq(0)
-          .type(limit(`Greeting Letter ${finalProjectName}`, 250), { delay: 0 });
-        cy.wait(WAIT_TIME);
-
-        if ($body.find('textarea[formcontrolname="greetingLetter"]').length > 1) {
-          cy.get('textarea[formcontrolname="greetingLetter"]').eq(1).clear();
-          cy.wait(WAIT_TIME);
-          cy.get('textarea[formcontrolname="greetingLetter"]').eq(1)
-            .type(limit(`จดหมายทักทาย ${finalProjectName}`, 250), { delay: 0 });
-          cy.wait(WAIT_TIME);
-        }
-      }
-    });
-
-    // Your Package
-    cy.get('body').then($body => {
-      if ($body.find('textarea[formcontrolname="yourPackage"]').length > 0) {
-        cy.get('textarea[formcontrolname="yourPackage"]').eq(0).clear();
-        cy.wait(WAIT_TIME);
-        cy.get('textarea[formcontrolname="yourPackage"]').eq(0)
-          .type(limit(`Your Package: ${finalProjectName}`, 250), { delay: 0 });
-        cy.wait(WAIT_TIME);
-
-        if ($body.find('textarea[formcontrolname="yourPackage"]').length > 1) {
-          cy.get('textarea[formcontrolname="yourPackage"]').eq(1).clear();
-          cy.wait(WAIT_TIME);
-          cy.get('textarea[formcontrolname="yourPackage"]').eq(1)
-            .type(limit(`แพ็กเกจของคุณ: ${finalProjectName}`, 250), { delay: 0 });
-          cy.wait(WAIT_TIME);
-        }
-      }
-    });
+    fill('marketingName', 'promo', 40);
+    fill('greetingLetter', 'greeting', 250);
+    fill('yourPackage', 'promo', 100);
   }
 
-  // ---------------------------------------------------------
-  // Save
-  // ---------------------------------------------------------
-  cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+  sendOnly('smsGreetingSendFlag', 'smsGreeting', 'greeting', 250);
 
-  cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
-  cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-  closeSuccessModal();
+  sendWithDefault(
+    'smsDeleteSendFlag',
+    'SmsDeletedefaultWordingFlag',
+    'smsDelete',
+    'expired',
+    250
+  );
+
+  if (type === 'PRE') {
+
+    sendWithDefault(
+      'lastMinuteAlertSendFlag',
+      'lastMinuteAlertDefaultWordingFlag',
+      'smsNotificationLastMinuteAlert',
+      'expireSoon',
+      250
+    );
+
+    const val = getSend('smsBeforeFeeDeductSendFlag');
+
+    cy.get('select[formcontrolname="smsBeforeFeeDeductSendFlag"]').select(val);
+
+    if (val === 'Send') {
+      cy.get('input[formcontrolname="beforeFeeDeduction"]').clear().type('3');
+      cy.get('select[formcontrolname="beforeFeeDeductionUnit"]').select('2: Days');
+
+      const isDefault = getDefault();
+
+      cy.get('input[formcontrolname="defaultWordingFlag"]')
+        .eq(isDefault ? 0 : 1)
+        .check({ force: true });
+
+      if (!isDefault) {
+        fill('smsNotificationBeforeFeeDeduction', 'beforeFee', 250);
+      }
+    }
+  }
+
+  sendOnly('smsPromotePackSendFlag', 'smsPromotePack', 'promo', 250);
+
+  cy.get('body').then($b => {
+    if ($b.find('textarea[formcontrolname="smsCheckCurrent"]').length) {
+      fill('smsCheckCurrent', 'check', 50);
+    }
+  });
+
+  // --------------------------------------------------
+  // 💾 SAVE
+  // --------------------------------------------------
+  cy.intercept('POST', '/PLMSpringBoot/api/**').as('save');
+
+  cy.contains('Save').click();
+
+  cy.wait('@save', { timeout: 100000 })
+    .its('response.statusCode')
+    .should('eq', 200);
+
+    closeSuccessModal();
 };
 
 export const smsWording = () => {
@@ -2267,8 +2152,12 @@ export const Tariff = (): void => {
     .should('be.visible')
     .click({ force: true });
 
-  cy.get('.mat-select-panel mat-option')
-    .should('be.visible')
+  // Wait for dropdown panel to appear
+  cy.get('.mat-select-panel', { timeout: 10000 }).should('be.visible');
+  cy.wait(500); // Give panel time to render options
+
+  cy.get('.mat-select-panel mat-option', { timeout: 10000 })
+    .should('have.length.greaterThan', 0)
     .then($options => {
       const randomIndex = Math.floor(Math.random() * $options.length);
       const selectedText = $options.eq(randomIndex).text().trim();
@@ -4232,8 +4121,6 @@ export const VerticalApp = () => {
     });
 
     cy.get('@selectedQuotaTypeText').then((quotaText) => {
-      // quotaText ตอนนี้เป็น String แล้ว สามารถเทียบได้เลย ไม่ต้อง .text()
-      // ใช้ includes หรือ === ก็ได้ตามความแม่นยำของ text
       if (String(quotaText).trim() === 'Unlimited Data (Throttling Speed)') {
         
         cy.get('select[formcontrolname="commuThrottlingSpeed"]', { timeout: 5000 })
