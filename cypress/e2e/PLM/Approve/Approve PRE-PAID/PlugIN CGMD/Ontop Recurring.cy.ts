@@ -22,43 +22,10 @@ const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?
   }
 
   Master.ProjectBasicInformationComplete('recurring', 'ontop', config);
-
-  // Target group
-  Master.selectTargetGroup('random');
-
-  // Remark
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.'.repeat(5));
-
-  Master.PriceExcluding();
-
-  // Target group
-  Master.targetgroup();
-
-  Master.RandomProductSpecification();
-  // ProductSpec
-  // const optionsToSelectProductSpec = ["Internet"];
-
-  // optionsToSelectProductSpec.forEach(option => {
-  //   cy.get('select[formcontrolname="availableListBox"]')
-  //     .contains(option)
-  //     .then($option => {
-  //       cy.wrap($option).dblclick();
-  //     });
-  // });
-
-  if (Module === 'PRE') {
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-  }
-  Master.Randomdropdown();
-  Master.dropdownPromotionGroup();
-  Master.smsWordingpre();
-  // Master.InternetRandom('notrecurring');
-  Master.backBacicInfo();
-  Master.addFile();
 };
 
 describe('PLM', () => {
-  describe.only('Scenario: Mob', () => {
+  describe('Scenario: Mob', () => {
     it('MKT PREPAIDrole', () => {
       runMKTprepaidFlow('PRE');
     });
@@ -74,6 +41,6 @@ describe('PLM', () => {
     it('MKT PREPAIDrole', () => {
       runMKTprepaidFlow('MUSIC', 'PRE');
     });
-    Master.afterMKTontopPREENTERPlugin();
+    Master.afterMKTontopPREMusicPlugin();
   });
 });

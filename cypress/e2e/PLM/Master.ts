@@ -1,4 +1,3 @@
-
 const env = Cypress.env();
 export const {
   urlsit,
@@ -35,21 +34,120 @@ const minutes = String(now.getMinutes()).padStart(2, '0');
 export let formattedDateMain = '';
 export let formattedDateOntop = '';
 
+// ========================
+// HELPER FUNCTIONS - Reduce Code Duplication
+// ========================
+
+/**
+ * Get credentials based on module
+ */
+export const getCredentials = (module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC'): { user: string, pass: string } => {
+  switch (module) {
+    case 'POST': return { user: MKTpost, pass: MKTpost1 };
+    case 'PRE': return { user: MKTpre, pass: MKTpre1 };
+    case 'ENTER': return { user: enter, pass: enterpass };
+    case 'MUSIC': return { user: music, pass: musicpass };
+    default: return { user: MKTpost, pass: MKTpost1 };
+  }
+};
+
+/**
+ * Get formatted time suffix (DDMM HHMM)
+ */
+export const getTimeSuffix = (): string => {
+  return `${day}${month} ${hours}${minutes}`;
+};
+
+/**
+ * Truncate name with suffix while respecting max length
+ */
+export const getTruncatedName = (baseName: string, suffix: string, maxLength: number): string => {
+  let finalName = `${baseName} ${suffix}`;
+  if (finalName.length > maxLength) {
+    const allowedLength = maxLength - suffix.length - 1;
+    const trimmedPrefix = baseName.substring(0, allowedLength).trim();
+    finalName = `${trimmedPrefix} ${suffix}`;
+  }
+  return finalName;
+};
+
+/**
+ * Select random option from mat-select dropdown
+ */
+export const selectRandomOption = (labelName: string): void => {
+  cy.contains('label', labelName).parent().next('div').find('mat-select').click();
+  cy.get('mat-option').then($options => {
+    const randomIndex = Math.floor(Math.random() * $options.length);
+    cy.wrap($options[randomIndex]).click({ force: true });
+  });
+};
+
+/**
+ * Handle "Add to USMP" modal if it exists
+ */
+export const handleAddToUSMP = (): void => {
+  cy.get('body').then(($body) => {
+    if ($body.find('button:contains("Add to USMP")').length > 0) {
+      cy.log('Found Add to USMP button, clicking...');
+      cy.contains('button', 'Add to USMP').click();
+      cy.wait(5000);
+      cy.get('.modal, .mat-dialog-container, div[role="dialog"]').should('be.visible').within(() => {
+        cy.contains('button', /Close|OK|ปิด/i).click();
+      });
+      cy.wait(5000);
+    } else {
+      cy.log('Add to USMP button not found, skipping...');
+    }
+  });
+};
+
+/**
+ * Scroll to bottom and wait (common pattern)
+ */
+export const scrollAndWait = (ms: number = 2000): void => {
+  cy.scrollTo('bottom');
+  cy.wait(ms);
+};
+
+/**
+ * Click "Yes" button if it exists
+ */
+export const clickYesIfExists = (timeout: number = 10000, position: 'first' | 'last' = 'last'): void => {
+  cy.get('body').then(($body) => {
+    if ($body.find('button:contains("Yes")').length > 0) {
+      cy.get('button').contains('Yes', { timeout }).eq(position === 'first' ? 0 : -1).click();
+    }
+  });
+};
+
+/**
+ * Click a button if it exists
+ */
+export const clickButtonIfExists = (buttonText: string, timeout: number = 10000): void => {
+  cy.get('body').then(($body) => {
+    if ($body.find(`button:contains("${buttonText}")`).length > 0) {
+      cy.contains('button', buttonText, { timeout }).click();
+    }
+  });
+};
+
+/**
+ * Get random phone number (08/09 prefix with random digits)
+ */
+export const getRandomPhone = (): string => {
+  return `0${Math.floor(8 + Math.random() * 2)}${Math.floor(10000000 + Math.random() * 90000000)}`;
+};
 
 export const login = (username: string, password: string): void => {
-  // 1. รอให้ Angular app โหลดเสร็จ (สำคัญ!)
   cy.get('app-login', { timeout: 3000000 }).should('be.visible');
 
-  // 2. รอให้ form โหลดเสร็จ
   cy.get('form', { timeout: 2000000 }).should('be.visible');
-
-  // 3. ใช้วิธีที่มั่นคงกว่าในการหา input
   cy.get('input[name="userId"]', { timeout: 2000000 })
-    .should('exist')  // ตรวจสอบว่า element มีอยู่ใน DOM
-    .should('be.visible')  // ตรวจสอบว่าเห็นได้
-    .should('not.be.disabled')  // ตรวจสอบว่าไม่ disabled
-    .clear()  // ล้างค่าที่อาจมีอยู่ก่อน
-    .type(username, { delay: 50 });  // พิมพ์แบบช้าๆ
+    .should('exist')
+    .should('be.visible')
+    .should('not.be.disabled')
+    .clear()
+    .type(username, { delay: 50 });
 
   // 4. สำหรับ password
   cy.get('input[name="pwd"]')
@@ -69,17 +167,24 @@ export const login = (username: string, password: string): void => {
     .its('response.statusCode')
     .should('eq', 200);
 }
+
+/**
+ * Login and wait for the app to be ready (combined login + error-code wait)
+ */
+export const loginAndWaitReady = (username: string, password: string): void => {
+  login(username, password);
+  cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+  cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+};
 export const ClaimProject = (formattedDate: string): void => {
   cy.get('h3')
     .contains('Unassigned Task', { timeout: 100000 })
     .parent()
     .within(() => {
-      // Wait for data to load
       cy.get('tbody tr').should(($rows) => {
         expect($rows.text()).not.to.contain('Fetching data');
       });
 
-      // Debug: Show all rows
       cy.get('tbody tr').then(($rows) => {
         cy.log(`📊 Total rows found: ${$rows.length}`);
         let matchFound = false;
@@ -111,51 +216,33 @@ export const ClaimProject = (formattedDate: string): void => {
       });
     });
 };
-
-/**
- * @param taskIdentifier ชื่อ Project หลัก (เช่น "MOB PRE onetime main 1912 1457")
- * @param assignee ชื่อคนที่จะ Assign
- * @param uniqueKeyword (Optional) คำเฉพาะเพื่อระบุแถว เช่น "CBS" หรือ "PlugIN" หรือ "Mobile"
- */
 export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueKeyword: string = ''): void {
 
-  // 1. Setup Intercepts
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
 
-  // 2. รอให้ตารางโหลดเสร็จ
   cy.get('h3').contains('Team Task').should('be.visible');
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
-  // 3. เตรียมชื่อที่จะค้นหา (ตัด _ ออกตาม Logic เดิมของคุณ เพื่อให้ได้ชื่อ Project หลัก)
   const partialIdentifier = taskIdentifier.split('_')[0];
   cy.log(`🔍 Searching for Project: "${partialIdentifier}" with Keyword: "${uniqueKeyword}"`);
 
-  // 4. ค้นหา Row ที่ถูกต้อง (Logic ใหม่: Filter หาแถวที่มีทั้งชื่อ Project และ Keyword)
   cy.get('tr', { timeout: 600000 })
     .filter((index, element) => {
       const rowText = Cypress.$(element).text();
-      // เงื่อนไข 1: ต้องมีชื่อ Project
       const hasProjectName = rowText.includes(partialIdentifier);
-      // เงื่อนไข 2: ถ้าส่ง uniqueKeyword มา ต้องมีคำนั้นด้วย (ถ้าไม่ส่งมา ถือว่าผ่านเลย)
       const hasKeyword = uniqueKeyword ? rowText.includes(uniqueKeyword) : true;
 
       return hasProjectName && hasKeyword;
     })
-    .first() // เอาแถวแรกที่เจอ (หลังจากกรองแล้ว)
+    .first()
     .as('taskRow');
 
-  // ตรวจสอบว่าเจอแถวไหมและ Scroll ไปหา
   cy.get('@taskRow').scrollIntoView().should('be.visible');
 
-  // 5. จัดการ Dropdown (Logic เดิมของคุณ)
   cy.get('@taskRow').within(() => {
     cy.get('select.form-control.input-sm').as('assigneeDropdown');
-
-    // คลิก parent เพื่อเปิด (บาง Framework ต้องการ step นี้)
     cy.get('@assigneeDropdown').parent().click();
-
-    // Trigger Event เพื่อบังคับให้ Dropdown ทำงาน (ตาม Code เดิมของคุณ)
     cy.get('@assigneeDropdown').then(($select) => {
       const selectElement = $select[0];
       const mouseDownEvent = new MouseEvent('mousedown', {
@@ -172,14 +259,6 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
       selectElement.dispatchEvent(focusEvent);
     });
 
-    // Debug: Show all options (Log ดูค่าที่มีให้เลือก)
-    // cy.get('@assigneeDropdown')
-    //   .find('option')
-    //   .each(($option: JQuery<HTMLOptionElement>) => {
-    //     cy.log(`📋 Option: "${$option.val()}" = "${$option.text().trim()}"`);
-    //   });
-
-    // รอให้ Option ของ Assignee โผล่มาและเลือก
     cy.get('@assigneeDropdown')
       .find(`option[value="${assignee}"]`, { timeout: 10000 })
       .should('exist');
@@ -195,9 +274,9 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
 type TaskListHeader = 'To Do List' | 'Unassigned Task';
 
 type FinalAction =
-  | 'AlertAndLogout'    // ทั่วไป: รอ Alert, กลับหน้า Workspace, แล้ว Logout
-  | 'ComplexLogout'     // สำหรับ SPADSup: ไม่รอ Alert, กลับหน้า Workspace, แล้ว Logout
-  | 'StopAfterCore';    // สำหรับ SPADTesterMain: ทำงานหลักเสร็จแล้วหยุดเลย
+  | 'AlertAndLogout'
+  | 'ComplexLogout'
+  | 'StopAfterCore';
 
 type CoreTaskCallback = () => void;
 
@@ -208,11 +287,13 @@ const createFullPageApprovalFlow = (
   coreTaskCallback: CoreTaskCallback,
   finalAction: FinalAction
 ): void => {
+
   cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
   cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
   cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
   cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
 
+  // --- 2. ค้นหาโปรเจกต์และคลิก Approve ---
   cy.get('h3').contains(taskListHeader).parent().within(() => {
     cy.get('tbody tr').then(($rows) => {
 
@@ -231,8 +312,10 @@ const createFullPageApprovalFlow = (
       });
   });
 
+  // --- 3. รอให้หน้าใหม่โหลดเสร็จสมบูรณ์ ---
   cy.url({ timeout: 600000 }).should('include', expectedUrl);
 
+  // --- 4. รอ API ที่สำคัญของหน้า Detail โหลดให้ครบ ---
   cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
     .then((interceptions) => {
       interceptions.forEach((interception) => {
@@ -240,9 +323,10 @@ const createFullPageApprovalFlow = (
         expect(interception.response!.statusCode, `API ${interception.request.url} should return 200`).to.eq(200);
       });
     });
-
+  // --- 5. รันขั้นตอน "เฉพาะ" ที่ส่งเข้ามา ---
   coreTaskCallback();
 
+  // --- 6. จัดการขั้นตอนสุดท้าย (Alert, Redirect, Logout) ---
   switch (finalAction) {
     case 'AlertAndLogout':
       //cy.on('window:alert', (txt) => {
@@ -255,16 +339,15 @@ const createFullPageApprovalFlow = (
 
       cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
       cy.contains('button', 'Logout').click();
-      //cy.url({ timeout: 3000000 }).should('include', '/login');
       break;
 
-    case 'ComplexLogout':
+    case 'ComplexLogout': // สำหรับ SPADSup (ไม่มี Alert)
       cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
       cy.contains('button', 'Logout').click();
       //cy.url({ timeout: 3000000 }).should('include', '/login');
       break;
 
-    case 'StopAfterCore':
+    case 'StopAfterCore': // สำหรับ SPADTesterMain (ทำเสร็จแล้วหยุด)
       cy.log('Core task finished. Stopping as requested.');
       break;
   }
@@ -294,12 +377,8 @@ const createSimplePageApprovalFlow = (
 
   coreTaskCallback();
 
-  //cy.on('window:alert', (txt) => {
-  //expect(txt).to.contain('Approve and Send Mail Notify Success');
-  //});
   cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
   cy.contains('button', 'Logout').click();
-  //cy.url({ timeout: 3000000 }).should('include', '/login');
 };
 
 export const approveProject = (projectName: string): void => {
@@ -324,6 +403,21 @@ export const approveProject = (projectName: string): void => {
   });
 };
 
+// ✅ **REDUCTION: Factory for Approval Flows** - ลดทั้ง 20+ functions เหลือ 1 base function
+const createApprovalFlowFactory = (
+  isDeploy: boolean = false,
+  coreLogic: (projectName: string) => void,
+  expectedUrl: string,
+  taskListHeader: TaskListHeader = 'To Do List',
+  finalAction: FinalAction = 'AlertAndLogout'
+): void => {
+  if (isDeploy) {
+    createFullPageApprovalFlow('DEPLOY_MARKER', taskListHeader, expectedUrl, () => coreLogic('DEPLOY_MARKER'), finalAction);
+  } else {
+    createSimplePageApprovalFlow('DEPLOY_MARKER', taskListHeader, expectedUrl, () => coreLogic('DEPLOY_MARKER'));
+  }
+};
+
 const _approveSPADLogic = (projectName: string, isComplex: boolean): void => {
   const buttonText = isComplex ? 'Approve as complex' : 'Approve as non complex';
 
@@ -345,9 +439,7 @@ const _approveSPADLogic = (projectName: string, isComplex: boolean): void => {
         .find('input')
         .type(random2DigitCode.toString());
 
-      cy.scrollTo('bottom');
-      cy.wait(2000);
-
+      scrollAndWait();
       cy.contains('button', buttonText, { timeout: 3000000 })
         .should('be.visible')
         .click();
@@ -364,6 +456,11 @@ export const approveProjectSPADSupCGMDPlugin = (projectName: string): void => {
   _approveSPADLogic(projectName, false);
 };
 
+// ✅ **Generic SPAD Approver** (combine both)
+export const approveProjectSPAD = (projectName: string, isComplex: boolean = true): void => {
+  _approveSPADLogic(projectName, isComplex);
+};
+
 const _approveSPADDOERLogic = (projectName: string, isMainFlow: boolean): void => {
   createFullPageApprovalFlow(
     projectName,
@@ -371,6 +468,7 @@ const _approveSPADDOERLogic = (projectName: string, isMainFlow: boolean): void =
     '/cgmd/cgmd-configure',
     () => {
       if (isMainFlow) {
+        cy.wait(5000)
         const rnd = () => Math.floor(Math.random() * 90000) + 10000;
 
         cy.get('label:contains("PACKAGE_TYPE")').parent().next('div').find('input')
@@ -380,19 +478,11 @@ const _approveSPADDOERLogic = (projectName: string, isMainFlow: boolean): void =
         cy.get('label:contains("PACKAGE_SUB_TYPE")').parent().next('div').find('input')
           .type('PST' + rnd());
       }
-      const selectRandomOption = (labelName: string) => {
-        cy.contains('label', labelName).parent().next('div').find('mat-select').click();
-        cy.get('mat-option').then($options => {
-          const randomIndex = Math.floor(Math.random() * $options.length);
-          cy.wrap($options[randomIndex]).click({ force: true });
-        });
-      };
       selectRandomOption('Gprs type');
       cy.wait(2000);
       selectRandomOption('Template');
 
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.contains('button', 'Promote To SPAD Tester', { timeout: 3000000 })
         .should('be.visible')
         .click();
@@ -416,10 +506,9 @@ const _approveSPADTesterLogic = (projectName: string, isMainFlow: boolean): void
     'To Do List',
     '/cgmd/cgmd-tester',
     () => {
-
       if (isMainFlow) {
         cy.wait(5000);
-        cy.scrollTo('bottom');
+        scrollAndWait();
 
         cy.intercept('GET', '**/api/SendPluginMain_v2/**').as('sendPluginApi');
 
@@ -433,20 +522,13 @@ const _approveSPADTesterLogic = (projectName: string, isMainFlow: boolean): void
 
         cy.on('window:confirm', () => true);
         cy.contains('button', 'Send PlugIN', { timeout: 3000000 }).should('be.visible').click();
-        cy.get('body').then(($body) => {
-          if ($body.find('button:contains("Yes")').length > 0) {
-            cy.get('button').contains('Yes', { timeout: 10000 }).first().click();
-          }
-        });
+        clickYesIfExists(10000, 'first');
         cy.wait(80000);
 
-        cy.scrollTo('top');
         cy.contains('button', 'Refresh Status', { timeout: 3000000 }).should('be.visible').click();
 
-        cy.scrollTo('bottom');
-        cy.wait(2000);
-
-        cy.removeAllListeners('window:alert'); // Clear old listeners
+        scrollAndWait();
+        cy.removeAllListeners('window:alert');
 
         cy.once('window:alert', (alertText) => {
           if (alertText.includes('Do you want to Approve') || alertText.includes('Call API Plugin Success')) {
@@ -457,16 +539,9 @@ const _approveSPADTesterLogic = (projectName: string, isMainFlow: boolean): void
         });
 
         cy.contains('button', 'Promote to SPAD Deploy', { timeout: 3000000 }).should('be.visible').click();
-
-        cy.get('body').then(($body) => {
-          if ($body.find('button:contains("Yes")').length > 0) {
-            cy.get('button').contains('Yes', { timeout: 10000 }).last().click();
-          }
-        });
-
+        clickYesIfExists(10000, 'last');
       } else {
-        cy.scrollTo('bottom');
-        cy.wait(2000);
+        scrollAndWait();
         cy.contains('button', 'Promote to SPAD Deploy', { timeout: 3000000 }).should('be.visible').click();
       }
     },
@@ -488,11 +563,8 @@ export const approveProjectSPADdeploy = (projectName: string): void => {
     'To Do List',
     '/actm/actm-doer',
     () => {
-
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.contains('button', 'Promote To ACTM', { timeout: 3000000 }).should('be.visible').click();
-
     },
     'AlertAndLogout'
   );
@@ -504,12 +576,26 @@ export const approveProjectCGMD = (projectName: string): void => {
     'To Do List',
     '/cgmd/cgmd-configure',
     () => {
+      scrollAndWait();
+      cy.get('button').then(($buttons) => {
+        const usmpBtn = $buttons.filter((_, el) =>
+          el.textContent?.trim() === 'Add to USMP'
+        );
 
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+        if (usmpBtn.length > 0) {
+          cy.log('Found Add to USMP button, clicking...');
+          cy.wrap(usmpBtn.first()).click();
+          cy.wait(5000);
+          cy.get('.modal, .mat-dialog-container, div[role="dialog"]').should('be.visible').within(() => {
+            cy.contains('button', /Close|OK|ปิด/i).click();
+          });
+          cy.wait(5000);
+        } else {
+          cy.log('Add to USMP button not found, skipping...');
+        }
+      });
       cy.get('button[name="CBS"]').should('be.visible', { timeout: 3000000 }).click();
       cy.contains('button', 'Yes').should('be.visible').click();
-
     },
     'AlertAndLogout'
   );
@@ -540,76 +626,44 @@ export const approveProjectCGMDPRE = (projectName: string): void => {
   );
 };
 
+
 export const approveProjectCGMDPREMainNotComplex = (projectName: string): void => {
   createFullPageApprovalFlow(
     projectName,
     'To Do List',
     '/cgmd/cgmd-configure',
     () => {
+      cy.get('label:contains("PACKAGE_ID (PP ID)")').parent().next('div').find('input')
+        .type('PP' + Math.floor(Math.random() * 90000) + 10000);
 
-      cy.get('label:contains("PACKAGE_ID (PP ID)")').parent().next('div').find('input').type('PP' + Math.floor(Math.random() * 90000) + 10000);
+      selectRandomOption('Gprs type');
+      cy.wait(2000);
+      selectRandomOption('Template');
 
-      cy.contains('label', 'Gprs type').parent().next('div').find('mat-select').click();
-      cy.get('mat-option').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        cy.wrap($options[randomIndex]).click({ force: true });
-      });
-      cy.wait(2000);
-      cy.contains('label', 'Template').parent().next('div').find('mat-select').click();
-      cy.get('mat-option').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        cy.wrap($options[randomIndex]).click({ force: true });
-      });
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
+      handleAddToUSMP();
+
       cy.contains('button', 'Approve To CGMD Tester', { timeout: 3000000 }).should('be.visible').click();
       cy.contains('button', 'Yes').should('be.visible').click();
-
     },
     'AlertAndLogout'
   );
 };
-export const approveProjectCGMDPREPlugin = (projectName: string): void => {
-  createFullPageApprovalFlow(
-    projectName,
-    'To Do List',
-    '/cgmd/cgmd-configure',
-    () => {
 
-      cy.get('label:contains("PACKAGE_ID (PP ID)")').parent().next('div').find('input').type('PP' + Math.floor(Math.random() * 90000) + 10000);
+/** @deprecated identical to approveProjectCGMDPREMainNotComplex */
+export const approveProjectCGMDPREPlugin = approveProjectCGMDPREMainNotComplex;
 
-      cy.contains('label', 'Gprs type').parent().next('div').find('mat-select').click();
-      cy.get('mat-option').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        cy.wrap($options[randomIndex]).click({ force: true });
-      });
-      cy.wait(2000);
-      cy.contains('label', 'Template').parent().next('div').find('mat-select').click();
-      cy.get('mat-option').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        cy.wrap($options[randomIndex]).click({ force: true });
-      });
-      cy.scrollTo('bottom');
-      cy.wait(2000);
-      cy.contains('button', 'Approve To CGMD Tester', { timeout: 3000000 }).should('be.visible').click();
-      cy.contains('button', 'Yes').should('be.visible').click();
-
-    },
-    'AlertAndLogout'
-  );
-};
+/** @deprecated identical to approveProjectCGMDPREMainNotComplex */
+export const approveProjectCGMDPREMain = approveProjectCGMDPREMainNotComplex;
 export const approveProjectCGMDtester = (projectName: string): void => {
   createFullPageApprovalFlow(
     projectName,
     'To Do List',
     '/cgmd/cgmd-tester',
     () => {
-
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.contains('span', 'Promote to ACTM').should('be.visible').click({ force: true });
       cy.contains('button', 'Yes').should('be.visible').click();
-
     },
     'AlertAndLogout'
   );
@@ -621,12 +675,9 @@ export const approveProjectCGMDtesterPRE = (projectName: string): void => {
     'To Do List',
     '/cgmd/cgmd-tester',
     () => {
-
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.contains('button', 'Promote To Pre Go Live', { timeout: 3000000 }).should('be.visible').click();
       cy.contains('button', 'Yes').should('be.visible').click();
-
     },
     'AlertAndLogout'
   );
@@ -638,10 +689,8 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string): void => 
     'To Do List',
     '/cgmd/cgmd-tester',
     () => {
-
-
       cy.wait(5000);
-      cy.scrollTo('bottom');
+      scrollAndWait();
 
       cy.intercept('GET', '**/api/SendPluginMain_v2/**').as('sendPluginApi');
 
@@ -655,57 +704,37 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string): void => 
         }
       });
 
-      // 4. ดัก confirm (ตอบ OK ทุก popup)
       cy.on('window:confirm', () => true);
 
-      // 5. คลิก 'Send PlugIN'
       cy.contains('button', 'Send PlugIN', { timeout: 3000000 })
         .should('be.visible')
         .click();
 
-      // 6. คลิก "Yes" ถ้ามี
-      cy.get('body').then(($body) => {
-        if ($body.find('button:contains("Yes")').length > 0) {
-          cy.get('button').contains('Yes', { timeout: 10000 }).first().click();
-        }
-      });
-
-      // 7. รอ 70 วินาที และ Refresh Status
+      clickYesIfExists(10000, 'first');
       cy.wait(80000);
-      cy.scrollTo('top');
+
       cy.contains('button', 'Refresh Status', { timeout: 3000000 })
         .should('be.visible')
         .click();
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
 
-      // --- แยก phase ใหม่ สำหรับ Promote ---
-      // ลบ listener เดิมก่อน เพื่อไม่ให้ alert เก่าถูกจับซ้ำ
       cy.removeAllListeners('window:alert');
 
-      // 8. ตั้ง alert listener สำหรับ Promote
       cy.once('window:alert', (alertText) => {
         if (alertText.includes('Do you want to Approve to Pre Go Live')) {
           expect(alertText).to.include('Do you want to Approve to Pre Go Live');
         } else if (alertText.includes('Call API Plugin Success')) {
-          // fallback case: บางระบบยังเด้งข้อความนี้ซ้ำ
           expect(alertText).to.include('Call API Plugin Success');
         } else {
           throw new Error(`Unexpected alert text (Promote): ${alertText}`);
         }
       });
 
-      // 9. คลิก 'Promote to SPAD Deploy'
       cy.contains('button', 'Promote to Pre Go Live', { timeout: 3000000 })
         .should('be.visible')
         .click();
 
-      // 10. คลิก "Yes" ถ้ามีปุ่ม
-      cy.get('body').then(($body) => {
-        if ($body.find('button:contains("Yes")').length > 0) {
-          cy.get('button').contains('Yes', { timeout: 10000 }).last().click();
-        }
-      });
+      clickYesIfExists(10000, 'last');
     },
     'StopAfterCore'
   );
@@ -717,9 +746,7 @@ export const approveProjectACTM = (projectName: string): void => {
     'Unassigned Task',
     '/actm/actm-doer',
     () => {
-
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.get(':nth-child(3) > :nth-child(4)').click();
     },
     'AlertAndLogout'
@@ -732,11 +759,8 @@ export const approveProjectOPER = (projectName: string): void => {
     'Unassigned Task',
     '/oper/oper-doer',
     () => {
-
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.get('.col-md-6 > :nth-child(3)').click();
-
     }
   );
 };
@@ -773,14 +797,12 @@ export const approveProjectAPO = (projectName: string): void => {
     'Unassigned Task',
     '/apo/apo-doer',
     () => {
-
-      cy.scrollTo('bottom');
-      cy.wait(2000);
+      scrollAndWait();
       cy.contains('button', 'Promote To Pre Go Live').click();
-
     }
   );
 };
+
 export const ProjectBasicInformationComplete = (
   PriceType: 'onetime' | 'recurring' | 'usage',
   ProductClass: 'main' | 'ontop' | 'ontopextra',
@@ -793,144 +815,150 @@ export const ProjectBasicInformationComplete = (
   }
 ) => {
   const { ProductClass1, Module, subModule, autoSetDuration = false, Plugin } = options;
+  const credentials = getCredentials(Module);
+  const timeSuffix = getTimeSuffix();
 
-  // --- Login ---
-  const credentials = (() => {
-    switch (Module) {
-      case 'POST': return { user: MKTpost, pass: MKTpost1 };
-      case 'PRE': return { user: MKTpre, pass: MKTpre1 };
-      case 'ENTER': return { user: enter, pass: enterpass };
-      case 'MUSIC': return { user: music, pass: musicpass };
-      default: return { user: MKTpost, pass: MKTpost1 };
-    }
-  })();
   login(credentials.user, credentials.pass);
-
-  // --- Create Project ---
   cy.get('.col-md-10 > .btn').should('be.visible').click();
 
-  const prefix = Module === 'ENTER' ? 'ENTER' : Module === 'MUSIC' ? 'MUSIC' : 'MOB';
+  const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
   const ModulePart = (Module === 'ENTER' || Module === 'MUSIC') ? `${prefix} ${subModule}` : `${prefix} ${Module}`;
-
   const pluginSuffix = Plugin ? ` ${Plugin}` : '';
-  const projectName = `${ModulePart} ${PriceType} ${ProductClass}${pluginSuffix} ${day}${month} ${hours}${minutes}`;
 
-  cy.get('input[formcontrolname="projectName"]').type(projectName);
+  let prefixName = `${ModulePart} ${PriceType} ${ProductClass}${pluginSuffix}`;
+  let projectName = getTruncatedName(prefixName, timeSuffix, 40);
+
+  cy.get('input[formcontrolname="projectName"]', { timeout: 10000 })
+    .should('be.visible')
+    .should('not.be.disabled')
+    .click()
+    .type(projectName);
 
   const envKey = ProductClass1 === 'Main' ? 'formattedDateMain' : 'formattedDate';
   Cypress.env(envKey, projectName);
 
-  if (ProductClass1 === 'Main') formattedDateMain = projectName;
-  else formattedDateOntop = projectName;
+  if (typeof formattedDateMain !== 'undefined' && ProductClass1 === 'Main') formattedDateMain = projectName;
+  if (typeof formattedDateOntop !== 'undefined' && ProductClass1 !== 'Main') formattedDateOntop = projectName;
 
-  // --- Date ---
+  // Multi-project support: also push into indexed list
+  const projectIndex = ProductClass1 === 'Main' ? 0 : 1;
+  registerProjectName(projectName, projectIndex);
+
   const date = new Date();
   date.setDate(date.getDate() + 1);
-  const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const formattedDateString = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  cy.get('input[aria-label="Date input field"]').type(formattedDate);
+  cy.get('input[aria-label="Date input field"]').click().type(formattedDateString);
   cy.wait(2000);
 
-  // --- Customer Type (ENTER/MUSIC) ---
   if (Module === 'ENTER' || Module === 'MUSIC') {
     if (!subModule) throw new Error(`subModule is required for Module ${Module}`);
     const customerType = subModule === 'POST' ? 'Post-paid' : 'Pre-paid';
-    cy.get('select[formcontrolname="customerType"]')
-      .select(customerType)
-      .should('have.value', customerType);
+    cy.get('select[formcontrolname="customerType"]').select(customerType);
   }
 
-  // --- Phone ---
-  const randomPhone = `0${Math.floor(8 + Math.random() * 2)}${Math.floor(10000000 + Math.random() * 90000000)}`;
-  cy.get('input[formcontrolname="phoneNo"]').type(randomPhone);
+  cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
 
-  // --- Save & Close ---
+  // Save Project
   cy.get('button[type="button"]').contains('Save').click();
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-  cy.wait(2000);
-  cy.get('.modal-body > :nth-child(1) > div > .btn').click();
 
-  // --- Add PO ---
-  cy.get(':nth-child(4) > .btn').click();
+  cy.wait(4000);
+  cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
+  cy.get('modal-container').should('not.exist');
 
-  const poName = `${ModulePart} ${PriceType} ${ProductClass}${pluginSuffix} ${day}${month} ${hours}${minutes}`;
+  // Add PO
+  cy.get(':nth-child(4) > .btn').should('be.visible').click({ force: true });
 
-  cy.get('input[formcontrolname="productName"]').type(poName);
+  let poName = getTruncatedName(prefixName, timeSuffix, 37);
+  cy.get('input[formcontrolname="productName"]').click().type(poName, { force: true });
+
   const poEnvKey = ProductClass1 === 'Main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
   Cypress.env(poEnvKey, poName);
 
-  cy.get('select[formcontrolname="promotionSubGroupFrom"]')
-    .select('Product Offering')
-    .should('have.value', 'Product Offering');
+  cy.get('select[formcontrolname="promotionSubGroupFrom"]').select('Product Offering');
 
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-
-  cy.contains('button', 'Create', { timeout: 10000 })
-    .should('be.visible')
-    .click()
-
+  cy.contains('button', 'Create', { timeout: 10000 }).should('be.visible').click();
   cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
-  // --- Navigate to Product Offering ---
-  cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
-
-  cy.wait('@getProject', { timeout: 300000 })
-    .its('response.statusCode')
-    .should('eq', 200);
-
-  cy.location('hash', { timeout: 300000 })
-    .should('include', '/project-home/mass-mkt/mass-mkt-product-offering');
+  // Navigate to PO Details
+  cy.intercept('GET', '**/getProjectByProjectId/*').as('getProject');
+  cy.wait('@getProject', { timeout: 300000 });
+  cy.location('hash', { timeout: 300000 }).should('include', '/project-home/mass-mkt/mass-mkt-product-offering');
   cy.wait(8000);
 
-  cy.get('select[formcontrolname="priceType"]', { timeout: 300000 })
-    .should('be.visible');
+  // PO Config
+  const priceTypeMap = { onetime: '1: One-Time', recurring: '2: Recurring', usage: '3: Usage' };
+  cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[PriceType], { force: true });
 
-  (() => {
-    // --- PriceType ---
-    const priceTypeMap = {
-      onetime: '1: One-Time',
-      recurring: '2: Recurring',
-      usage: '3: Usage'
-    };
-    const priceValue = priceTypeMap[PriceType];
-    cy.get('select[formcontrolname="priceType"]')
-      .select(priceValue, { force: true })
-      .should('have.value', priceValue);
+  const productClassMapMobile = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
+  const productClassMapEnterMusic = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
+  let productValue = (Module === 'ENTER' || Module === 'MUSIC')
+    ? productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra']
+    : productClassMapMobile[ProductClass];
+  cy.get('select[formcontrolname="productClass"]').select(productValue);
 
-    // --- ProductClass ---
-    const productClassMapMobile = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
-    const productClassMapEnterMusic = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
+  if (autoSetDuration) {
+    const randomMonth = Cypress._.random(2, 60);
+    cy.get('input[formcontrolname="packageDuration"]').clear().type(randomMonth.toString());
+    cy.get('select[formcontrolname="packageDurationUnit"]').find('option:not([disabled])').then($options => {
+      const idx = Cypress._.random(0, $options.length - 1);
+      cy.get('select[formcontrolname="packageDurationUnit"]').select(($options[idx] as HTMLOptionElement).value);
+    });
+    cy.get('.col-md-8 > .btn').click();
+  }
 
-    let productValue: string;
-    if (Module === 'ENTER' || Module === 'MUSIC') {
-      if (ProductClass === 'main') throw new Error(`Product Class "Main" is not available for Module ${Module}`);
-      productValue = productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra'];
-    } else {
-      productValue = productClassMapMobile[ProductClass];
-    }
+  if (subModule === 'PRE') {
+    const randomBillCycle = Cypress._.random(1, 60);
+    cy.get('input[formcontrolname="packageBillCycle"]')
+      .should('be.visible')
+      .clear()
+      .type(randomBillCycle.toString());
+    cy.get('select[formcontrolname="packageBillCycleUnit"]')
+      .find('option:not([disabled])')
+      .then($options => {
+        const idx = Cypress._.random(0, $options.length - 1);
+        const value = ($options[idx] as HTMLOptionElement).value;
+        cy.get('select[formcontrolname="packageBillCycleUnit"]')
+          .select(value);
+      });
+  }
 
-    cy.get('select[formcontrolname="productClass"]')
-      .select(productValue)
-      .should('have.value', productValue);
-    cy.wait(2000);
+  PriceExcluding();
+  selectTargetGroup('random');
+  dropdownPromotionGroup();
 
-    if (autoSetDuration) {
-      const randomInRange = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
-      const randomMonth = randomInRange(2, 60);
-      cy.get('input[formcontrolname="packageDuration"]').clear().type(randomMonth.toString());
+  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.'.repeat(5));
 
-      cy.get('select[formcontrolname="packageDurationUnit"]')
-        .find('option:not([disabled])')
-        .then(($options) => {
-          const randomIndex = Math.floor(Math.random() * $options.length);
-          const valueToSelect = ($options[randomIndex] as HTMLOptionElement).value;
-          cy.get('select[formcontrolname="packageDurationUnit"]').select(valueToSelect);
-        });
-    }
-  })();
+  // ส่ง subModule ไปด้วย
+  cy.log(`🟡 Before RandomProductSpecification | ProductClass: ${ProductClass} | subModule: ${subModule} | Module: ${Module}`);
+  RandomProductSpecification(ProductClass, subModule, Module);
+
+  if (Module === 'PRE' && (ProductClass === 'ontop' || ProductClass === 'ontopextra')) {
+    cy.get('body').then(($body) => {
+      const mvpnRadios = $body.find('input[formcontrolname="allowMvpn"]');
+      if (mvpnRadios.length > 0) {
+        const randomIndex = Math.floor(Math.random() * 2);
+        cy.wrap(mvpnRadios).eq(randomIndex).check({ force: true });
+        cy.log(`Randomly selected: ${randomIndex === 0 ? 'Yes' : 'No'}`);
+      }
+    });
+  }
+
+  targetgroup();
+
+  if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {
+    RetryPattern();
+  }
+  if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
+    CopyDeductFail();
+  }
+
+  smsWording();
+  backBacicInfo();
+  addFile();
 };
 
 export const ProjectBasicInformationCompleteOtherPOSub = (
@@ -939,14 +967,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
   Module: 'POST' | 'PRE'
 ): void => {
   // --- Login ---
-  const credentials = (() => {
-    switch (Module) {
-      case 'POST': return { user: MKTpost, pass: MKTpost1 };
-      case 'PRE': return { user: MKTpre, pass: MKTpre1 };
-      default: return { user: MKTpost, pass: MKTpost1 };
-    }
-  })();
-
+  const credentials = getCredentials(Module);
   login(credentials.user, credentials.pass);
 
   // --- Create Project ---
@@ -961,8 +982,6 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
   cy.get('input[formcontrolname="projectName"]').type(projectName);
   Cypress.env('projectName', projectName);
-
-  // ตรวจสอบว่าเก็บค่าถูกต้อง
   cy.log(`✅ Stored projectName: ${Cypress.env('projectName')}`);
 
   // --- Date ---
@@ -975,17 +994,16 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
   cy.wait(2000);
 
   // --- Phone ---
-  const randomPhone = `0${Math.floor(8 + Math.random() * 2)}${Math.floor(10000000 + Math.random() * 90000000)}`;
-  cy.get('input[formcontrolname="phoneNo"]').type(randomPhone);
+  cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
 
   // --- Save & Close ---
   cy.get('button[type="button"]').contains('Save').click();
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-  cy.wait(2000);
-  cy.get('.modal-body > :nth-child(1) > div > .btn').click();
+  cy.wait(4000);
+  cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
 
   // --- Add PO ---
-  cy.get(':nth-child(4) > .btn').click();
+  cy.get(':nth-child(4) > .btn').click({ force: true });
 
   let poName: string;
   if (Module === 'PRE' && (PoSubGroup === 'Service' || PoSubGroup === 'OrderFee')) {
@@ -1031,8 +1049,6 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
   // --- Fill additional fields ---
   (() => {
-
-    // Set PriceType for PRE Service/OrderFee
     if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
       const priceTypeMap = {
         onetime: 'One-Time',
@@ -1070,7 +1086,6 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
       //     }
       //   });
 
-      // สุ่มตัวเลข 1-999 (เพราะ maxlength="5")
       const randomDuration = Math.floor(Math.random() * 999) + 1;
 
       cy.get('input[formcontrolname="duration"]')
@@ -1239,7 +1254,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
         selectedIndices.forEach((index: number) => {
           cy.get('select[formcontrolname="availableListBox"] option')
             .eq(index)
-            .dblclick();
+            .dblclick({ force: true });
         });
       });
       // Other Condition
@@ -1297,7 +1312,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
         selectedIndices.forEach((index: number) => {
           cy.get('select[formcontrolname="availableListBox"] option')
             .eq(index)
-            .dblclick();
+            .dblclick({ force: true });
         });
       });
       // Memo Description
@@ -1352,7 +1367,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
         selectedIndices.forEach((index: number) => {
           cy.get('select[formcontrolname="availableListBox"] option')
             .eq(index)
-            .dblclick();
+            .dblclick({ force: true });
         });
       });
 
@@ -1367,472 +1382,219 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
   })();
 };
 
-; export const priorityInternet = (): void => {
-  // 1. เปิด Tab Internet
-  cy.get('app-mass-enh-product-offering-detail-tab div.scrollmenu')
-    .not('[hidden]')
-    .contains('a', /^Internet$/)
-    .scrollIntoView()
-    .should('be.visible')
-    .click();
-
-  cy.log('⏳ Waiting for table data...');
-  cy.wait(2000);
-
-  // รอให้ตารางหลักโหลด
-  cy.get('app-mass-enh-internet table.table-hover.table-bordered:visible')
-    .should('exist')
-    .find('tbody tr')
-    .find('button[title="Edit"]')
-    .should('be.visible');
-
-  // --- Loop นอก: จัดการ Main Row ---
-  const processMainTableRow = (rowIndex: number = 0) => {
-    cy.get('body').then(($body) => {
-      // หาตารางหลัก (Main Table)
-      const $mainTable = $body.find('app-mass-enh-internet > div > table.table-hover.table-bordered:visible').first();
-      const $rows = $mainTable.find('> tbody > tr');
-
-      if (rowIndex >= $rows.length) {
-        cy.log('✅ Processed all main rows.');
-        return;
-      }
-
-      const $currentRow = Cypress.$($rows[rowIndex]);
-
-      if ($currentRow.find('button[title="Edit"]').length === 0) {
-        cy.log(`ℹ️ Row ${rowIndex} has no Edit button. Skipping.`);
-        processMainTableRow(rowIndex + 1);
-        return;
-      }
-
-      cy.log(`🚀 Processing Main Row: ${rowIndex}`);
-
-      // กด Edit Main Row
-      cy.wrap($currentRow).find('button[title="Edit"]').scrollIntoView().click();
-      cy.wait(1000); // รอ Form เปิด
-
-      // เรียก Loop ใน
-      processFormInsideRow(rowIndex);
-    });
-  };
-
-  // --- Loop ใน: จัดการ Form และ Nested Table ---
-  const processFormInsideRow = (mainRowIndex: number) => {
-    cy.get('body').then(($body) => {
-      // Scope หาเฉพาะใน Form ที่เปิดอยู่ (Collapse Panel)
-      const $activeForm = $body.find('app-mass-enh-internet .collapse.in, app-mass-enh-internet .collapse.show').first();
-
-      // =======================================================
-      // PART 1: เช็คตารางย่อย (Nested Table)
-      // =======================================================
-      // หาตารางข้างใน Form (ถ้ามี)
-      const $nestedTable = $activeForm.find('table.table-hover.table-bordered');
-
-      if ($nestedTable.length > 0) {
-        // หา Header เพื่อดูว่า Column Priority อยู่ index ไหน (กันพลาด)
-        let priorityColIndex = -1;
-        $nestedTable.find('thead th').each((i, el) => {
-          if (Cypress.$(el).text().trim().includes('Priority')) {
-            priorityColIndex = i;
-          }
-        });
-
-        // ถ้าเจอ Column Priority ให้วนลูปหาแถวที่ค่าว่าง
-        if (priorityColIndex !== -1) {
-          const $nestedRows = $nestedTable.find('tbody tr');
-          let targetNestedRowIndex = -1;
-
-          $nestedRows.each((i, row) => {
-            const $cell = Cypress.$(row).find('td').eq(priorityColIndex);
-            // เช็คว่า text ว่าง และ แถวนั้นต้องมีปุ่ม Edit ด้วย
-            if ($cell.text().trim() === '' && Cypress.$(row).find('button[title="Edit"]').length > 0) {
-              targetNestedRowIndex = i;
-              return false; // break loop
-            }
-          });
-
-          // เจอแถวว่างในตารางย่อย -> จัดการมันก่อน!
-          if (targetNestedRowIndex !== -1) {
-            cy.log(`⚠️ Found empty nested priority at row ${targetNestedRowIndex}. Fixing...`);
-
-            // 1. กด Edit ของแถวย่อย
-            cy.wrap($nestedRows[targetNestedRowIndex])
-              .find('button[title="Edit"]')
-              .click();
-
-            // 2. รอ Input ปรากฏ (ชื่อ formcontrolname="priority")
-            cy.wait(500);
-            const randomNumber = Math.floor(Math.random() * 99999) + 1;
-
-            // หา Input เฉพาะในแถวที่กำลังแก้
-            cy.get('app-mass-enh-internet input[formcontrolname="priority"]:visible')
-              .clear()
-              .type(randomNumber.toString());
-
-            // 3. กด Update ของแถวย่อย (ระวัง: ต้องกดปุ่ม Update ของ nested row หรือปุ่ม Add/Update ใกล้ๆ)
-            // สมมติว่าพอกด Edit แถวย่อย ปุ่ม Action จะเปลี่ยนเป็น Update/Cancel ในแถวนั้น
-            cy.wrap($nestedRows[targetNestedRowIndex])
-              .parents('table') // ถอยไปหา Table แม่
-              .parent() // ถอยไปอีกนิดเผื่อปุ่มอยู่นอก Table (ปกติเคสนี้ปุ่มมักจะอยู่ในแถว หรือใต้ตาราง)
-              .find('button.btn-primary') // หาปุ่มสีฟ้า
-              .contains(/Update|Add/i)
-              .click();
-
-            cy.wait(2000); // รอ Refresh
-            processFormInsideRow(mainRowIndex); // วนกลับมาเช็คใหม่
-            return; // จบรอบนี้
-          }
-        }
-      }
-
-      // =======================================================
-      // PART 2: เช็ค Input ใน Form หลัก (Standalone Inputs)
-      // =======================================================
-      // ถ้าในตารางย่อยครบแล้ว (หรือไม่มี) มาเช็ค Input ทั่วไป เช่น fixedSpeedPriority
-      const $mainInputs = $activeForm.find('input[formcontrolname*="riority"]'); // หา input ที่ชื่อมีคำว่า riority
-      let emptyMainInputIndex = -1;
-
-      for (let i = 0; i < $mainInputs.length; i++) {
-        // ต้องเช็คว่า Input นี้ไม่ได้อยู่ในตารางย่อยที่เราเพิ่งเช็คไป (หรือเช็ค value เลยก็ได้)
-        if (!Cypress.$($mainInputs[i]).val()) {
-          emptyMainInputIndex = i;
-          break;
-        }
-      }
-
-      if (emptyMainInputIndex !== -1) {
-        cy.log('⚠️ Found empty main form priority. Fixing...');
-        const randomNumber = Math.floor(Math.random() * 99999) + 1;
-
-        cy.wrap($mainInputs[emptyMainInputIndex])
-          .scrollIntoView()
-          .type(randomNumber.toString());
-
-        // กด Update ใหญ่ของ Form
-        cy.get('app-mass-enh-internet button.btn-primary')
-          .contains(/Update|Add/i)
-          .scrollIntoView()
-          .click();
-
-        cy.wait(2000);
-        processFormInsideRow(mainRowIndex); // เช็คซ้ำ (เผื่อมีหลาย Input)
-        return;
-      }
-
-      // =======================================================
-      // PART 3: ครบทุกอย่างแล้ว -> ไป Main Row ถัดไป
-      // =======================================================
-      cy.log('✅ Form complete. Moving to next row.');
-      cy.get('app-mass-enh-internet button').contains('Cancel').filter(':visible').click();
-      cy.wait(500);
-      processMainTableRow(mainRowIndex + 1);
-
-    });
-  };
-
-  // เริ่มต้น
-  processMainTableRow(0);
-};
-export const InternetRandom = (type: 'notrecurring' | 'recurring' = 'notrecurring') => {
-  if (type === 'notrecurring') {
-    Internetrandom(
-      'button.btn.btn-primary.btn-xs:eq(3)',
-      ':nth-child(1) > .btn'
-    );
-  } else if (type === 'recurring') {
-    Internetrandom(
-      'button.btn.btn-primary.btn-xs:eq(4)',
-      'button.btn-primary:contains("Add"):last'
-    );
+const generateAccessNumber = (): string => {
+  const randomPrefix = Cypress._.random(1000, 9999);
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let randomSuffix = '';
+  for (let i = 0; i < 6; i++) {
+    randomSuffix += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  return `*${randomPrefix}*${randomSuffix}#`;
 };
-const Internetrandom = (addButtonSelector: string, saveButtonSelector: string): void => {
-  cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
-  cy.scrollTo('bottom');
-
-  cy.get(addButtonSelector).click();
-  cy.get('select[formcontrolname="InternetQuotaType"]', { timeout: 20000 })
-    .should('exist');
-
-
-  detectDeductTabs().then((hasDeductTabs) => {
-    if (hasDeductTabs) {
-      cy.get('tabset .nav-tabs li', { timeout: 10000 })
-        .first()
-        .find('a')
-        .should('be.visible')
-        .click({ force: true });
-
-      cy.wait(500);
-    }
-
-    cy.get(addButtonSelector, { timeout: 20000 })
-      .should('be.visible')
-      .click({ force: true });
-
-    cy.get('select[formcontrolname="InternetQuotaType"]', { timeout: 20000 })
-      .should('be.visible')
-      .last()
-      .then(($select) => {
-
-        const $options = $select.find('option:not([disabled])');
-
-        if ($options.length === 0) {
-          cy.log('❌ No InternetQuotaType options found');
-          return;
-        }
-
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        const selectedValue = ($options[randomIndex] as HTMLOptionElement).value;
-
-        cy.wrap($select).select(selectedValue, { force: true });
-
-        const checkAndSelectExceedRate = () => {
-          const labelText = 'Internet Exceed Rate';
-
-          const rootSelector = hasDeductTabs
-            ? '.tab-content .tab-pane.active'
-            : 'body';
-
-          cy.get(rootSelector).then(($root) => {
-            if ($root.find(`label:contains("${labelText}"):visible`).length > 0) {
-              cy.get(rootSelector)
-                .contains('.col-md-12', labelText)
-                .find('mat-select')
-                .scrollIntoView()
-                .click({ force: true });
-
-              selectRandomExceedRate(hasDeductTabs);
-              cy.wait(500);
-            } else {
-              cy.log('ℹ️ Internet Exceed Rate not found, skipping...');
-            }
-          });
-        };
-
-        switch (selectedValue) {
-          case 'Limited Data (Pay per use)':
-          case 'Limited Data (Stop Net)':
-            selectRandomInternetQuota(hasDeductTabs);
-            cy.wait(500);
-            selectRandomInternetSpeed(hasDeductTabs);
-            cy.wait(500);
-            checkAndSelectExceedRate();
-            break;
-
-          case 'Limited Data Only':
-            selectRandomInternetQuota(hasDeductTabs);
-            cy.wait(500);
-            selectRandomInternetSpeed(hasDeductTabs);
-            cy.wait(500);
-            checkAndSelectExceedRate();
-            break;
-
-          case 'Unlimited Data (Throttling Speed)':
-            selectRandomInternetQuota(hasDeductTabs);
-            cy.wait(500);
-            selectRandomInternetSpeed(hasDeductTabs);
-            cy.wait(500);
-            selectInternetThrottlingSpeed(hasDeductTabs);
-            cy.wait(500);
-            checkAndSelectExceedRate();
-            break;
-
-          case 'Pay per use only':
-            checkAndSelectExceedRate();
-            break;
-
-          case 'Unlimited Data (Fixed Speed)':
-            cy.get('[formarrayname="internetQuotaNetworkCoverageCheckBox"]')
-              .contains('label', '5G')
-              .click({ force: true });
-
-            cy.wait(800);
-
-            selectRandomInternetSpeedfixed(hasDeductTabs);
-            cy.wait(500);
-            checkAndSelectExceedRate();
-            break;
-
-          default:
-            cy.log(`⚠️ Unknown InternetQuotaType: ${selectedValue}`);
-            break;
-        }
-
-        cy.get(saveButtonSelector, { timeout: 20000 })
-          .should('be.visible')
-          .click({ force: true });
-      });
-  });
-};
-
-const detectDeductTabs = (): Cypress.Chainable<boolean> => {
-  return cy.get('body').then(($body) => {
-    return $body.find('tabset .nav-tabs').length > 0;
-  });
-};
-
-const selectRandomInternetQuota = (hasTabs: boolean) => {
-
-  if (hasTabs) {
-    cy.get('.nav-tabs').scrollIntoView();
-    cy.get('.nav-tabs').contains('Deduct Success').click();
-    cy.wait(500);
-  }
-
-  const rootSelector = hasTabs
-    ? '.tab-content .tab-pane.active'
-    : 'body';
-
-  cy.get(rootSelector)
-    .contains('.form-group', '*Internet Quota :')
-    .find('mat-select')
-    .scrollIntoView()
-    .should('be.visible')
-    .click();
-
-  cy.get('.cdk-overlay-pane', { timeout: 10000 })
-    .should('be.visible')
-    .and('not.have.class', 'mat-select-panel-animating');
-
-  cy.get('mat-option')
-    .should('be.visible')
-    .then(($options) => {
-      const fiveGOptions = $options.filter((index, option) =>
-        Cypress.$(option).text().trim().startsWith('5G')
-      );
-
-      if (fiveGOptions.length > 0) {
-        const randomIndex = Math.floor(Math.random() * fiveGOptions.length);
-
-        // ✅ แก้ไข: เพิ่ม { force: true } เพื่อแก้ปัญหา element hidden
-        cy.wrap(fiveGOptions[randomIndex])
-          .scrollIntoView()
-          .click({ force: true });
-
-      } else {
-        cy.log('⚠️ No 5G options found!');
-        // ใช้ click backdrop จะชัวร์กว่า ESC ในบางกรณี
-        cy.get('body').click(0, 0, { force: true });
-      }
-    });
-};
-const selectRandomInternetSpeed = (hasTabs: boolean) => {
-  cy.scrollTo('bottom');
-
-  const rootSelector = hasTabs
-    ? '.tab-content .tab-pane.active'
-    : 'body';
-
-  cy.get(rootSelector)
-    .contains('.col-md-12', '*Internet Speed :')
-    .find('select')
-    .should('exist')
-    .then(($select) => {
-
-      const $options = $select.find('option');
-      const startIndex = 1;
-
-      if ($options.length > startIndex) {
-        const randomIndex = Math.floor(Math.random() * ($options.length - startIndex)) + startIndex;
-        const randomValue = ($options[randomIndex] as unknown as HTMLOptionElement).value;
-
-        cy.wrap($select)
-          .select(randomValue, { force: true })
-          .should('have.value', randomValue);
-      } else {
-        cy.log('⚠️ No Internet Speed options available');
-      }
-    });
-};
-
-const selectRandomExceedRate = (hasTabs: boolean) => {
-  const rootSelector = hasTabs
-    ? '.tab-content .tab-pane.active'
-    : 'body';
-
-  cy.get(rootSelector)
-    .contains('Internet Exceed Rate')
-    .closest('.col-md-12')
-    .find('mat-select')
+export const RandomHumanTouchPoint = (subModule: string) => {
+  // 1. เปิด Panel Human Touch Point
+  cy.contains('.scrollmenu a', 'Selling Location & Channel', { timeout: 30000 })
     .scrollIntoView()
     .click({ force: true });
 
-  // Wait for dropdown panel to appear
-  cy.get('.mat-select-panel', { timeout: 10000 }).should('be.visible');
-  cy.wait(500); // Give panel time to render options
+  cy.get('app-mass-mkt-human-touch-point', { timeout: 30000 })
+    .should('exist')
+    .and('be.visible');
 
-  cy.get('.mat-select-panel mat-option', { timeout: 10000 })
-    .should('have.length.greaterThan', 0)
-    .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      cy.wrap($options.eq(randomIndex)).click({ force: true });
+  // Helper สร้าง Text สุ่ม
+  const randomText = (len = 30) =>
+    Cypress._.sampleSize(
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ',
+      len
+    ).join('');
+
+  // Helper สร้างเบอร์โทรสุ่ม (ถ้าไม่มี function นี้ใน scope global)
+  const generateAccessNumber = () =>
+    `0${Math.floor(Math.random() * 900000000 + 100000000)}`;
+
+  // -----------------------------------------------------------
+  // 2. Logic การเลือก: ต้องมี ROM หรือ Easy App ROM หรือ ทั้งคู่
+  // -----------------------------------------------------------
+  cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
+    .find('option')
+    .then($options => {
+      // ดึง Text ทั้งหมดออกมา
+      const allOptions = [...$options].map(opt => opt.innerText.trim()).filter(t => t !== '');
+
+      // ตัวเป้าหมายที่ต้องมี
+      const mandatoryTargets = ['ROM', 'Easy App ROM'];
+
+      // เช็คว่าใน list มีตัวเป้าหมายตัวไหนบ้าง (ป้องกัน error ถ้าตัวใดตัวหนึ่งหายไป)
+      const availableTargets = mandatoryTargets.filter(target => allOptions.includes(target));
+
+      if (availableTargets.length === 0) {
+        cy.log('⚠️ Warning: ROM and Easy App ROM are not available in the list!');
+        return;
+      }
+
+      let itemsToSelect: string[] = [];
+
+      // --- Logic สุ่มการเลือก Mandatory (1 ตัว หรือ ทั้งคู่) ---
+      // สุ่มเลข 1 หรือ 2 (ถ้ามีแค่ตัวเดียวให้เลือกตัวนั้นเลย)
+      const pickCount = availableTargets.length > 1 ? Cypress._.random(1, 2) : 1;
+
+      if (pickCount === 2) {
+        // เลือกทั้งคู่ (ROM และ Easy App ROM)
+        itemsToSelect = availableTargets;
+        cy.log('🎲 Logic Selected: BOTH (ROM & Easy App ROM)');
+      } else {
+        // เลือกแค่ 1 ตัว (สุ่มเอาระหว่าง ROM หรือ Easy App ROM)
+        const singlePick = Cypress._.sample(availableTargets);
+        if (singlePick) itemsToSelect = [singlePick];
+        cy.log(`🎲 Logic Selected: SINGLE (${singlePick})`);
+      }
+
+      // --- Logic สุ่มตัวประกอบอื่นๆ (Optional: 0-2 ตัว) ---
+      // เอาตัวเลือกอื่นๆ ที่ไม่ใช่ ROM/Easy App ROM มาสุ่มเพิ่ม
+      const otherOptions = allOptions.filter(opt => !mandatoryTargets.includes(opt));
+      const randomOthers = Cypress._.sampleSize(otherOptions, Cypress._.random(0, 2));
+
+      // รวม List ที่จะเลือกทั้งหมด
+      const finalSelection = [...itemsToSelect, ...randomOthers];
+
+      cy.log(`✅ Final Selection: ${finalSelection.join(', ')}`);
+
+      // ทำการเลือกใน Dropdown
+      cy.get('select[formcontrolname="availableListBox"]')
+        .select(finalSelection, { force: true });
+
+      // กดปุ่ม Add (>)
+      cy.get('button')
+        .find('.glyphicon-chevron-right')
+        .first()
+        .parents('button')
+        .click({ force: true });
+    });
+
+  // -----------------------------------------------------------
+  // 3. Loop เพื่อกรอกข้อมูล (Edit)
+  // -----------------------------------------------------------
+  cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 })
+    .should('have.length.greaterThan', 0);
+
+  cy.get('table tbody tr.ng-star-inserted')
+    .each($row => {
+      cy.wrap($row)
+        .find('td')
+        .first()
+        .invoke('text')
+        .then(raw => {
+          const channel = raw.trim();
+          if (!channel) return;
+
+          cy.log(`✏️ Edit Human Touch Point: ${channel}`);
+
+          cy.wrap($row)
+            .find('button[title="Edit"]')
+            .should('be.visible')
+            .click({ force: true });
+
+          // --- Case: ROM / Easy App ROM ---
+          if (channel === 'ROM' || channel === 'Easy App ROM') {
+
+            // Logic: ตรวจสอบ subModule = PRE เท่านั้น
+            if (subModule === 'PRE') {
+              let sub = '';
+              let unsub = '';
+
+              do {
+                sub = generateAccessNumber();
+                unsub = generateAccessNumber();
+              } while (sub === unsub);
+
+              cy.get('input[formcontrolname="subscribeAccessNumber"]', { timeout: 20000 })
+                .clear()
+                .type(sub);
+
+              cy.get('input[formcontrolname="unsubscribeAccessNumber"]')
+                .clear()
+                .type(unsub);
+            }
+
+            // กรอกราคาและ Description ของ ROM
+            cy.get('input[formcontrolname="romPrice"]')
+              .clear()
+              .type(Cypress._.random(1, 999).toString());
+
+            cy.get('textarea[formcontrolname="description"]')
+              .clear()
+              .type(randomText(40));
+
+            // Upload File
+            // ตรวจสอบ path ไฟล์ให้ถูกต้อง
+            cy.get('input[type="file"]')
+              .selectFile('cypress/fixtures/sample.pdf', { force: true });
+
+            cy.get('textarea[formcontrolname="attachmentDescription"]')
+              .clear()
+              .type(randomText(30));
+          }
+
+          // --- Case: Event / Selective ---
+          if (
+            channel === 'Event' ||
+            channel === 'Selective Channel/Location'
+          ) {
+            cy.get('textarea[formcontrolname="description"]')
+              .clear()
+              .type(randomText(35));
+          }
+
+          // กด Update
+          cy.contains('button', 'Update', { timeout: 20000 })
+            .should('be.visible')
+            .click({ force: true });
+
+          cy.wait(5000);
+        });
     });
 };
 
-const selectRandomInternetSpeedfixed = (hasTabs: boolean) => {
-  cy.scrollTo('bottom');
-
-  const selector = hasTabs
-    ? '.tab-content .tab-pane.active select[formcontrolname="fixedSpeedInternetSpeed"]'
-    : 'select[formcontrolname="fixedSpeedInternetSpeed"]';
-
-  cy.get(selector, { timeout: 10000 }).then($select => {
-    const $options = $select.find('option');
-    const startIndex = 1;
-
-    if ($options.length > startIndex) {
-      const randomIndex = Math.floor(Math.random() * ($options.length - startIndex)) + startIndex;
-      const randomValue = ($options[randomIndex] as HTMLOptionElement).value;
-
-      cy.wrap($select)
-        .select(randomValue, { force: true })
-        .should('have.value', randomValue);
-    } else {
-      cy.log('⚠️ No Fixed Internet Speed options found');
-    }
-  });
-};
-
-const selectInternetThrottlingSpeed = (hasTabs: boolean) => {
-  cy.scrollTo('bottom');
-
-  const selector = hasTabs
-    ? '.tab-content .tab-pane.active select[formcontrolname="internetThrottlingSpeed"]'
-    : 'select[formcontrolname="internetThrottlingSpeed"]';
-
-  cy.get(selector, { timeout: 10000 }).then($select => {
-    const $options = $select.find('option:not([disabled])');
-
-    if ($options.length > 0) {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      const randomValue = ($options[randomIndex] as HTMLOptionElement).value;
-
-      cy.wrap($select)
-        .select(randomValue, { force: true })
-        .should('have.value', randomValue);
-    } else {
-      cy.log('⚠️ No Throttling Speed options found');
-    }
-  });
-};
-
 export const CopyDeductFail = () => {
-  const tabs = ['Internet', 'Voice', 'SMS', 'MMS'];
+  const tabs = ['Internet', 'Voice', 'SMS', 'MMS', 'Vertical App', 'Cloud Game'];
 
   tabs.forEach((tabName) => {
     cy.wait(2000);
-    cy.get('.scrollmenu > .nav')
-      .contains(tabName)
-      .scrollIntoView()
-      .click();
-    cy.contains('.nav-tabs .nav-link', 'Deduct Fail')
-      .click({ force: true });
+    cy.get('.scrollmenu > .nav').then(($nav) => {
+      const $tab = $nav.find(':contains("' + tabName + '")').filter(function () {
+        return Cypress.$(this).text().trim() === tabName;
+      });
 
-    cy.wait(2000);
-    cy.contains('button', 'Copy From Deduct Success')
-      .click({ force: true });
+      if ($tab.length === 0) {
+        cy.log(`Tab "${tabName}" not found, skipping...`);
+        return;
+      }
+
+      cy.wrap($tab).scrollIntoView().click();
+
+      cy.get('.nav-tabs').then(($navTabs) => {
+        const $deductFail = $navTabs.find('.nav-link:contains("Deduct Fail")');
+
+        if ($deductFail.length === 0) {
+          cy.log(`"Deduct Fail" tab not found for "${tabName}", skipping...`);
+          return;
+        }
+
+        cy.wrap($deductFail).click({ force: true });
+
+        cy.wait(2000);
+        cy.get('button').then(($buttons) => {
+          const $copyBtn = $buttons.filter(':contains("Copy From Deduct Success")');
+
+          if ($copyBtn.length === 0) {
+            cy.log(`"Copy From Deduct Success" button not found for "${tabName}", skipping...`);
+            return;
+          }
+
+          cy.wrap($copyBtn).click({ force: true });
+        });
+      });
+    });
   });
 };
 
@@ -1846,292 +1608,321 @@ const closeSuccessModal = (): void => {
     .click();
 };
 
-type SmsPattern =
-  | 'BALANCED'
-  | 'TRANSACTION_FOCUS'
-  | 'MARKETING_FOCUS'
-  | 'EXPIRY_FLOW'
-  | 'SILENT_USER'
-  | 'THAI_USER'
-  | 'EN_USER'
-  | 'SHORT_ALL'
-  | 'LONG_ALL';
-
-export const _smsWordingLogic = (type: 'POST' | 'PRE') => {
-
-  // --------------------------------------------------
-  // 🎯 PATTERN
-  // --------------------------------------------------
-  const pattern: SmsPattern = Cypress._.sample([
-    'BALANCED',
-    'TRANSACTION_FOCUS',
-    'MARKETING_FOCUS',
-    'EXPIRY_FLOW',
-    'SILENT_USER',
-    'THAI_USER',
-    'EN_USER',
-    'SHORT_ALL',
-    'LONG_ALL'
-  ]);
-
-  cy.log(`🔥 Pattern: ${pattern}`);
-
-  // --------------------------------------------------
-  // 🧠 BASE
-  // --------------------------------------------------
-  const name =
-    Cypress.env('projectName') ||
-    Cypress.env('poName') ||
-    'PACKAGE-A';
-
-  const limit = (str: string, max: number) =>
-    str.length > max ? str.substring(0, max) : str;
-
-  // --------------------------------------------------
-  // 🌏 LANGUAGE
-  // --------------------------------------------------
-  const getLang = (): 'TH' | 'EN' => {
-    if (pattern === 'THAI_USER') return 'TH';
-    if (pattern === 'EN_USER') return 'EN';
-    return Math.random() < 0.7 ? 'TH' : 'EN';
+const _smsWordingLogic = (type: 'POST' | 'PRE') => {
+  const limit = (str: string, maxLen: number): string => {
+    if (!str) return '';
+    return str.length > maxLen ? str.substring(0, maxLen) : str;
   };
 
-  // --------------------------------------------------
-  // 🧠 REAL SMS TEXT LIBRARY
-  // --------------------------------------------------
-  const smsLib = {
-    greeting: {
-      TH: `ยินดีต้อนรับสู่แพ็กเกจ ${name}`,
-      EN: `Welcome to ${name}`
-    },
-    success: {
-      TH: `สมัคร ${name} สำเร็จ`,
-      EN: `Subscription to ${name} successful`
-    },
-    fail: {
-      TH: `ไม่สามารถหักค่าบริการ ${name} ได้`,
-      EN: `Payment for ${name} failed`
-    },
-    beforeFee: {
-      TH: `${name} จะหักค่าบริการในอีก 3 วัน`,
-      EN: `${name} will be charged in 3 days`
-    },
-    expireSoon: {
-      TH: `${name} ใกล้หมดอายุ`,
-      EN: `${name} is about to expire`
-    },
-    expired: {
-      TH: `${name} หมดอายุแล้ว`,
-      EN: `${name} has expired`
-    },
-    promo: {
-      TH: `รับสิทธิ์ ${name} วันนี้`,
-      EN: `Enjoy ${name} today`
-    },
-    check: {
-      TH: `เช็คแพ็กเกจ ${name}`,
-      EN: `Check your package ${name}`
-    }
+  const getRandomSendFlag = (): string => {
+    const options = ['Send', "Don't Send"];
+    return options[Math.floor(Math.random() * options.length)];
   };
 
-  // --------------------------------------------------
-  // 🧠 TEXT GENERATOR
-  // --------------------------------------------------
-  const genText = (key: keyof typeof smsLib, maxLen: number) => {
-    const lang = getLang();
-    let text = smsLib[key][lang];
+  const WAIT_TIME = 3000;
+  const currentGreetingVal = 'Send';
+  const lastMinuteVal = getRandomSendFlag();
+  const beforeFeeDeductVal = getRandomSendFlag();
+  const deductSuccessVal = getRandomSendFlag();
+  const deductFailVal = getRandomSendFlag();
 
-    if (pattern === 'SHORT_ALL') {
-      text = lang === 'TH' ? `ใช้ ${name}` : `Use ${name}`;
-    }
+  const isBeforePromoSend = Math.random() < 0.5;
+  const beforePromoVal = isBeforePromoSend ? 'Send' : "Don't Send";
+  const promoExpVal = isBeforePromoSend ? "Don't Send" : 'Send';
 
-    if (pattern === 'LONG_ALL') {
-      text =
-        lang === 'TH'
-          ? `ขอบคุณที่ใช้บริการ ${name} สามารถใช้งานได้ตามเงื่อนไขที่กำหนด`
-          : `Thank you for using ${name}, service is active under terms`;
-    }
+  cy.scrollTo('bottom');
+  cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
+  cy.get('textarea, select', { timeout: 15000 }).should('exist');
+  cy.wait(5000);
 
-    return limit(text, maxLen);
-  };
+  cy.then(() => {
+    const finalProjectName = Cypress.env('formattedDateMain') ||
+      Cypress.env('formattedDate') ||
+      Cypress.env('projectName') ||
+      Cypress.env('formattedDateMainPONAME') ||
+      Cypress.env('formattedDateOntopPONAME') ||
+      Cypress.env('poName');
 
-  // --------------------------------------------------
-  // 🎯 SEND FLAG LOGIC (REAL)
-  // --------------------------------------------------
-  const getSend = (section: string) => {
-    switch (pattern) {
 
-      case 'SILENT_USER':
-        return "Don't Send";
+    const textFields = [
+      { name: 'shortPromotionName', prefixEN: 'Sample ', prefixTH: 'ตัวอย่าง ', max: 50 },
+      { name: 'cmsDisplay', prefixEN: 'CMS Display for ', prefixTH: 'CMS แสดงผล ', max: 250 },
+      { name: 'promotionDescription', prefixEN: 'Desc: ', prefixTH: 'รายละเอียด: ', max: 250 }
+    ];
 
-      case 'TRANSACTION_FOCUS':
-        return section.includes('Greeting') ||
-          section.includes('Delete')
-          ? 'Send'
-          : "Don't Send";
+    textFields.forEach(field => {
+      cy.get(`textarea[formcontrolname="${field.name}"]`).should('be.visible').then(($els: any) => {
+        cy.wrap($els[0]).clear({ force: true }).type(limit(`${field.prefixEN}${finalProjectName}`, field.max), { delay: 0, force: true });
+        if ($els.length > 1) {
+          cy.wrap($els[1]).clear({ force: true }).type(limit(`${field.prefixTH}${finalProjectName}`, field.max), { delay: 0, force: true });
+        }
+        cy.wait(WAIT_TIME);
+      });
+    });
 
-      case 'MARKETING_FOCUS':
-        return section.includes('Promote')
-          ? 'Send'
-          : Math.random() < 0.5 ? 'Send' : "Don't Send";
+    // --- Section 4: SMS Greeting (Force Send & Type) ---
+    cy.get('body').then(($body: any) => {
+      if ($body.find('select[formcontrolname="smsGreetingSendFlag"]').length > 0) {
+        cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(currentGreetingVal);
+        cy.get('textarea[formcontrolname="smsGreeting"]')
+          .should('be.visible')
+          .each(($el: any, index: number) => {
+            const prefix = index === 0 ? 'Welcome!' : 'ยินดีต้อนรับ';
+            cy.wrap($el).clear({ force: true }).type(limit(`${prefix} ${finalProjectName}`, 400), { delay: 0, force: true });
+          });
+      }
+      if ($body.find('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').length > 0) {
+        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(currentGreetingVal);
+      }
+    });
 
-      case 'EXPIRY_FLOW':
-        return section.includes('Exp')
-          ? 'Send'
-          : "Don't Send";
+    // --- Section 6: SMS Delete (PRE Only) ---
+    if (type === 'PRE') {
+      const sendOptions = ['Send', "Don't Send"];
+      const randomSendVal = sendOptions[Math.floor(Math.random() * sendOptions.length)];
 
-      default:
-        return Math.random() < 0.75 ? 'Send' : "Don't Send";
-    }
-  };
+      cy.get('select[formcontrolname="smsDeleteSendFlag"]').then(($select: any) => {
+        if ($select.length === 0) return;
 
-  const getDefault = () => {
-    if (pattern === 'TRANSACTION_FOCUS') return true;
-    if (pattern === 'MARKETING_FOCUS') return false;
-    return Math.random() < 0.5;
-  };
+        // 1️⃣ Select Send / Don't Send
+        cy.wrap($select).select(randomSendVal, { force: true });
+        cy.wait(WAIT_TIME);
 
-  // --------------------------------------------------
-  // 🧩 HELPERS
-  // --------------------------------------------------
-  const fill = (control: string, key: keyof typeof smsLib, len: number) => {
-    cy.get(`textarea[formcontrolname="${control}"]`)
-      .should('exist')
-      .then($el => {
-        const text = genText(key, len);
+        if (randomSendVal !== 'Send') return;
 
-        cy.wrap($el[0]).clear().type(text, { force: true });
+        // 2️⃣ Random Default Wording (Y / N)
+        const defaultOptions = ['Yes', 'No'];
+        const randomDefaultVal = defaultOptions[Math.floor(Math.random() * defaultOptions.length)];
 
-        if ($el.length > 1) {
-          cy.wrap($el[1]).clear().type(genText(key, len), { force: true });
+        cy.get('input[formcontrolname="smsDeleteDefaultWordingFlag"]')
+          .then(($radios: any) => {
+            if ($radios.length > 0) {
+              cy.wrap($radios)
+                .contains(randomDefaultVal)
+                .click({ force: true });
+            }
+          });
+
+        cy.wait(WAIT_TIME);
+
+        // 3️⃣ If Default Wording = No → fill SMS Delete
+        if (randomDefaultVal === 'No') {
+          cy.get('textarea[formcontrolname="smsDelete"]').then(($els: any) => {
+            cy.wrap($els[0])
+              .clear({ force: true })
+              .type(
+                limit('SMS Delete ENG: Auto generated content for PRE case', 250),
+                { delay: 0, force: true }
+              );
+
+            if ($els.length > 1) {
+              cy.wrap($els[1])
+                .clear({ force: true })
+                .type(
+                  limit('SMS Delete THA: ข้อความลบแพ็กสำหรับกรณี PRE', 250),
+                  { delay: 0, force: true }
+                );
+            }
+          });
         }
       });
-  };
+    }
 
-  const sendOnly = (
-    flag: string,
-    textarea: string,
-    key: keyof typeof smsLib,
-    len: number
-  ) => {
-    const val = getSend(flag);
 
-    cy.get('body').then($b => {
-      if ($b.find(`select[formcontrolname="${flag}"]`).length) {
-        cy.get(`select[formcontrolname="${flag}"]`).select(val);
+    // --- Section 7: Last Minute Alert ---
+    cy.get('body').then(($body: any) => {
+      const selector = 'select[formcontrolname="lastMinuteAlertSendFlag"]';
 
-        if (val === 'Send') {
-          fill(textarea, key, len);
+      if ($body.find(selector).length > 0) {
+        const options = ['Send', "Don't Send"];
+        const randomVal = options[Math.floor(Math.random() * options.length)];
+
+        cy.get(selector).then(($select: any) => {
+          if ($select.length > 0) {
+            cy.wrap($select).select(randomVal, { force: true });
+            cy.wait(WAIT_TIME);
+          }
+        });
+      }
+    });
+
+
+    // --- Section 8: Before Promotion Expired ---
+    const selectRandomOption = ($select: any) => {
+      const options = [...$select.find('option')]
+        .filter((opt: any) =>
+          opt.value &&
+          opt.value !== 'null' &&
+          !opt.disabled
+        )
+        .map((opt: any) => opt.value);
+
+      return Cypress._.sample(options);
+    };
+
+    cy.get('body').then(($body: any) => {
+      if ($body.find('select[formcontrolname="beforePromotionExpAlertSendFlag"]').length > 0) {
+
+        cy.get('select[formcontrolname="beforePromotionExpAlertSendFlag"]')
+          .select(beforePromoVal, { force: true });
+
+        cy.wait(WAIT_TIME);
+
+        if (beforePromoVal === 'Send') {
+
+          // 👉 Deduction number
+          cy.get('input[formcontrolname="beforePromotionExpAlertDeduction"]')
+            .then(($input: any) => {
+              if (!$input.val()) {
+                cy.wrap($input)
+                  .clear({ force: true })
+                  .type(`${Cypress._.random(1, 30)}`, { force: true });
+              }
+            });
+
+          // 👉 Deduction unit (dynamic)
+          cy.get('select[formcontrolname="beforePromotionExpAlertDeductionUnit"]')
+            .then(($select: any) => {
+              const currentVal = $select.val();
+              if (!currentVal || currentVal === 'null') {
+                const randomUnit = selectRandomOption($select);
+                cy.wrap($select).select(randomUnit, { force: true });
+              }
+            });
         }
       }
     });
-  };
+    cy.get('body').then(($body: any) => {
+      const selector = 'select[formcontrolname="smsPromotePackSendFlag"]';
 
-  const sendWithDefault = (
-    flag: string,
-    radio: string,
-    textarea: string,
-    key: keyof typeof smsLib,
-    len: number
-  ) => {
-    const val = getSend(flag);
+      if ($body.find(selector).length > 0) {
+        const smsPromotePackVal = getRandomSendFlag();
 
-    cy.get('body').then($b => {
-      if ($b.find(`select[formcontrolname="${flag}"]`).length) {
-        cy.get(`select[formcontrolname="${flag}"]`).select(val);
+        // เลือกค่าตามที่สุ่มได้
+        cy.get(selector).select(smsPromotePackVal, { force: true }).trigger('change', { force: true });
 
-        if (val === 'Send') {
-          const isDefault = getDefault();
+        cy.wait(WAIT_TIME);
 
-          cy.get(`input[formcontrolname="${radio}"]`)
-            .eq(isDefault ? 0 : 1)
-            .check({ force: true });
+        // ✅ แยกกรณี Send และ Don't Send ชัดเจน
+        if (smsPromotePackVal === 'Send') {
+          // กรณี Send: textarea ต้องมีอยู่และมีอย่างน้อย 2 อัน
+          cy.get('textarea[formcontrolname="smsPromotePack"]')
+            .should('have.length.at.least', 2)
+            .each(($el: any, index: number) => {
+              const prefix = index === 0 ? 'SMS Promote Package ENG:' : 'SMS Promote Package THA:';
+              cy.wrap($el)
+                .clear({ force: true })
+                .type(
+                  limit(`${prefix} ${finalProjectName}`, 250),
+                  { delay: 0, force: true }
+                );
+            });
+        } else {
+          // ✅ กรณี Don't Send: ไม่ต้องทำอะไรกับ textarea
+          // แค่ตรวจสอบว่าไม่มี textarea หรือถ้ามีก็ควรถูกซ่อน/disabled
+          cy.log('Selected "Don\'t Send" - skipping textarea input');
 
-          if (!isDefault) {
-            fill(textarea, key, len);
+          // Optional: ตรวจสอบว่า textarea ไม่มีอยู่หรือถูกซ่อน
+          cy.get('body').then(($newBody: any) => {
+            const textareas = $newBody.find('textarea[formcontrolname="smsPromotePack"]');
+            if (textareas.length > 0) {
+              cy.log(`Found ${textareas.length} textareas but ignoring them (Don't Send mode)`);
+              // ถ้าอยากตรวจสอบว่า disabled หรือซ่อนอยู่
+              // cy.wrap(textareas).should('not.be.visible');
+            } else {
+              cy.log('No textareas found (as expected for Don\'t Send mode)');
+            }
+          });
+        }
+      }
+    });
+    // --- Section 9: Promotion Expired ---
+    cy.get('body').then(($body: any) => {
+      if ($body.find('select[formcontrolname="promotionExpAlertSendFlag"]').length > 0) {
+        cy.get('select[formcontrolname="promotionExpAlertSendFlag"]').select(promoExpVal);
+        cy.wait(WAIT_TIME);
+      }
+    });
+
+    // --- Section 11: SMS Check Current ---
+    cy.get('body').then(($body: any) => {
+      if ($body.find('textarea[formcontrolname="smsCheckCurrent"]').length > 0) {
+        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(0).clear({ force: true }).type(limit(`sms Check Current ${finalProjectName}`, 50), { delay: 0, force: true });
+        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(1).clear({ force: true }).type(limit(`sms CheckCurrent ${finalProjectName}`, 50), { delay: 0, force: true });
+        cy.wait(WAIT_TIME);
+      }
+    });
+
+    // --- Section 12-14: Random Flags ---
+    const otherFlags = [
+      { name: 'smsBeforeFeeDeductSendFlag', val: beforeFeeDeductVal },
+      { name: 'recurringDeductSuccessAlertSendFlag', val: deductSuccessVal },
+      { name: 'recurringDeductFailAlertSendFlag', val: deductFailVal }
+    ];
+    otherFlags.forEach(item => {
+      cy.get('body').then(($body: any) => {
+        if ($body.find(`select[formcontrolname="${item.name}"]`).length > 0) {
+          cy.get(`select[formcontrolname="${item.name}"]`).select(item.val);
+          cy.wait(WAIT_TIME);
+        }
+      });
+    });
+
+    if (type === 'POST') {
+      cy.get('body').then(($body: any) => {
+        // Marketing Name
+        if ($body.find('textarea[formcontrolname="marketingName"]').length > 0) {
+          cy.get('textarea[formcontrolname="marketingName"]').clear({ force: true }).type(limit(`marketingName ${finalProjectName}`, 40), { delay: 0, force: true });
+        }
+        // Your Package
+        if ($body.find('textarea[formcontrolname="yourPackage"]').length > 0) {
+          cy.get('textarea[formcontrolname="yourPackage"]').each(($el: any, index: number) => {
+            const prefix = index === 0 ? 'yourPackage ENG:' : 'yourPackage THA:';
+            cy.wrap($el).clear({ force: true }).type(limit(`${prefix} ${finalProjectName}`, 250), { delay: 0, force: true });
+          });
+        }
+        // Greeting Letter
+        if ($body.find('textarea[formcontrolname="greetingLetter"]').length > 0) {
+          cy.get('textarea[formcontrolname="greetingLetter"]').each(($el: any, index: number) => {
+            const prefix = index === 0 ? 'Greeting Letter ENG:' : 'Greeting Letter THA:';
+            cy.wrap($el).clear({ force: true }).type(limit(`${prefix} ${finalProjectName}`, 250), { delay: 0, force: true });
+          });
+        }
+        // SMS Delete (POST) - Adjusted: Only Send/Don't Send Flag
+        if ($body.find('select[formcontrolname="smsDeleteSendFlag"]').length > 0) {
+          const deleteVal = getRandomSendFlag();
+
+          cy.get('select[formcontrolname="smsDeleteSendFlag"]')
+            .select(deleteVal, { force: true });
+
+          cy.wait(WAIT_TIME);
+
+          if (deleteVal === 'Send') {
+            cy.get('textarea[formcontrolname="smsDelete"]')
+              .should('have.length.at.least', 2)
+              .each(($el: any, index: number) => {
+                const prefix = index === 0 ? 'SMS Delete ENG:' : 'SMS Delete THA:';
+                cy.wrap($el)
+                  .clear({ force: true })
+                  .type(
+                    limit(`${prefix} ${finalProjectName}`, 250),
+                    { delay: 0, force: true }
+                  );
+              });
           }
         }
-      }
-    });
-  };
 
-  // --------------------------------------------------
-  // 🚀 FLOW
-  // --------------------------------------------------
-  cy.contains('SMS Wording').click();
-
-  fill('shortPromotionName', 'promo', 50);
-  fill('cmsDisplay', 'promo', 250);
-  fill('promotionDescription', 'promo', 250);
-
-  if (type === 'POST') {
-    fill('marketingName', 'promo', 40);
-    fill('greetingLetter', 'greeting', 250);
-    fill('yourPackage', 'promo', 100);
-  }
-
-  sendOnly('smsGreetingSendFlag', 'smsGreeting', 'greeting', 250);
-
-  sendWithDefault(
-    'smsDeleteSendFlag',
-    'SmsDeletedefaultWordingFlag',
-    'smsDelete',
-    'expired',
-    250
-  );
-
-  if (type === 'PRE') {
-
-    sendWithDefault(
-      'lastMinuteAlertSendFlag',
-      'lastMinuteAlertDefaultWordingFlag',
-      'smsNotificationLastMinuteAlert',
-      'expireSoon',
-      250
-    );
-
-    const val = getSend('smsBeforeFeeDeductSendFlag');
-
-    cy.get('select[formcontrolname="smsBeforeFeeDeductSendFlag"]').select(val);
-
-    if (val === 'Send') {
-      cy.get('input[formcontrolname="beforeFeeDeduction"]').clear().type('3');
-      cy.get('select[formcontrolname="beforeFeeDeductionUnit"]').select('2: Days');
-
-      const isDefault = getDefault();
-
-      cy.get('input[formcontrolname="defaultWordingFlag"]')
-        .eq(isDefault ? 0 : 1)
-        .check({ force: true });
-
-      if (!isDefault) {
-        fill('smsNotificationBeforeFeeDeduction', 'beforeFee', 250);
-      }
+      });
     }
-  }
 
-  sendOnly('smsPromotePackSendFlag', 'smsPromotePack', 'promo', 250);
-
-  cy.get('body').then($b => {
-    if ($b.find('textarea[formcontrolname="smsCheckCurrent"]').length) {
-      fill('smsCheckCurrent', 'check', 50);
-    }
-  });
-
-  // --------------------------------------------------
-  // 💾 SAVE
-  // --------------------------------------------------
-  cy.intercept('POST', '/PLMSpringBoot/api/**').as('save');
-
-  cy.contains('Save').click();
-
-  cy.wait('@save', { timeout: 100000 })
-    .its('response.statusCode')
-    .should('eq', 200);
+    // --- Save ---
+    cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+    cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
+    cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 
     closeSuccessModal();
+  });
 };
-
 export const smsWording = () => {
   _smsWordingLogic('POST');
 };
@@ -2140,57 +1931,62 @@ export const smsWordingpre = () => {
   _smsWordingLogic('PRE');
 };
 export const Tariff = (): void => {
-  // Navigate to Tariff & Discount section
-  cy.get('.scrollmenu > .nav')
-    .contains('Tariff Plan & Discount')
-    .should('be.visible')
-    .click();
+  cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount').scrollIntoView().should('be.visible').click();
+  cy.contains('.panel-heading', 'Tariff Plan')
+    .scrollIntoView()
+    .should('be.visible');
 
-  cy.scrollTo('bottom');
-  cy.wait(2000);
-  cy.get('#mat-select-2 .mat-select-trigger')
+  // 🔥 1. เปลี่ยนมาใช้การค้นหาจาก Label "*Tariff Plan :" แทนการใช้ ID 
+  cy.contains('label', '*Tariff Plan :')
+    .closest('.col-md-12') // ถอยออกมาที่กรอบครอบ (Container) หลัก
+    .find('mat-select .mat-select-trigger') // พุ่งเป้าไปที่ Trigger ของ Dropdown ที่อยู่ข้างใน
     .should('be.visible')
     .click({ force: true });
 
-  // Wait for dropdown panel to appear
-  cy.get('.mat-select-panel', { timeout: 10000 }).should('be.visible');
-  cy.wait(500); // Give panel time to render options
-
-  cy.get('.mat-select-panel mat-option', { timeout: 10000 })
+  // 2. รอและดึงรายการ Dropdown มาสุ่ม
+  cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
     .should('have.length.greaterThan', 0)
-    .then($options => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      const selectedText = $options.eq(randomIndex).text().trim();
+    .then(($options) => {
 
-      cy.log(`Total options: ${$options.length}`);
-      cy.log(`Random index: ${randomIndex}`);
-      cy.log(`Selected: ${selectedText}`);
+      const totalOptions = $options.length;
 
+      // ดักจับ: ถ้า Option แรกคือ "Please Select" ให้เริ่มสุ่มจาก Index 1
+      const firstOptionText = $options.eq(0).text().trim();
+      const startIndex = (firstOptionText === 'Please Select') ? 1 : 0;
+
+      // สุ่มตัวเลข Index
+      const randomIndex = Math.floor(Math.random() * (totalOptions - startIndex)) + startIndex;
+
+      const selectedTariffName = $options.eq(randomIndex).text().trim();
+      cy.log(`✨ ระบบสุ่มเลือกแพ็กเกจ: ${selectedTariffName}`);
+
+      // คลิกเลือก Option
       cy.wrap($options[randomIndex]).click({ force: true });
 
-      // Verify selection
-      cy.get('#mat-select-2 .mat-select-value-text')
-        .should('contain.text', selectedText);
+      // 🔥 3. ตรวจสอบค่า (Verify) โดยอ้างอิงจาก Label เหมือนเดิม
+      cy.contains('label', '*Tariff Plan :')
+        .closest('.col-md-12')
+        .find('mat-select .mat-select-value')
+        .should('contain.text', selectedTariffName);
     });
-  // --- จบตรรกะเฉพาะ ---
 
-  // Click Generate Discount button
+  // 4. ทำงานกับปุ่มอื่นๆ ต่อ
   cy.contains('button', 'Generate Discount')
     .should('be.visible')
-    .and('not.be.disabled')
     .click();
 
-  // Click Save button
+  cy.get('select[formcontrolname="actualUsageVoice"]').should('be.visible').select(1);
+  cy.get('select[formcontrolname="billPresentment"]').should('be.visible').select(1);
+
   cy.contains('button', 'Save')
     .should('be.visible')
     .and('not.be.disabled')
     .click();
 
-  // Wait for modal footer and close it (เรียกใช้ฟังก์ชันช่วย)
   closeSuccessModal();
 };
 
-const standardBeforeApproveCKS = (): void => {
+const standardBeforeApproveCKS = async (): Promise<void> => {
   //Button Back
   cy.contains('button', 'Back')
     .should('be.visible')
@@ -2249,9 +2045,7 @@ const standardBeforeApproveCKS = (): void => {
   cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
   cy.wait(3500)
 
-  // ใช้ global variable ที่ตั้งค่าไว้ตอนสร้างโปรเจกต์
-  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME') || Cypress.env('poName');
-  cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+  const finalProjectName = getStandardProjectName();
 
   //  ClaimProject from Unassigned Task
   ClaimProject(finalProjectName);
@@ -2291,6 +2085,8 @@ const standardBeforeApproveCKS = (): void => {
 
   // verify redirect กลับ workspace
   cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
+
+  cy.wait(2000);
 
   // Click the Logout button
   cy.contains('button', 'Logout')
@@ -2338,7 +2134,7 @@ export const beforeapproveMKT = () => {
   cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
 
   cy.wait(3500)
-  const finalProjectName = formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME') || Cypress.env('poName');
+  const finalProjectName = getStandardProjectName();
   cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
 
   //  ClaimProject from Unassigned Task
@@ -2402,7 +2198,6 @@ export const beforeapproveCKSontop = () => {
   standardBeforeApproveCKS();
 };
 
-
 const selectRandomDropdownRecurring = (): void => {
   cy.get('.mat-select-value')
     .contains('Please Select')
@@ -2455,7 +2250,6 @@ type EnhanceStepsCallback = () => void;
 
 type ApproveFunction = (projectName: string) => void;
 
-
 const standardCksPoEnhancementFlow = (
   getProjectNameFn: GetProjectNameFn,
   enhanceStepsCallback: EnhanceStepsCallback
@@ -2468,7 +2262,7 @@ const standardCksPoEnhancementFlow = (
   cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
 
   // รอให้ API ต่าง ๆ เสร็จสิ้น
-  cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 1000000 });
+  cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
   cy.get('body').should('be.visible');
 
   // ดึงชื่อโปรเจกต์ตาม Logic ที่ส่งเข้ามา
@@ -2489,7 +2283,9 @@ const standardCksPoEnhancementFlow = (
 
   // รอ
   cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 100000 });
-  cy.get('button.btn-sample', { timeout: 30000 }) // รอสูงสุด 30 วินาที
+
+  // Click the button Enhance PO
+  cy.get('button.btn-sample')
     .contains('Enhance PO')
     .scrollIntoView({ ensureScrollable: false })
     .should('be.visible')
@@ -2501,17 +2297,10 @@ const standardCksPoEnhancementFlow = (
 
   // รอ url
   cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/)
-  // Wait คงที่ตามโค้ดเดิม
-
+  cy.wait(8000);
   enhanceStepsCallback();
-  cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 };
 
-/**
- * 2. ฟังก์ชันสำหรับไปหน้า Tracking และ Assign งาน
- * --------------------------------------------------
- * หน้าที่: กดเมนู -> ไปหน้า Process Tracking -> รอ Table -> Assign งาน
- */
 const assignTaskViaTracking = (
   projectName: string,
   assignee: string,
@@ -2561,21 +2350,17 @@ const performRoleTaskWithAssignment = (
   approveFunction: ApproveFunction,
   BillingSystem: string = ''
 ): void => {
-  login(user, pass);
+  loginAndWaitReady(user, pass);
 
   // intercept APIs ที่ต้องรอ
-  cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-  // cy.intercept('GET', '**/newApi/CheckTask/setUserOnline').as('setUserOnline');
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.visit('/#/workspace-home/workspace');
 
   // รอและตรวจสอบ response
-  cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-  // cy.wait('@setUserOnline', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
   cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 
   // ดึงชื่อโปรเจกต์
-  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) || formattedDateMain || formattedDateOntop || Cypress.env('projectName') as string;
+  const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
 
   // ไปหน้า Tracking และ Assign งาน
@@ -2589,44 +2374,27 @@ const performRoleTaskWithAssignment = (
   approveFunction(projectNamePONAME);
 };
 
-/**
- * 5. ฟังก์ชันสำหรับ Role ที่แค่ "Approve" (เช่น ACTM, OPER)
- * --------------------------------------------------
- * หน้าที่: ล็อกอิน -> รอ API -> Approve
- */
+
 const performSimpleApprovalRole = (
   user: string,
   pass: string,
   approveFunction: ApproveFunction
 ): void => {
-  login(user, pass);
+  loginAndWaitReady(user, pass);
 
-  cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-  cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) || formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('poName') as string;
-  // const projectNamePONAME = 'MUSIC POST onetime ontop 3110 1008';
+  const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
 
   approveFunction(projectNamePONAME);
 };
-
-/**
- * 6. ฟังก์ชันสำหรับ Role ที่ต้อง "Claim" และ "Approve" (เช่น Spad)
- * --------------------------------------------------
- * หน้าที่: ล็อกอิน -> รอ API -> Claim -> Approve
- */
 const performSimpleClaimAndApprovalRole = (
   user: string,
   pass: string,
   approveFunction: ApproveFunction
 ): void => {
-  login(user, pass);
+  loginAndWaitReady(user, pass);
 
-  cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-  cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
-
-  const projectNamePONAME: string = (Cypress.env('formattedDateMainPONAME') || Cypress.env('formattedDateOntopPONAME')) || formattedDateMain || formattedDateOntop || Cypress.env('projectName') || Cypress.env('poName') as string;
+  const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
 
   ClaimProject(projectNamePONAME);
@@ -2639,6 +2407,8 @@ const getStandardProjectName = (): string => {
   return (
     formattedDateMain ||
     formattedDateOntop ||
+    Cypress.env('formattedDateMain') ||
+    Cypress.env('formattedDate') ||
     Cypress.env('projectName') ||
     Cypress.env('formattedDateMainPONAME') ||
     Cypress.env('formattedDateOntopPONAME') ||
@@ -2648,6 +2418,43 @@ const getStandardProjectName = (): string => {
 
 const getOntopProjectName = (): string => formattedDateOntop as string;
 
+// ============================================================
+// MULTI-PROJECT SUPPORT
+// ============================================================
+
+/**
+ * Register a project name into the list (supports multiple projects).
+ * index 0 = Main, index 1 = Ontop, etc.
+ */
+export const registerProjectName = (name: string, index: number = 0): void => {
+  const list: string[] = Cypress.env('projectNameList') || [];
+  list[index] = name;
+  Cypress.env('projectNameList', list);
+};
+
+/**
+ * Get a project name by index from the list.
+ * Falls back to getStandardProjectName() if not found.
+ */
+export const getProjectNameByIndex = (index: number = 0): string => {
+  const list: string[] = Cypress.env('projectNameList') || [];
+  return list[index] || getStandardProjectName();
+};
+
+/**
+ * Run an approval callback for every registered project in the list.
+ * If no list exists, runs once using getStandardProjectName().
+ * 
+ * Usage example (multi-project):
+ *   Cypress.env('projectNameList', ['Project A 1234', 'Project B 5678']);
+ *   runForAllProjects((name) => approveProjectSPADSup(name));
+ */
+export const runForAllProjects = (callback: (projectName: string) => void): void => {
+  const list: string[] = Cypress.env('projectNameList') || [];
+  const projects = list.length > 0 ? list : [getStandardProjectName()];
+  projects.forEach(name => callback(name));
+};
+
 const executeCKSRole = (
   projectNameStrategy: 'standard' | 'ontop',
   approvalType: 'main' | 'ontop',
@@ -2655,7 +2462,7 @@ const executeCKSRole = (
 ) => {
   it('CKS role', () => {
     const getProjectName: GetProjectNameFn = projectNameStrategy === 'standard' ? getStandardProjectName : getOntopProjectName;
-    // const getProjectName: GetProjectNameFn = () => 'Music PRE Regression 1912';
+    // const getProjectName: GetProjectNameFn = () => 'MOB POST onetime main 1704 1143';
     standardCksPoEnhancementFlow(getProjectName, () => {
       customSteps();
 
@@ -2670,9 +2477,7 @@ const executeCKSRole = (
 
 const performMusicRoles = () => {
   it('TSCENTER role', () => {
-    login(tscenter, tscenterpass);
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    loginAndWaitReady(tscenter, tscenterpass);
 
     const finalProjectName = getStandardProjectName();
     cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
@@ -2693,9 +2498,7 @@ const performMusicRoles = () => {
 
   const performSupportRole = (roleUser: any, rolePass: any, urlPart: string, btnText: string) => {
     it(`${urlPart} role`, () => {
-      login(roleUser, rolePass);
-      cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-      cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+      loginAndWaitReady(roleUser, rolePass);
       const finalProjectName = getStandardProjectName();
       cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
       ClaimProject(finalProjectName);
@@ -2723,9 +2526,7 @@ const performMusicRoles = () => {
   performSupportRole(aafsp, aafsppass, 'aafsp', 'Promote To E2E Tester');
 
   it('e2etest role', () => {
-    login(e2etest, e2etestpass);
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    loginAndWaitReady(e2etest, e2etestpass);
     const finalProjectName = getStandardProjectName();
     cy.log('🎯 Project ใช้สำหรับ Claim: ' + finalProjectName);
     ClaimProject(finalProjectName);
@@ -2751,9 +2552,7 @@ const performMusicRoles = () => {
   });
 
   it('MKT role', () => {
-    login(music, musicpass);
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    loginAndWaitReady(music, musicpass);
     const finalProjectName = getStandardProjectName();
     cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
     approveProject(finalProjectName);
@@ -2771,9 +2570,7 @@ const performMusicRoles = () => {
   performSupportRole(aafdp, aafdppass, 'aafdp', 'Promote To E2E Deploy');
 
   it('e2edp role', () => {
-    login(e2edp, e2edppass);
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+    loginAndWaitReady(e2edp, e2edppass);
     const finalProjectName = getStandardProjectName();
     cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
     ClaimProject(finalProjectName);
@@ -2802,9 +2599,7 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
 
     if (PoSubGroup === 'AccountFee' || PoSubGroup === 'OrderFee') {
       it('SASFF role', () => {
-        login(sasff, sasffpass);
-        cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-        cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+        loginAndWaitReady(sasff, sasffpass);
         const finalProjectName = getStandardProjectName();
         cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
         ClaimProject(finalProjectName);
@@ -2839,9 +2634,7 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
 
     if (PoSubGroup === 'AccountFee' || PoSubGroup === 'OrderFee') {
       it('SASFF role', () => {
-        login(sasff, sasffpass);
-        cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-        cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+        loginAndWaitReady(sasff, sasffpass);
         const finalProjectName = getStandardProjectName();
         cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
         ClaimProject(finalProjectName);
@@ -2868,43 +2661,32 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
 
 export const afterMKTMainUsagePOST = (): void => {
   executeCKSRole('standard', 'main', () => {
+    checkAndFillContentType();
+    checkAndFillCloudGameContentType();
+    checkAndUpdatePriority();
     Tariff();
     //priorityInternet();
   });
   afterCKSPOST();
+
 };
 
-export const afterMKTontopPOST = (): void => {
+const _afterMKTontopCommon = (module: string): void => {
   executeCKSRole('standard', 'ontop', () => {
-
+    checkAndFillContentType();
+    checkAndFillCloudGameContentType();
+    checkAndUpdatePriority();
     //priorityInternet();
   });
-  afterCKSCommon('POST');
+  afterCKSCommon(module);
 };
 
-export const afterMKTontopENTER = (): void => {
-  executeCKSRole('standard', 'ontop', () => {
+export const afterMKTontopPOST = (): void => _afterMKTontopCommon('POST');
+export const afterMKTontopENTER = (): void => _afterMKTontopCommon('ENTER');
+export const afterMKTontopMUSIC = (): void => _afterMKTontopCommon('MUSIC');
 
-    //priorityInternet();
-  });
-  afterCKSCommon('ENTER');
-};
-
-export const afterMKTontopMUSIC = (): void => {
-  executeCKSRole('standard', 'ontop', () => {
-
-    //priorityInternet();
-  });
-  afterCKSCommon('MUSIC');
-};
-
-export const afterMKTMAINPOST = (): void => {
-  executeCKSRole('standard', 'main', () => {
-    Tariff();
-    //priorityInternet();
-  });
-  afterCKSPOST();
-};
+/** @deprecated identical to afterMKTMainUsagePOST */
+export const afterMKTMAINPOST = afterMKTMainUsagePOST;
 
 export const afterCKSPREontop = (): void => {
   afterCKSCommonPRE_Internal();
@@ -2915,56 +2697,71 @@ const stepsOntopPRE = () => {
   addauto5gCKS();
   dropdownRecurringCKS();
   diyflagCKS();
+  checkAndFillContentType();
+  checkAndFillCloudGameContentType();
   //priorityInternet();
   cy.scrollTo('bottom');
   smsCKSPRE();
 };
 
-export const afterMKTontopPRE = (): void => {
+export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
+
+export const typeRejectNoteByRole = (role: string): void => {
+  const message = `reject from ${role}`;
+
+  cy.get('textarea[formcontrolname="noteDetail"]')
+    .should('be.visible')
+    .type(message);
+
+  // กดปุ่ม Add
+  cy.contains('button', 'Add')
+    .should('not.be.disabled')
+    .click();
+
+  // กดปุ่ม Reject
+  cy.get('button.btn-danger')
+    .contains('Reject')
+    .should('not.be.disabled')
+    .click();
+};
+export const CKSroleRJ = (): void => {
+  it('CKS role', () => {
+    login(cks, ckspass);
+
+    // --- Intercept Configs ---
+    cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
+    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
+    cy.get('body').should('be.visible');
+
+    const finalProjectName = getStandardProjectName();
+    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+    ClaimProject(finalProjectName);
+    approveProject(finalProjectName);
+
+    // --- Intercept Data ---
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+    cy.intercept('GET', '/PLMSpringBoot/api/mod-po-history/getByProjectCode/**').as('getHistory');
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/attachment/**').as('getAttachment');
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/note/**').as('getNote');
+    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 100000 });
+
+
+    typeRejectNoteByRole('cks');
+  });
+};
+const _afterMKTontopPREWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
   executeCKSRole('ontop', 'ontop', stepsOntopPRE);
-  afterCKSCommonPRE('PRE');
+  afterFn(module);
 };
 
-export const afterMKTontopPREENTER = (): void => {
-  executeCKSRole('ontop', 'ontop', () => {
-    cy.wait(7500);
-    addauto5gCKS();
-    dropdownRecurringCKS();
-    diyflagCKS();
-    unregister();
-    //priorityInternet();
-    cy.scrollTo('bottom');
-    smsCKSPRE();
-  });
-  afterCKSCommonPRE('ENTER');
-};
-export const afterMKTontopPREENTERPlugin = (): void => {
-  executeCKSRole('ontop', 'ontop', () => {
-    cy.wait(7500);
-    addauto5gCKS();
-    dropdownRecurringCKS();
-    diyflagCKS();
-    unregister();
-    //priorityInternet();
-    cy.scrollTo('bottom');
-    smsCKSPRE();
-  });
-  afterCKSPREPlugin('ENTER');
-};
-
-export const afterMKTontopPREMUSIC = (): void => {
-  executeCKSRole('ontop', 'ontop', () => {
-    cy.wait(7500);
-    addauto5gCKS();
-    dropdownRecurringCKS();
-    diyflagCKS();
-    unregister();
-    //priorityInternet();
-    cy.scrollTo('bottom');
-    smsCKSPRE();
-  });
-  afterCKSCommonPRE('MUSIC');
-};
+export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
+export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
 
 const stepsOntopPREUsage = () => {
   cy.wait(7500);
@@ -2972,6 +2769,9 @@ const stepsOntopPREUsage = () => {
   unregister();
   dropdownRecurringCKS();
   diyflagCKS();
+  checkAndFillContentType();
+  checkAndFillCloudGameContentType();
+  checkAndUpdatePriority();
   //priorityInternet();
   cy.scrollTo('bottom');
   smsCKSPRE();
@@ -2989,38 +2789,14 @@ export const afterMKTontopPREUsageMusic = (): void => {
   afterCKSCommonPRE('MUSIC');
 };
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
-  it('CKS role', () => {
-    login(cks, ckspass);
-    cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
-    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
-    cy.get('body').should('be.visible');
-
-    const finalProjectName = getStandardProjectName();
-    // const finalProjectName = 'MOB PRE onetime main 1712 1349'
-    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-    ClaimProject(finalProjectName);
-    approveProject(finalProjectName);
-
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
-    cy.intercept('GET', '/PLMSpringBoot/api/mod-po-history/getByProjectCode/**').as('getHistory');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/attachment/**').as('getAttachment');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/note/**').as('getNote');
-    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 100000 });
-    cy.get('button.btn-sample', { timeout: 30000 }) // รอสูงสุด 30 วินาที
-      .contains('Enhance PO')
-      .scrollIntoView({ ensureScrollable: false })
-      .should('be.visible')
-      .click();
-
-    // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    // cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-    cy.get('.loading-curtain', { timeout: 40000000 }).should('not.exist');
-    cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/);
-    cy.wait(7500);
+  executeCKSRole('standard', 'main', () => {
     dropdownRecurringCKSMain();
     unregister();
     addauto5gCKS();
+    checkAndFillContentType();
+    checkAndFillCloudGameContentType();
+    checkAndUpdatePriority();
+    CopyDeductFail();
     //priorityInternet();
     beforeapproveCKS();
   });
@@ -3035,39 +2811,13 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
   it('APO role', () => performSimpleApprovalRole(apo, apopass, approveProjectAPO));
 };
 export const afterMKTMainPRE_NotComplex = (): void => {
-  it('CKS role', () => {
-    login(cks, ckspass);
-    cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
-    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
-    cy.get('body').should('be.visible');
-
-    const finalProjectName = getStandardProjectName();
-    // const finalProjectName = 'MOB PRE recurring main Plg 0801 2111'
-    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-    ClaimProject(finalProjectName);
-    approveProject(finalProjectName);
-
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
-    cy.intercept('GET', '/PLMSpringBoot/api/mod-po-history/getByProjectCode/**').as('getHistory');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/attachment/**').as('getAttachment');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/note/**').as('getNote');
-    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 100000 });
-    cy.get('button.btn-sample', { timeout: 30000 }) // รอสูงสุด 30 วินาที
-      .contains('Enhance PO')
-      .scrollIntoView({ ensureScrollable: false })
-      .should('be.visible')
-      .click();
-
-    // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    // cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-
-    cy.get('.loading-curtain', { timeout: 4000000 }).should('not.exist');
-    cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/);
-    cy.wait(7500);
+  executeCKSRole('standard', 'main', () => {
     dropdownRecurringCKSMain();
     unregister();
     addauto5gCKS();
+    checkAndFillContentType();
+    checkAndFillCloudGameContentType();
+    checkAndUpdatePriority();
     //priorityInternet();
     beforeapproveCKS();
   });
@@ -3077,127 +2827,33 @@ export const afterMKTMainPRE_NotComplex = (): void => {
   it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN'));
   it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN'));
 };
+const _stepsOntopNotComplex = (): void => {
+  addauto5gCKS();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  unregister();
+  addauto5gCKS();
+  checkAndFillContentType();
+  checkAndFillCloudGameContentType();
+  checkAndUpdatePriority();
+  //priorityInternet();
+  beforeapproveCKS();
+};
+
+const _afterMKTOntopNotComplexTail = (): void => {
+  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
+  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
+  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin));
+  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREPlugin, 'PlugIN'));
+  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN'));
+};
+
 export const afterMKTOntop_NotComplex = (): void => {
-  it('CKS role', () => {
-    login(cks, ckspass);
-    cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
-    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 1000000 });
-    cy.get('body').should('be.visible');
-
-    const finalProjectName = getStandardProjectName();
-    // const finalProjectName = 'MOB PRE onetime ontop 1901 2145'
-    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-    ClaimProject(finalProjectName);
-    approveProject(finalProjectName);
-
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
-    cy.intercept('GET', '/PLMSpringBoot/api/mod-po-history/getByProjectCode/**').as('getHistory');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/attachment/**').as('getAttachment');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/note/**').as('getNote');
-    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 1000000 });
-
-    // cy.get('button.btn.btn-xs.btn-success', { timeout: 30000 })
-    //   .contains('Generate Enhance PO')
-    //   .scrollIntoView({ ensureScrollable: false })
-    //   .should('be.visible')
-    //   .click();
-    //   cy.once('window:alert', (alertText) => {
-    //     // Verify the alert text
-    //     expect(alertText).to.equal('Generate Enhance PO ?');
-    //   });
-
-    //   // Handle confirm dialogs (auto-click OK for all popups)
-    //   cy.on('window:confirm', () => true);
-
-    cy.get('.loading-curtain', { timeout: 4000000 }).should('not.exist');
-
-    cy.get('button.btn-sample', { timeout: 30000 }) // รอสูงสุด 30 วินาที
-      .contains('Enhance PO')
-      .scrollIntoView({ ensureScrollable: false })
-      .should('be.visible')
-      .click();
-
-    // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    // cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-
-    cy.get('.loading-curtain', { timeout: 4000000 }).should('not.exist');
-    cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/);
-    cy.wait(7500);
-    addauto5gCKS();
-    dropdownRecurringCKS();
-    diyflagCKS();
-    unregister();
-    addauto5gCKS();
-    // priorityInternet();
-    beforeapproveCKS();
-  });
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
-  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin));
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREPlugin, 'PlugIN'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN'));
+  executeCKSRole('standard', 'ontop', _stepsOntopNotComplex);
+  _afterMKTOntopNotComplexTail();
 };
-export const afterMKTOntopEnter_NotComplex = (): void => {
-  it('CKS role', () => {
-    login(cks, ckspass);
-    cy.intercept('POST', '/PLMSpringBoot/api/flw-cfg-lov/getFlwCfgLovByFlwCfgLovParam').as('getCfgLovParam');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getActiveFlagFlwApi/NRM_RTMT/INITIAL_RTMT').as('getActiveFlag');
-    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 1000000 });
-    cy.get('body').should('be.visible');
 
-    const finalProjectName = getStandardProjectName()
-    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-    ClaimProject(finalProjectName);
-    approveProject(finalProjectName);
-
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
-    cy.intercept('GET', '/PLMSpringBoot/api/mod-po-history/getByProjectCode/**').as('getHistory');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/attachment/**').as('getAttachment');
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-common/note/**').as('getNote');
-    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 1000000 });
-
-    // cy.get('button.btn.btn-xs.btn-success', { timeout: 30000 })
-    //   .contains('Generate Enhance PO')
-    //   .scrollIntoView({ ensureScrollable: false })
-    //   .should('be.visible')
-    //   .click();
-    //   cy.once('window:alert', (alertText) => {
-    //     // Verify the alert text
-    //     expect(alertText).to.equal('Generate Enhance PO ?');
-    //   });
-
-    //   // Handle confirm dialogs (auto-click OK for all popups)
-    //   cy.on('window:confirm', () => true);
-
-    //   cy.get('.loading-curtain', { timeout: 4000000 }).should('not.exist');
-
-    cy.get('button.btn-sample', { timeout: 30000 }) // รอสูงสุด 30 วินาที
-      .contains('Enhance PO')
-      .scrollIntoView({ ensureScrollable: false })
-      .should('be.visible')
-      .click();
-
-    // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    // cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-
-    cy.get('.loading-curtain', { timeout: 4000000 }).should('not.exist');
-    cy.url().should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/);
-    cy.wait(7500);
-    addauto5gCKS();
-    dropdownRecurringCKS();
-    diyflagCKS();
-    unregister();
-    addauto5gCKS();
-    // //priorityInternet();
-    beforeapproveCKS();
-  });
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
-  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin));
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREPlugin, 'PlugIN'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN'));
-};
+export const afterMKTOntopEnter_NotComplex = afterMKTOntop_NotComplex;
 export const afterCKSPOST = (Module?: string): void => {
   it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB'));
   it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB'));
@@ -3262,9 +2918,10 @@ export const targetgroup = () => {
     .should('exist')
     .and('be.visible')
     .then($option => {
-      cy.wrap($option).dblclick();
+      cy.wrap($option).dblclick({ force: true });
     });
 }
+
 export const selectTargetGroup = (type:
   'mass' | 'massDisabled' | 'massStudents' | 'save' | 'fmc' |
   'specialCondition' | 'cvm' | 'staff' | 'test' | 'netGift' |
@@ -3305,11 +2962,11 @@ export const selectTargetGroup = (type:
     .select(value)
     .should('have.value', value);
 };
-
 export const PriceExcluding = (): void => {
-  //Multi Duration
-  //add button
-  cy.get('.col-md-8 > .btn').click();
+  cy.contains('th', 'Charge Excluding VAT')
+    .closest('.col-md-8')
+    .find('.btn-primary')
+    .click();
   //Charge Excluding VAT 
 
   function getRandomRealisticCharge(min = 100, max = 2000): string {
@@ -3330,7 +2987,6 @@ export const PriceExcluding = (): void => {
 
   cy.get('.col-md-6 > .btn').click();
 }
-
 export const backBacicInfo = () => {
   //Back to Project Basic Information 
   cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 100000 });
@@ -3352,7 +3008,7 @@ export const addauto5gCKS = () => {
   const values = ['1: Y', '2: X', '3: N'];
   const randomValue = values[Math.floor(Math.random() * values.length)];
   const selector = 'select[formcontrolname="autoAddService5g"]';
-  cy.scrollTo('top');
+  // cy.scrollTo('top');
   cy.get('body').then(($body) => {
     if ($body.find(selector).length > 0) {
       cy.get(selector)
@@ -3449,22 +3105,6 @@ export const smsCKSPRE = () => {
   //   .clear()
   //   .type('feature description');
 }
-
-export const grouppackage = () => {
-  cy.get('select[formcontrolname="groupPackage"]')
-    .find('option:not([disabled])')
-    .then($options => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      const selectedValue = $options.eq(randomIndex).val() as string;
-      const selectedText = $options.eq(randomIndex).text().trim();
-
-      cy.log(`Randomly selected: ${selectedText}`);
-
-      cy.get('select[formcontrolname="groupPackage"]')
-        .select(selectedValue)
-        .should('have.value', selectedValue);
-    });
-}
 export const unregister = () => {
   cy.get('body').then(($body) => {
     if ($body.text().includes('UnRegister (Hold)')) {
@@ -3482,7 +3122,6 @@ export const unregister = () => {
     }
   });
 }
-
 export const RetryPattern = () => {
   cy.get('.scrollmenu > .nav')
     .contains('Retry Pattern')
@@ -3777,96 +3416,112 @@ export const Randomdropdown = () => {
   });
 
 }
+export const RandomProductSpecification = (productClass: string, subModule?: string, Module?: string) => {
 
-const processRatingSection = (
-  componentSelector: string,
-  sectionName: string,
-  fillFormCallback?: () => void
-) => {
-  cy.get(componentSelector, { timeout: 15000 })
-    .should('exist')
-    .within(() => {
-      cy.get('.collapse-panel').then(($panel) => {
-        if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
-          cy.get('.panel-heading')
-            .contains(sectionName)
-            .click({ force: true });
-          cy.get('.collapse-panel').should('be.visible');
-        }
-      });
-
-      // 2. Click Add Button
-      cy.get('button:has(.glyphicon-plus)').click({ force: true });
-
-      // 3. Fill Form (Execute callback if provided)
-      if (fillFormCallback) {
-        fillFormCallback();
-      }
-
-      // 4. Submit
-      cy.get('button[type="submit"]')
-        .contains('Add')
-        .click({ force: true });
-    });
-};
-
-export const RandomProductSpecification = () => {
-  const targetList = [
-    // "AIS Secure Net",
-    // "Apple Care",
-    // "Cloud PC",
-    // "Flowaccount",
-    // "MS365 Copilot",
-    // "Mobile Care",
-    // "Ubisoft Plus",
-    // "Voice",
-    // "SMS",
-    // "MMS",
-    "Vertical App"
+  const generalList = [
+    'AIS Secure Net',
+    'Apple Care',
+    'Cloud PC',
+    'Flowaccount',
+    'MS365 Copilot',
+    'Mobile Care',
+    'Ubisoft Plus',
+    'Voice',
+    'SMS',
+    'MMS',
+    'Internet',
+    'Calling Melody',
+    'Vertical App',
+    'Cloud Game',
+    'AI IP Camera',
+    'WiFi',
+    'Karaoke',
+    'VRBT',
+    'Music Streaming',
+    'Arcade',
+    'TV Plus',
+    'Youtube Premium'
   ];
-  const selectedProducts: string[] = [];
 
   cy.contains('.panel-heading', '*Product Specification')
     .closest('.panel')
     .within(() => {
-      cy.get('select[formcontrolname="availableListBox"] option')
+
+      if (productClass === 'main') {
+        cy.get('select[formcontrolname="selectedListBox"]')
+          .find('option')
+          .then($options => {
+            const selected = [...$options].map(el => el.textContent?.trim() || '');
+            cy.wrap(selected).as('selectedItems');
+          });
+      } else {
+        cy.wrap([]).as('selectedItems');
+      }
+
+      cy.get('select[formcontrolname="availableListBox"]')
+        .first()
+        .find('option')
         .then($options => {
-          const allTexts = $options.toArray().map(el => (el as HTMLOptionElement).innerText.trim());
-          const validTexts = allTexts.filter(text => targetList.includes(text));
-
-          if (validTexts.length > 0) {
-            const randomCount = Cypress._.random(1, validTexts.length);
-            const selectedTexts = Cypress._.sampleSize(validTexts, randomCount);
-
-            selectedTexts.forEach((itemText) => {
-              cy.log(`Processing: ${itemText}`);
-
-              cy.get('select[formcontrolname="availableListBox"]')
-                .contains('option', itemText)
-                .dblclick({ force: true });
-
-              cy.wait(500);
-              selectedProducts.push(itemText);
-            });
-          }
+          const allOptions = [...$options].map(el => el.textContent?.trim() || '');
+          const availableGeneral = allOptions.filter(text => generalList.includes(text));
+          const pickedItems = availableGeneral.filter(() => Cypress._.random(0, 1) === 1);
+          cy.wrap(pickedItems).as('pickedItems');
         });
-    })
-    .then(() => {
-      if (selectedProducts.includes('Voice')) {
-        Voice();
-      }
-      if (selectedProducts.includes('SMS')) {
-        Sms();
-      }
-      if (selectedProducts.includes('MMS')) {
-        Mms();
-      }
-      if (selectedProducts.includes('Vertical App')) { 
-        VerticalApp();
-      }
     });
-};
 
+  cy.get('@selectedItems').then(selectedItems => {
+    cy.get('@pickedItems').then(pickedItems => {
+
+      const configQueue: string[] = [];
+
+      if (productClass === 'main' && (selectedItems as unknown as string[]).includes('Internet')) {
+        configQueue.push('Internet');
+      }
+
+      (pickedItems as unknown as string[]).forEach(item => {
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]')
+              .first()
+              .contains('option', item)
+              .dblclick({ force: true });
+            cy.wait(300);
+          });
+
+        if (productClass === 'main') {
+          if (!['Voice', 'SMS', 'MMS', 'Internet'].includes(item)) {
+            configQueue.push(item);
+          }
+        } else {
+          configQueue.push(item);
+        }
+      });
+
+      cy.then(() => {
+        if (configQueue.includes('Voice')) Voice();
+        if (configQueue.includes('SMS')) Sms();
+        if (configQueue.includes('MMS')) Mms();
+        if (configQueue.includes('Internet')) InternetRandom(productClass, subModule, Module);
+        if (configQueue.includes('Vertical App')) VerticalApp();
+        if (configQueue.includes('Cloud Game')) CloudGame();
+        if (configQueue.includes('AI IP Camera')) AIIPCamera();
+        if (configQueue.includes('WiFi')) WiFi();
+        if (configQueue.includes('Karaoke')) Karaoke();
+        if (configQueue.includes('VRBT')) VRBT();
+        if (configQueue.includes('Music Streaming')) MusicStreaming();
+
+        const entItems = configQueue.filter(item =>
+          ['Arcade', 'TV Plus', 'Youtube Premium'].includes(item)
+        );
+        if (entItems.length > 0) {
+          EntertainmentPartnership(entItems as any);
+        }
+      });
+
+    });
+  });
+};
 export const Voice = () => {
   cy.get('body', { timeout: 10000 }).then(($body) => {
     if ($body.find('app-mass-mkt-product-offering-detail-tab ul.nav-tabs').length > 0) {
@@ -3889,26 +3544,30 @@ export const Voice = () => {
             cy.wrap($select).select(val as string, { force: true });
           });
       };
-      processRatingSection('app-mass-mkt-voice-rating', 'Voice Rating', fillRatingForm);
-      processRatingSection('app-mass-mkt-vdo-call-rating', 'VDO Call Rating', fillRatingForm);
-      processRatingSection('app-mass-mkt-landline-rating', 'Landline Rating', fillRatingForm);
+
+      const processRatingSection = (tag: string, header: string, action: () => void) => {
+        cy.get(tag).within(() => {
+          cy.contains('.panel-heading', header).click({ force: true });
+          action();
+        });
+      };
+      cy.log('Configuring Voice Ratings...');
     }
   });
 };
 
 export const Sms = () => {
   const processFreeResource = () => {
-    // 1. เปิด Dropdown
     cy.get('app-mass-mkt-sms-free-resource').within(() => {
       cy.get('.collapse-panel').first().then(($panel) => {
         if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
           cy.get('.panel-heading').first().click({ force: true });
-          cy.wait(500);
+          cy.wait(2000);
         }
       });
 
       cy.get('button:has(.glyphicon-plus)').click({ force: true });
-      cy.wait(500);
+      cy.wait(2000);
       cy.get('mat-select .mat-select-trigger').click({ force: true });
     });
     cy.get('mat-option:not(.mat-option-disabled)', { timeout: 10000 })
@@ -3918,14 +3577,11 @@ export const Sms = () => {
           cy.wrap($options.eq(randomIndex))
             .scrollIntoView()
             .click({ force: true });
-        } else {
-          cy.log('❌ No valid options found');
         }
       });
 
-    // 3. กดปุ่ม Add
     cy.get('app-mass-mkt-sms-free-resource').within(() => {
-      cy.wait(500);
+      cy.wait(2000);
       cy.contains('button', 'Add').click({ force: true });
     });
   };
@@ -3951,7 +3607,6 @@ export const Sms = () => {
     });
   };
 
-  // --- Main Execution SMS ---
   cy.get('body', { timeout: 10000 }).then(($body) => {
     if ($body.find('app-mass-mkt-product-offering-detail-tab ul.nav-tabs').length > 0) {
       cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
@@ -3959,13 +3614,9 @@ export const Sms = () => {
         .click({ force: true });
 
       processFreeResource();
+      // Open main panel if closed
       cy.get('app-mass-mkt-sms-rating').within(() => {
-        cy.get('.collapse-panel').first().then(($mainPanel) => {
-          if ($mainPanel.outerHeight() === 0 || $mainPanel.css('display') === 'none') {
-            cy.get('.panel-heading').first().click({ force: true });
-            cy.wait(500);
-          }
-        });
+        cy.get('.panel-heading').first().click({ force: true });
       });
       fillRatingSection('SMS Rating', 'smsExcludingVat');
       fillRatingSection('SMS Delivery Report Rating', 'smsdrExcludingVat');
@@ -3973,26 +3624,21 @@ export const Sms = () => {
     }
   });
 };
+
 export const Mms = () => {
   const processFreeResource = () => {
-    // 1. จัดการ Free Resource (คล้าย SMS)
     cy.get('app-mass-mkt-mms-free-resource').within(() => {
       cy.get('.collapse-panel').first().then(($panel) => {
         if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
           cy.get('.panel-heading').first().click({ force: true });
-          cy.wait(500);
+          cy.wait(2000);
         }
       });
-
-      // กดปุ่ม + เพื่อเพิ่ม
       cy.get('button:has(.glyphicon-plus)').click({ force: true });
-      cy.wait(500);
-
-      // กดเปิด Dropdown (ใช้ mat-select)
+      cy.wait(2000);
       cy.get('mat-select .mat-select-trigger').click({ force: true });
     });
 
-    // เลือก Option แบบสุ่ม
     cy.get('mat-option:not(.mat-option-disabled)', { timeout: 10000 })
       .then(($options) => {
         if ($options.length > 0) {
@@ -4000,14 +3646,11 @@ export const Mms = () => {
           cy.wrap($options.eq(randomIndex))
             .scrollIntoView()
             .click({ force: true });
-        } else {
-          cy.log('❌ No valid options found for MMS Free Resource');
         }
       });
 
-    // กดปุ่ม Add
     cy.get('app-mass-mkt-mms-free-resource').within(() => {
-      cy.wait(500);
+      cy.wait(2000);
       cy.contains('button', 'Add').click({ force: true });
     });
   };
@@ -4020,39 +3663,27 @@ export const Mms = () => {
       .blur({ force: true });
   };
 
-  // --- Main Execution MMS ---
   cy.get('body', { timeout: 10000 }).then(($body) => {
-    // เช็คว่ามี Tab อยู่ไหม
     if ($body.find('app-mass-mkt-product-offering-detail-tab ul.nav-tabs').length > 0) {
-
-      // 1. คลิก Tab MMS
       cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
         .contains(/^MMS$/)
         .click({ force: true });
-
-      // 2. ทำ MMS Free Resource
       processFreeResource();
 
-      // 3. ทำ MMS Rating 
-      // (ตาม requirement: ไม่ต้องกดเปิด panel rating ให้กรอกเลย)
       cy.get('app-mass-mkt-mms-rating').within(() => {
-        // กรอก MMS Excluding VAT
         fillMmsRatingInput('mmsExcludingVat');
-
-        // กรอก MMS Delivery Report Excluding VAT
         fillMmsRatingInput('mmsdrExcludingVat');
-
-        // กรอก MMS Read & Reply Excluding VAT
         fillMmsRatingInput('mmsrrExcludingVat');
       });
     }
   });
 };
+
 export const VerticalApp = () => {
   cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
     .contains(/^Vertical App$/)
     .click({ force: true });
-
+cy.wait(5000);
   cy.get('app-mass-mkt-vertical-app').within(() => {
     cy.get('.collapse-panel').then(($panel) => {
       if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
@@ -4060,85 +3691,1472 @@ export const VerticalApp = () => {
       }
     });
 
-    // กดปุ่ม +
     cy.get('button:has(.glyphicon-plus)').click({ force: true });
-    cy.wait(500);
-
-    cy.get('select[formcontrolname="VerticalAppQuotaType"]')
-      .should('be.visible')
-      .then(($select) => {
-        const $options = $select.find('option:not([disabled])');
-        const randomOption = Cypress._.sample($options.toArray());
-        
-        if (randomOption) {
-          const $opt = Cypress.$(randomOption);
-          const val = $opt.val() as string;
-          const text = $opt.text().trim(); // ดึง Text ออกมาเตรียมไว้เลย
-
-          cy.wrap($select).select(val, { force: true });
-          
-          // บันทึก Text เก็บไว้ใน Alias แทน Value หรือ Element
-          cy.wrap(text).as('selectedQuotaTypeText'); 
-        }
-      });
-
-    // กดเปิด Dropdown ของ Material (Application List)
-    cy.get('mat-select[aria-label="Please Select"] .mat-select-trigger').click({ force: true });
   });
 
-  // เลือก Application จาก Dropdown (อยู่นอก within เพราะ mat-option render ที่ body)
-  cy.get('mat-option:not(.mat-option-disabled)', { timeout: 10000 }).then(($options) => {
-    if ($options.length > 0) {
+  cy.get('select[formcontrolname="VerticalAppUsageType"]')
+    .find('option:not([disabled])')
+    .then(($options) => {
       const randomIndex = Cypress._.random(0, $options.length - 1);
-      cy.wrap($options.eq(randomIndex)).click({ force: true });
-    }
-  });
+      const val = $options.eq(randomIndex).val() as string;
+      cy.get('select[formcontrolname="VerticalAppUsageType"]').select(val, { force: true });
+    });
 
-  // กลับเข้ามาทำงานในส่วน Vertical App ต่อ
+  cy.get('select[formcontrolname="VerticalAppQuotaType"]')
+    .find('option:not([disabled])')
+    .then(($options) => {
+      const randomIndex = Cypress._.random(0, $options.length - 1);
+      const val = $options.eq(randomIndex).val() as string;
+      cy.wrap(val).as('selectedQuotaValue');
+      cy.get('select[formcontrolname="VerticalAppQuotaType"]').select(val, { force: true });
+    });
+
+  cy.contains('label', '*Vertical App :')
+    .closest('.form-group')
+    .find('mat-select .mat-select-trigger')
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('body')
+    .find('mat-option')
+    .not('.mat-option-disabled')
+    .then(($options) => {
+      const randomIndex = Cypress._.random(0, $options.length - 1);
+
+      cy.wrap($options)
+        .eq(randomIndex)
+        .scrollIntoView()
+        .click({ force: true });
+    });
+
   cy.get('app-mass-mkt-vertical-app').within(() => {
-    // Checkbox 5G
+    // สุ่มเลือกระหว่าง 5G หรือ ไม่มี 4G
+    const pick5G = Cypress._.random(0, 1) === 1;
 
-    cy.contains('label', '5G')
-      .find('input[type="checkbox"]')
-      .then(($checkbox) => {
-        const shouldSelect = Cypress._.random(0, 1) === 1;
-        if (shouldSelect) {
+    cy.get('[formarrayname="vaNetworkCoverageCheckBox"] input[type="checkbox"]')
+      .each(($checkbox, index) => {
+        // index 0 = 5G, index 1 = ไม่มี 4G (ปรับตาม DOM จริง)
+        const should5GBeChecked = index === 0 && pick5G;
+        const shouldNo4GBeChecked = index === 1 && !pick5G;
+
+        if (should5GBeChecked || shouldNo4GBeChecked) {
           cy.wrap($checkbox).check({ force: true });
         } else {
           cy.wrap($checkbox).uncheck({ force: true });
         }
       });
 
-    // เลือก Speed
-    cy.get('select[formcontrolname="commuSpeed"]').then(($select) => {
+    cy.get('select[formcontrolname="commuSpeed"]')
+      .find('option:not([disabled])')
+      .then(($options) => {
+        const randomIndex = Cypress._.random(0, $options.length - 1);
+        const val = $options.eq(randomIndex).val() as string;
+        cy.get('select[formcontrolname="commuSpeed"]').select(val, { force: true });
+      });
 
-      const $options = $select.find('option:not([disabled])');
-      const randomOption = Cypress._.sample($options.toArray());
-      if (randomOption) {
-        const value = Cypress.$(randomOption).val() as string;
-        cy.wrap($select).select(value, { force: true });
-      }
-    });
-
-    cy.get('@selectedQuotaTypeText').then((quotaText) => {
-      if (String(quotaText).trim() === 'Unlimited Data (Throttling Speed)') {
-        
-        cy.get('select[formcontrolname="commuThrottlingSpeed"]', { timeout: 5000 })
-          .should('be.visible')
-          .then(($select) => {
-            const $options = $select.find('option:not([disabled])');
-            const randomOption = Cypress._.sample($options.toArray());
-            if (randomOption) {
-              const value = Cypress.$(randomOption).val() as string;
-              cy.wrap($select).select(value, { force: true });
-            }
+    cy.get('@selectedQuotaValue').then((quotaValue) => {
+      if (String(quotaValue).includes('Throttling')) {
+        cy.get('select[formcontrolname="commuThrottlingSpeed"]')
+          .should('exist')
+          .find('option:not([disabled])')
+          .then(($options) => {
+            const randomIndex = Cypress._.random(0, $options.length - 1);
+            const val = $options.eq(randomIndex).val() as string;
+            cy.get('select[formcontrolname="commuThrottlingSpeed"]').select(val, { force: true });
           });
       }
     });
 
-    cy.wait(500);
-    cy.get('button.btn-primary')
-      .contains('Add')
-      .click({ force: true });
+    cy.contains('button', /^Add$/).click({ force: true });
   });
+};
+export const CloudGame = () => {
+
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Cloud Game$/)
+    .click({ force: true });
+
+  cy.wait(5000);
+
+  cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+    .first()
+    .should('be.visible')
+    .within(() => {
+      cy.get('button .glyphicon-plus').first().parent().click();
+
+      cy.contains('label', '*Content :')
+        .closest('.col-md-12')
+        .find('.mat-select-trigger')
+        .click({ force: true });
+    });
+
+  cy.get('.cdk-overlay-container .mat-select-panel', { timeout: 10000 })
+    .should('be.visible');
+
+  cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
+    .should('have.length.greaterThan', 0)
+    .then(($options) => {
+      const count = $options.length;
+      const randomIndex = Math.floor(Math.random() * count);
+      cy.wrap($options).eq(randomIndex).click({ force: true });
+    });
+
+  cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+    .first()
+    .should('be.visible')
+    .within(() => {
+      cy.get('button.btn-primary')
+        .contains('Add')
+        .click({ force: true });
+    });
+};
+export const EntertainmentPartnership = (
+  platforms: Array<'Arcade' | 'TV Plus' | 'Youtube Premium'>
+) => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Entertainment Partnership$/)
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+        .should('be.visible')
+        .within(() => {
+          platforms.forEach((platform) => {
+            const targetPlatform = platform === 'Youtube Premium' ? 'Google' : platform;
+
+            cy.get('button .glyphicon-plus').first().parent().click();
+
+            const cpOptions = ['Apple', 'GOOGLE IRELAND LIMITED'];
+            const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
+
+            cy.contains('label', 'CP Name')
+              .closest('.form-group')
+              .find('select[formcontrolname="cpName"]')
+              .select(randomCp);
+
+            cy.wait(2000);
+
+            cy.contains('label', 'Platform')
+              .closest('.form-group')
+              .find('select[formcontrolname="platform"]')
+              .select(targetPlatform);
+
+            cy.wait(2000);
+
+            cy.contains('h3', 'Partner App ID')
+              .closest('.panel')
+              .within(() => {
+                cy.get('button .glyphicon-plus').first().parent().click();
+
+                cy.contains('h3', 'Partner App ID Detail')
+                  .closest('.panel')
+                  .should('be.visible')
+                  .within(() => {
+                    cy.get('input[formcontrolname="partnerPackageName"]')
+                      .clear()
+                      .type('test');
+
+                    cy.get('select[formcontrolname="customerType"]')
+                      .should('be.visible')
+                      .find('option:not([disabled])')
+                      .then(($options) => {
+                        const options = $options.toArray() as HTMLOptionElement[];
+
+                        const matched = options.find(
+                          (opt) => opt.text.trim() === partnerCustomerType
+                        );
+
+                        if (!matched) {
+                          throw new Error(
+                            `No option matched "${partnerCustomerType}" in customerType dropdown`
+                          );
+                        }
+
+                        cy.get('select[formcontrolname="customerType"]')
+                          .select(matched.value.trim())
+                          .should('have.value', matched.value.trim());
+
+                        cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+                      });
+
+                    cy.contains('button', /^Add$/)
+                      .should('be.visible')
+                      .click();
+                  });
+
+                cy.contains('h3', 'Partner App ID Detail')
+                  .closest('.panel')
+                  .should(($panel) => {
+                    const isHidden =
+                      $panel.attr('hidden') !== undefined ||
+                      $panel.css('display') === 'none' ||
+                      $panel.css('visibility') === 'hidden' ||
+                      !$panel.is(':visible');
+                    expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                  });
+              });
+
+            cy.wait(2000);
+
+            cy.get('button')
+              .filter(':visible')
+              .contains(/^Add$/)
+              .should('be.enabled')
+              .click({ force: true });
+          });
+        });
+    });
+};
+export const WiFi = () => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^WiFi$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-wifi')
+    .find('.glyphicon-plus')
+    .closest('button')
+    .should('be.enabled')
+    .click();
+
+  // สุ่มจาก options จริงบนหน้า โดย filter "Please Select" ออก
+  cy.get('select[formcontrolname="wiFiUsageType"]').then(($select) => {
+    const options = $select
+      .find('option:not([disabled])')
+      .toArray()
+      .map((el) => (el as HTMLOptionElement).value)
+      .filter((v) => v && v !== '0: null');
+
+    const randomUsage = Cypress._.sample(options)!;
+    cy.wrap($select).select(randomUsage);
+    cy.log(`Selected WiFi Usage Type: ${randomUsage}`);
+  });
+
+  cy.get('select[formcontrolname="wiFiQuotaType"]').then(($select) => {
+    const options = $select
+      .find('option:not([disabled])')
+      .toArray()
+      .map((el) => (el as HTMLOptionElement).value)
+      .filter((v) => v && v !== '0: null');
+
+    const randomQuota = Cypress._.sample(options)!;
+    cy.wrap($select).select(randomQuota);
+    cy.log(`Selected WiFi Quota Type: ${randomQuota}`);
+  });
+
+  cy.contains('label', '*WiFi :')
+    .closest('.form-group')
+    .find('mat-select')
+    .click();
+
+  cy.get('mat-option')
+    .should('be.visible')
+    .then(($options) => {
+      const randomIndex = Cypress._.random(0, $options.length - 1);
+      cy.wrap($options).eq(randomIndex).click();
+      cy.log(`Selected WiFi Option Index: ${randomIndex}`);
+    });
+  cy.wait(5000)
+  cy.contains('button', /^Add$/)
+    .scrollIntoView()
+    .should('be.visible')
+    .click({ force: true });
+};
+export const AIIPCamera = () => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^AI IP Camera$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-ai-ip-camera .panel-body .btn-primary .glyphicon-plus')
+    .first()
+    .parent()
+    .should('be.enabled')
+    .click();
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('select[formcontrolname="cpName"]')
+        .should('be.visible')
+        .find('option')
+        .then(($options) => {
+          const validOptions = ($options.toArray() as HTMLOptionElement[]).filter(
+            (opt) =>
+              !opt.disabled &&
+              opt.value &&
+              opt.value !== 'null' &&
+              opt.value !== ''
+          );
+
+          if (validOptions.length === 0) {
+            throw new Error('No valid options found in CP Name dropdown');
+          }
+
+          const randomIndex = Math.floor(Math.random() * validOptions.length);
+          const randomValue = validOptions[randomIndex].value;
+
+          cy.get('select[formcontrolname="cpName"]')
+            .select(randomValue)
+            .should('have.value', randomValue);
+
+          cy.log(`Selected CP Name: ${randomValue}`);
+        });
+
+      cy.contains('.panel-heading', 'Partner App ID')
+        .closest('.panel')
+        .within(() => {
+          cy.get('.btn-xs .glyphicon-plus').last().should('be.visible').click();
+        });
+
+      cy.contains('.panel-heading', 'Partner App ID Detail')
+        .closest('.panel')
+        .should('be.visible')
+        .within(() => {
+          cy.get('select[formcontrolname="customerType"]')
+            .should('be.visible')
+            .find('option:not([disabled])')
+            .then(($options) => {
+              const options = $options.toArray() as HTMLOptionElement[];
+
+              const matched = options.find(
+                (opt) => opt.text.trim() === partnerCustomerType
+              );
+
+              if (!matched) {
+                throw new Error(
+                  `No option matched "${partnerCustomerType}" in customerType dropdown`
+                );
+              }
+
+              cy.get('select[formcontrolname="customerType"]')
+                .select(matched.value.trim())
+                .should('have.value', matched.value.trim());
+
+              cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+            });
+
+          cy.contains('button', /^Add$/)
+            .should('be.enabled')
+            .click();
+        });
+
+      cy.contains('.panel-heading', 'Partner App ID Detail')
+        .closest('.panel')
+        .should(($panel) => {
+          const isHidden =
+            $panel.attr('hidden') !== undefined ||
+            $panel.css('display') === 'none' ||
+            $panel.css('visibility') === 'hidden' ||
+            !$panel.is(':visible');
+          expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+        });
+
+      cy.get('app-mass-mkt-ai-ip-camera')
+        .within(() => {
+          cy.get('.row.ng-star-inserted')
+            .last()
+            .within(() => {
+              cy.contains('button', /^Add$/)
+                .should('be.enabled')
+                .click();
+            });
+        });
+    });
+};
+export const Karaoke = () => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Karaoke$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
+    .first()
+    .parent()
+    .should('be.enabled')
+    .click();
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+        .should('be.visible')
+        .within(() => {
+
+          cy.get('select[formcontrolname="cpName"]')
+            .should('be.visible')
+            .select('Karaoke_Bundle_PLAYPremium')
+            .should('have.value', 'Karaoke_Bundle_PLAYPremium');
+
+          cy.log('Selected CP Name: Karaoke_Bundle_PLAYPremium');
+
+          const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
+          const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+          const isAISPlayBox = randomPlatform === '3: AIS Play Box';
+
+          cy.get('select[formcontrolname="platform"]')
+            .should('be.visible')
+            .select(randomPlatform)
+            .should('have.value', randomPlatform);
+
+          cy.log(`Selected Platform: ${randomPlatform}`);
+
+          cy.wait(2000);
+
+          cy.contains('h3', 'Partner App ID')
+            .closest('.panel')
+            .within(() => {
+              cy.get('button .glyphicon-plus').first().parent().click();
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should('be.visible')
+                .within(() => {
+                  cy.get('input[formcontrolname="partnerPackageName"]')
+                    .should('be.visible')
+                    .clear()
+                    .type('test');
+
+                  cy.get('select[formcontrolname="customerType"]')
+                    .should('be.visible')
+                    .find('option:not([disabled])')
+                    .then(($options) => {
+                      const options = $options.toArray() as HTMLOptionElement[];
+
+                      const matched = options.find(
+                        (opt) => opt.text.trim() === partnerCustomerType
+                      );
+
+                      if (!matched) {
+                        throw new Error(
+                          `No option matched "${partnerCustomerType}" in customerType dropdown`
+                        );
+                      }
+
+                      cy.get('select[formcontrolname="customerType"]')
+                        .select(matched.value.trim())
+                        .should('have.value', matched.value.trim());
+
+                      cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+                    });
+
+                  cy.contains('button', /^Add$/)
+                    .should('be.visible')
+                    .click();
+                });
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should(($panel) => {
+                  const isHidden =
+                    $panel.attr('hidden') !== undefined ||
+                    $panel.css('display') === 'none' ||
+                    $panel.css('visibility') === 'hidden' ||
+                    !$panel.is(':visible');
+                  expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                });
+            });
+
+          cy.wait(2000);
+
+          if (isAISPlayBox) {
+            cy.contains('h3', 'Vimmi Product')
+              .closest('.panel')
+              .within(() => {
+                cy.get('button .glyphicon-plus').first().parent().click();
+
+                cy.contains('h4', 'Vimmi Product Detail')
+                  .closest('.panel')
+                  .should('be.visible')
+                  .within(() => {
+                    cy.get('input[formcontrolname="vimmiProductNameText"]')
+                      .should('be.visible')
+                      .clear()
+                      .type('test');
+
+                    const random19Digits = Array.from({ length: 19 }, () =>
+                      Math.floor(Math.random() * 10)
+                    ).join('');
+
+                    cy.log(`Random Vimmi Product ID: ${random19Digits}`);
+
+                    cy.get('input[formcontrolname="vimmiProductId"]')
+                      .should('be.visible')
+                      .clear()
+                      .type(random19Digits);
+
+                    cy.contains('button', /^Add$/)
+                      .should('be.visible')
+                      .click();
+                  });
+              });
+
+            cy.wait(2000);
+          }
+
+          cy.get('button')
+            .filter(':visible')
+            .contains(/^Add$/)
+            .should('be.enabled')
+            .click();
+        });
+    });
+};
+export const MusicStreaming = () => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Music Streaming$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
+    .first()
+    .parent()
+    .should('be.enabled')
+    .click();
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+        .should('be.visible')
+        .within(() => {
+
+          const cpOptions = ['GMM Plern', 'jooxvip', 'Apple'];
+          const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
+
+          cy.get('select[formcontrolname="cpName"]')
+            .should('be.visible')
+            .find('option:not([disabled])')
+            .then(($options) => {
+              const options = $options.toArray() as HTMLOptionElement[];
+              const matched = options.find(
+                (opt) => opt.text.trim().includes(randomCp)
+              );
+
+              if (!matched) {
+                throw new Error(`No option matched "${randomCp}" in CP Name dropdown`);
+              }
+
+              cy.get('select[formcontrolname="cpName"]')
+                .select(matched.value.trim())
+                .should('have.value', matched.value.trim());
+
+              cy.log(`Selected CP Name: ${matched.value.trim()}`);
+            });
+
+          cy.wait(2000);
+
+          const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
+          const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+
+          cy.get('select[formcontrolname="platform"]')
+            .should('be.visible')
+            .select(randomPlatform)
+            .should('have.value', randomPlatform);
+
+          cy.log(`Selected Platform: ${randomPlatform}`);
+
+          cy.wait(2000);
+
+          cy.contains('h3', 'Partner App ID')
+            .closest('.panel')
+            .within(() => {
+              cy.get('button .glyphicon-plus').first().parent().click();
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should('be.visible')
+                .within(() => {
+                  cy.get('input[formcontrolname="partnerPackageName"]')
+                    .should('be.visible')
+                    .clear()
+                    .type('test');
+
+                  cy.get('select[formcontrolname="customerType"]')
+                    .should('be.visible')
+                    .find('option:not([disabled])')
+                    .then(($options) => {
+                      const options = $options.toArray() as HTMLOptionElement[];
+
+                      const matched = options.find(
+                        (opt) => opt.text.trim() === partnerCustomerType
+                      );
+
+                      if (!matched) {
+                        throw new Error(
+                          `No option matched "${partnerCustomerType}" in customerType dropdown`
+                        );
+                      }
+
+                      cy.get('select[formcontrolname="customerType"]')
+                        .select(matched.value.trim())
+                        .should('have.value', matched.value.trim());
+
+                      cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+                    });
+
+                  cy.contains('button', /^Add$/)
+                    .should('be.visible')
+                    .click();
+                });
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should(($panel) => {
+                  const isHidden =
+                    $panel.attr('hidden') !== undefined ||
+                    $panel.css('display') === 'none' ||
+                    $panel.css('visibility') === 'hidden' ||
+                    !$panel.is(':visible');
+                  expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                });
+            });
+
+          cy.wait(2000);
+
+          cy.get('button')
+            .filter(':visible')
+            .contains(/^Add$/)
+            .should('be.enabled')
+            .click();
+        });
+    });
+};
+export const VRBT = () => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^VRBT$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  // กด + เพื่อเปิด VRBT Detail form
+  cy.get('app-mass-mkt-vrbt')
+    .find('button.btn-primary')
+    .find('.glyphicon-plus')
+    .parent('button')
+    .should('be.enabled')
+    .click({ force: true });
+
+  cy.wait(2000);
+
+  cy.get('app-mass-mkt-vrbt', { timeout: 15000 })
+    .should('be.visible')
+    .within(() => {
+      cy.get('.panel')
+        .contains('h3', 'VRBT Detail')
+        .closest('.panel')
+        .should('not.have.attr', 'hidden')
+        .within(() => {
+
+          cy.get('select[formcontrolname="productName"]')
+            .should('be.visible')
+            .find('option:not([disabled])')
+            .then(($options) => {
+              const options = $options.toArray() as HTMLOptionElement[];
+              const matched = options.find(
+                (opt) => opt.text.trim() === 'Platform Calling VDO'
+              );
+              if (!matched) {
+                throw new Error('No option matched "Platform Calling VDO" in Product Name dropdown');
+              }
+              cy.get('select[formcontrolname="productName"]')
+                .select(matched.value.trim())
+                .should('have.value', matched.value.trim());
+              cy.log(`Selected Product Name: ${matched.value.trim()}`);
+            });
+          cy.wait(2000);
+          cy.get('ng2-dual-list-box[formcontrolname="partnerSku"]')
+            .within(() => {
+              cy.get('select[formcontrolname="availableListBox"]')
+                .find('option')
+                .then(($options) => {
+                  const options = $options.toArray() as HTMLOptionElement[];
+                  if (options.length === 0) {
+                    throw new Error('No available options in Partner SKU list');
+                  }
+                  const randomIndex = Math.floor(Math.random() * options.length);
+                  const randomValue = options[randomIndex].value;
+                  cy.log(`Selected Partner SKU: ${options[randomIndex].text.trim()}`);
+                  cy.get('select[formcontrolname="availableListBox"]')
+                    .select(randomValue);
+                  cy.wait(300);
+                  cy.get('button.str').click();
+                });
+            });
+          cy.wait(300);
+
+          cy.contains('button', /^Add$/)
+            .should('be.visible')
+            .should('be.enabled')
+            .click();
+        });
+    });
+};
+export const InternetRandom = (ProductClass: string, subModule?: string, Module?: string) => {
+
+  cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
+  cy.scrollTo('bottom');
+  cy.get('app-mass-mkt-internet button.btn-xs').find('.glyphicon-plus').filter(':visible').first().click();
+
+  const allowedOptions = [
+    // 'Limited Data (Pay per use)',
+    // 'Limited Data (Stop Net)',
+    // 'Limited Data Only',
+    'Pay per use only',
+    // 'Unlimited Data (Fixed Speed)',
+    // 'Unlimited Data (Throttling Speed)'
+  ];
+
+  cy.get('app-mass-mkt-internet select[formcontrolname="InternetQuotaType"]')
+    .filter(':visible')
+    .last()
+    .then($select => {
+      cy.wrap($select).find('option').then($options => {
+        const availableOptions = [...$options]
+          .map(opt => (opt as HTMLOptionElement).text.trim())
+          .filter(text => allowedOptions.includes(text));
+
+        const selectedValue = availableOptions[Math.floor(Math.random() * availableOptions.length)];
+        cy.wrap($select).select(selectedValue);
+        cy.wait(2000);
+
+        switch (selectedValue) {
+          case 'Limited Data (Pay per use)':
+          case 'Limited Data (Stop Net)':
+            selectRandomInternetQuota();
+            selectNativeDropdown('internetSpeed');
+
+            if (ProductClass === 'main') {
+              selectInternetExceedRate();
+            }
+            break;
+
+          case 'Limited Data Only':
+            cy.log(`🔵 Case: Limited Data Only | ProductClass: ${ProductClass} | subModule: ${subModule}| Module: ${Module}`);
+
+            selectRandomInternetQuota();
+            selectNativeDropdown('internetSpeed');
+            if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
+              cy.log('✅ Condition met → calling selectInternetExceedRate()');
+              selectInternetExceedRate();
+            }
+            break;
+
+          case 'Pay per use only':
+            selectInternetExceedRate();
+            break;
+
+          case 'Unlimited Data (Fixed Speed)':
+            const networkCoverageCheckbox = '[formarrayname="internetQuotaNetworkCoverageCheckBox"]';
+
+            cy.get(networkCoverageCheckbox)
+              .filter(':visible')
+              .then(($container) => {
+                const $5gLabel = $container.find('label').filter((_, el) =>
+                  Cypress.$(el).text().trim().includes('5G')
+                );
+
+                const has5G = $5gLabel.length > 0;
+
+                if (has5G) {
+                  cy.wrap($5gLabel).click({ force: true });
+                  cy.wait(300);
+                  selectFixedSpeedWith5G();
+                } else {
+                  selectFixedSpeedWithout5G();
+                }
+              });
+
+            if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
+              selectInternetExceedRate();
+            }
+            break;
+
+          case 'Unlimited Data (Throttling Speed)':
+            selectRandomInternetQuota();
+            selectSpecificInternetSpeed();
+            selectThrottlingSpeed();
+            if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
+              selectInternetExceedRate();
+            }
+            break;
+        }
+      });
+    });
+
+  cy.get('app-mass-mkt-internet button.btn-primary')
+    .filter(':visible')
+    .each(($btn) => {
+      const text = $btn.text().trim();
+      if (text === 'Add') {
+        cy.wrap($btn).scrollIntoView().click({ force: true });
+      }
+    });
+};
+
+const selectSpecificInternetSpeed = () => {
+  const allowedSpeeds = [
+    'Max Speed (5G 2Gbps/2Gbps)',
+    'Max Speed (5G Default 1Gbps/1Gbps)',
+    '4Gbps/4Gbps'
+  ];
+
+  cy.get('select[formcontrolname="internetSpeed"]')
+    .filter(':visible')
+    .then(($select) => {
+      const $options = $select.find('option');
+
+      const targetOptions = [...$options].filter(opt =>
+        allowedSpeeds.some(allowed => (opt as HTMLOptionElement).text.trim().includes(allowed))
+      );
+
+      if (targetOptions.length > 0) {
+        const randomOption = targetOptions[Math.floor(Math.random() * targetOptions.length)] as HTMLOptionElement;
+        cy.wrap($select).select(randomOption.value);
+        cy.wait(2000);
+        cy.log(`Selected Specific Speed: ${randomOption.text}`);
+      } else {
+        cy.log('Specific Internet Speed options not found. Selecting default.');
+        const fallbackOptions = $select.find('option:not([disabled])');
+        if (fallbackOptions.length > 1) {
+          const fallback = fallbackOptions[1] as HTMLOptionElement;
+          cy.wrap($select).select(fallback.value);
+          cy.wait(2000);
+        }
+      }
+    });
+};
+
+const selectRandomInternetQuota = () => {
+  cy.contains('label', '*Internet Quota :')
+    .filter(':visible')
+    .closest('.row')
+    .find('mat-select .mat-select-trigger')
+    .click({ force: true });
+
+  cy.get('.cdk-overlay-pane mat-option', { timeout: 10000 })
+    .should('be.visible')
+    .then(($options) => {
+      const targetOptions = $options.filter((index, option) =>
+        Cypress.$(option).text().trim().startsWith('5G')
+      );
+      if (targetOptions.length > 0) {
+        const randomIndex = Math.floor(Math.random() * targetOptions.length);
+        cy.wrap(targetOptions[randomIndex]).click({ force: true });
+        cy.wait(2000);
+      } else {
+        if ($options.length > 0) {
+          cy.wrap($options[0]).click({ force: true });
+          cy.wait(2000);
+        } else {
+          cy.get('.cdk-overlay-backdrop').click({ force: true });
+        }
+      }
+    });
+};
+
+const selectInternetExceedRate = () => {
+  cy.contains('label', '*Internet Exceed Rate :')
+    .closest('.row')
+    .find('mat-select')
+    .should('not.have.class', 'mat-select-disabled')
+    .click();
+
+  cy.get('.cdk-overlay-pane mat-option:not(.mat-option-disabled)', {
+    timeout: 10000,
+  })
+    .should('have.length.greaterThan', 0)
+    .first()
+    .click();
+
+  cy.wait(2000);
+
+  cy.contains('label', '*Internet Exceed Rate :')
+    .closest('.row')
+    .find('.mat-select-value-text, .mat-select-value')
+    .should('not.contain', 'Please Select');
+};
+
+const selectThrottlingSpeed = () => {
+  const allowedSpeeds = [
+    '150 Mbps', '100 Mbps', '50 Mbps', '42 Mbps', '40 Mbps',
+    '21 Mbps', '15 Mbps', '12 Mbps', '5 Mbps', '4 Mbps',
+    '11 Mbps', '10 Mbps', '8 Mbps', '7.2 Mbps', '3 Mbps', '1 Mbps',
+    '512 Kbps', '384 Kbps', '256 Kbps', '128 Kbps', '64 Kbps', '10 Kbps'
+  ];
+
+  cy.get('select[formcontrolname="internetThrottlingSpeed"]')
+    .filter(':visible')
+    .then(($select) => {
+      const $options = $select.find('option:not([disabled])');
+
+      const matchedOptions = [...$options].filter(opt => {
+        const text = (opt as HTMLOptionElement).text.trim();
+        return allowedSpeeds.some(allowed =>
+          text.toLowerCase().includes(allowed.toLowerCase())
+        );
+      });
+
+      if (matchedOptions.length > 0) {
+        const randomOption = matchedOptions[
+          Math.floor(Math.random() * matchedOptions.length)
+        ] as HTMLOptionElement;
+        cy.wrap($select).select(randomOption.value);
+        cy.wait(2000);
+        cy.log(`Selected Throttling Speed: ${randomOption.text}`);
+      } else {
+        cy.log('No matching throttling speed found, falling back to random non-disabled option');
+        if ($options.length > 1) {
+          const fallback = $options[
+            Math.floor(Math.random() * ($options.length - 1)) + 1
+          ] as HTMLOptionElement;
+          cy.wrap($select).select(fallback.value);
+          cy.wait(2000);
+          cy.log(`Fallback Throttling Speed: ${fallback.text}`);
+        }
+      }
+    });
+};
+
+const selectFixedSpeedWith5G = () => {
+  const allowedSpeeds = [
+    'Max Speed (5G 2Gbps/2Gbps)',
+    'Max Speed (5G Default 1Gbps/1Gbps)',
+    '300 Mbps'
+  ];
+
+  cy.get('select[formcontrolname="fixedSpeedInternetSpeed"]')
+    .filter(':visible')
+    .then(($select) => {
+      const $options = $select.find('option:not([disabled])');
+
+      const matchedOptions = [...$options].filter(opt => {
+        const text = (opt as HTMLOptionElement).text.trim();
+        return allowedSpeeds.some(allowed =>
+          text.toLowerCase().includes(allowed.toLowerCase())
+        );
+      });
+
+      if (matchedOptions.length > 0) {
+        const randomOption = matchedOptions[
+          Math.floor(Math.random() * matchedOptions.length)
+        ] as HTMLOptionElement;
+        cy.wrap($select).select(randomOption.value);
+        cy.wait(2000);
+        cy.log(`[5G] Selected Fixed Speed: ${randomOption.text}`);
+      } else {
+        cy.log('[5G] No matching speed found, falling back to random');
+        if ($options.length > 1) {
+          const fallback = $options[
+            Math.floor(Math.random() * ($options.length - 1)) + 1
+          ] as HTMLOptionElement;
+          cy.wrap($select).select(fallback.value);
+          cy.wait(2000);
+          cy.log(`[5G Fallback] Selected: ${fallback.text}`);
+        }
+      }
+    });
+};
+
+const selectFixedSpeedWithout5G = () => {
+  const allowedSpeeds = [
+    '300 Mbps', '150 Mbps', '20 Mbps', '15 Mbps', '10 Mbps',
+    '8 Mbps', '7.2 Mbps', '6 Mbps', '5 Mbps', '4 Mbps',
+    '3 Mbps', '2 Mbps', '1 Mbps', '512 Kbps'
+  ];
+
+  cy.get('select[formcontrolname="fixedSpeedInternetSpeed"]')
+    .filter(':visible')
+    .then(($select) => {
+      const $options = $select.find('option:not([disabled])');
+
+      const matchedOptions = [...$options].filter(opt => {
+        const text = (opt as HTMLOptionElement).text.trim();
+        return allowedSpeeds.some(allowed =>
+          text.toLowerCase().includes(allowed.toLowerCase())
+        );
+      });
+
+      if (matchedOptions.length > 0) {
+        const randomOption = matchedOptions[
+          Math.floor(Math.random() * matchedOptions.length)
+        ] as HTMLOptionElement;
+        cy.wrap($select).select(randomOption.value);
+        cy.wait(2000);
+        cy.log(`[Non-5G] Selected Fixed Speed: ${randomOption.text}`);
+      } else {
+        cy.log('[Non-5G] No matching speed found, falling back to random');
+        if ($options.length > 1) {
+          const fallback = $options[
+            Math.floor(Math.random() * ($options.length - 1)) + 1
+          ] as HTMLOptionElement;
+          cy.wrap($select).select(fallback.value);
+          cy.wait(2000);
+          cy.log(`[Non-5G Fallback] Selected: ${fallback.text}`);
+        }
+      }
+    });
+};
+
+const selectNativeDropdown = (formControlName: string) => {
+  cy.get(`select[formcontrolname="${formControlName}"]`)
+    .filter(':visible')
+    .then(($select) => {
+      const options = $select.find('option:not([disabled])');
+      if (options.length > 1) {
+        const randomIndex = Math.floor(Math.random() * (options.length - 1)) + 1;
+        const randomOption = options[randomIndex] as HTMLOptionElement;
+        cy.wrap($select).select(randomOption.value);
+        cy.wait(2000);
+      }
+    });
+};
+
+async function checkAndFillContentType(): Promise<void> {
+  console.log('🚀 checkAndFillContentType started');
+
+  const targetTabs: string[] = ['Karaoke', 'Music Streaming', 'Entertainment Partnership'];
+
+  const tabs = document.querySelectorAll<HTMLAnchorElement>(
+    'app-mass-enh-product-offering-detail-tab li a'
+  );
+
+  console.log('📋 All tabs found:', tabs.length);
+  console.log('📋 Tab texts:', Array.from(tabs).map(a => a.textContent?.trim()));
+
+  for (const tabName of targetTabs) {
+    console.log(`🔍 Looking for tab: "${tabName}"`);
+
+    const tab = Array.from(tabs).find(
+      (a) => a.textContent?.trim() === tabName
+    );
+
+    if (!tab) {
+      console.log(`⚠️ Tab "${tabName}" not found, skipping...`);
+      continue;
+    }
+
+    tab.click();
+    await wait(500);
+    console.log(`✅ Clicked tab: ${tabName}`);
+
+    const editButtons = document.querySelectorAll<HTMLButtonElement>(
+      'button.btn-warning[title="Edit"]'
+    );
+
+    console.log(`📋 [${tabName}] Edit buttons found:`, editButtons.length);
+
+    if (editButtons.length === 0) {
+      console.log(`⚠️ No Edit button found in ${tabName}`);
+      continue;
+    }
+
+    for (let i = 0; i < editButtons.length; i++) {
+      editButtons[i].click();
+      await wait(500);
+      console.log(`✅ [${tabName}] Clicked Edit button #${i + 1}`);
+
+      const contentTypeSelect = document.querySelector<HTMLSelectElement>(
+        'select[formcontrolname="contentType"]'
+      );
+
+      console.log(`📋 [${tabName}] Content Type select found:`, !!contentTypeSelect);
+
+      if (!contentTypeSelect) {
+        console.log(`⚠️ [${tabName}] Content Type select not found`);
+        continue;
+      }
+
+      const selectedValue: string = contentTypeSelect.value;
+      const isEmpty: boolean =
+        selectedValue === 'null' ||
+        selectedValue === '' ||
+        selectedValue === '0: null' ||
+        contentTypeSelect.selectedIndex <= 0;
+
+      console.log(
+        `[${tabName}] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`
+      );
+
+      if (isEmpty) {
+        const validOptions = Array.from(contentTypeSelect.options).filter(
+          (opt: HTMLOptionElement) => !opt.disabled && opt.value !== 'null'
+        );
+
+        console.log(`📋 [${tabName}] Valid options:`, validOptions.map(o => o.text.trim()));
+
+        if (validOptions.length === 0) {
+          console.log(`⚠️ [${tabName}] No valid options to select`);
+          continue;
+        }
+
+        const randomOption: HTMLOptionElement =
+          validOptions[Math.floor(Math.random() * validOptions.length)];
+
+        contentTypeSelect.value = randomOption.value;
+
+        contentTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+        contentTypeSelect.dispatchEvent(new Event('input', { bubbles: true }));
+
+        console.log(
+          `✅ [${tabName}] Selected random Content Type: "${randomOption.text.trim()}"`
+        );
+
+        await wait(300);
+        const updateButton: HTMLButtonElement | null = findUpdateButton();
+
+        console.log(`📋 [${tabName}] Update button found:`, !!updateButton);
+
+        if (updateButton) {
+          updateButton.click();
+          console.log(`✅ [${tabName}] Clicked Update button`);
+          await wait(500);
+        } else {
+          console.log(`⚠️ [${tabName}] Update button not found`);
+        }
+
+      } else {
+        const currentText =
+          contentTypeSelect.options[contentTypeSelect.selectedIndex]?.text.trim();
+        console.log(
+          `✅ [${tabName}] Content Type already has value: "${currentText}"`
+        );
+      }
+    }
+  }
+
+  console.log('🎉 Done checking all tabs');
+}
+
+function findUpdateButton(): HTMLButtonElement | null {
+  const buttons = document.querySelectorAll<HTMLButtonElement>(
+    'button[type="button"]'
+  );
+  return (
+    Array.from(buttons).find((btn) => {
+      const text = btn.textContent?.trim().toLowerCase() ?? '';
+      return text === 'update' || text === 'save' || text === 'ok';
+    }) ?? null
+  );
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+
+const setNativeValue = (input: HTMLInputElement, value: string): void => {
+  const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype, 'value'
+  )?.set;
+  nativeInputValueSetter?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+};
+
+const findVisibleInput = (
+  scope: HTMLElement,
+  fcName: string
+): HTMLInputElement | null => {
+  // ไม่เช็ค hidden ancestor เพราะ Angular ซ่อน section แต่ยังเขียนค่าได้
+  return scope.querySelector<HTMLInputElement>(
+    `input[formcontrolname="${fcName}"]`
+  );
+};
+
+async function checkAndFillCloudGameContentType(): Promise<void> {
+  console.log('🚀 checkAndFillCloudGameContentType started');
+
+  const cloudGameComponent = document.querySelector<HTMLElement>(
+    'app-mass-enh-vr[title="Cloud Game"]'
+  );
+
+  console.log('📋 Cloud Game component found:', !!cloudGameComponent);
+
+  if (!cloudGameComponent) {
+    console.log('⚠️ Cloud Game component not found, skipping...');
+    return;
+  }
+
+  const editButtons = cloudGameComponent.querySelectorAll<HTMLButtonElement>(
+    'button.btn-warning[title="Edit"]'
+  );
+
+  console.log('📋 Edit buttons found:', editButtons.length);
+
+  if (editButtons.length === 0) {
+    console.log('⚠️ No Edit button found in Cloud Game');
+    return;
+  }
+
+  for (let i = 0; i < editButtons.length; i++) {
+    editButtons[i].click();
+    await wait(500);
+    console.log(`✅ [Cloud Game] Clicked Edit button #${i + 1}`);
+
+    const contentTypeSelect = cloudGameComponent.querySelector<HTMLSelectElement>(
+      'select[formcontrolname="contentTypeValue"]'
+    );
+
+    console.log(`📋 [Cloud Game] Content Type select found:`, !!contentTypeSelect);
+
+    if (!contentTypeSelect) {
+      console.log('⚠️ [Cloud Game] Content Type select not found');
+      continue;
+    }
+
+    const selectedValue: string = contentTypeSelect.value;
+    const isEmpty: boolean =
+      selectedValue === '' ||
+      selectedValue === 'null' ||
+      contentTypeSelect.selectedIndex < 0 ||
+      contentTypeSelect.selectedIndex === 0 && contentTypeSelect.options[0]?.disabled;
+
+    console.log(
+      `[Cloud Game] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`
+    );
+
+    if (isEmpty) {
+      const validOptions = Array.from(contentTypeSelect.options).filter(
+        (opt: HTMLOptionElement) => !opt.disabled && opt.value !== '' && opt.value !== 'null'
+      );
+
+      console.log('📋 [Cloud Game] Valid options:', validOptions.map(o => o.text.trim()));
+
+      if (validOptions.length === 0) {
+        console.log('⚠️ [Cloud Game] No valid options to select');
+        continue;
+      }
+
+      const randomOption: HTMLOptionElement =
+        validOptions[Math.floor(Math.random() * validOptions.length)];
+
+      contentTypeSelect.value = randomOption.value;
+
+      contentTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      contentTypeSelect.dispatchEvent(new Event('input', { bubbles: true }));
+
+      console.log(
+        `✅ [Cloud Game] Selected random Content Type: "${randomOption.text.trim()}"`
+      );
+
+      await wait(300);
+
+      const updateButton: HTMLButtonElement | null = findCloudGameUpdateButton(cloudGameComponent);
+
+      console.log('📋 [Cloud Game] Update button found:', !!updateButton);
+
+      if (updateButton) {
+        updateButton.click();
+        console.log('✅ [Cloud Game] Clicked Update button');
+        await wait(500);
+      } else {
+        console.log('⚠️ [Cloud Game] Update button not found');
+      }
+
+    } else {
+      const currentText =
+        contentTypeSelect.options[contentTypeSelect.selectedIndex]?.text.trim();
+      console.log(
+        `✅ [Cloud Game] Content Type already has value: "${currentText}"`
+      );
+    }
+  }
+
+  console.log('🎉 [Cloud Game] Done checking Content Type');
+}
+
+function findCloudGameUpdateButton(container: HTMLElement): HTMLButtonElement | null {
+  const buttons = container.querySelectorAll<HTMLButtonElement>(
+    'button[type="button"], button[type="submit"]'
+  );
+  return (
+    Array.from(buttons).find((btn) => {
+      const text = btn.textContent?.trim().toLowerCase() ?? '';
+      return text === 'update' || text === 'save' || text === 'ok';
+    }) ?? null
+  );
+}
+const checkAndUpdatePriority = () => {
+  cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
+  cy.wait(10000);
+  cy.contains('th', 'Quota Type', { timeout: 15000 });
+
+  const processRows = (rowIndex: number) => {
+    cy.get('table thead th')
+      .contains('Quota Type')
+      .closest('table')
+      .find('tbody tr')
+      .then(($rows) => {
+        if (rowIndex >= $rows.length) {
+          cy.log('✅ ทำครบทุกแถวแล้ว');
+          return;
+        }
+
+        const $currentRow = $rows.eq(rowIndex);
+        const quotaType = $currentRow.find('td:first').text().trim();
+
+        if (!quotaType || quotaType === 'No data to display') {
+          cy.log(`⚠️ ข้ามแถวที่ ${rowIndex + 1} ไม่มีข้อมูล`);
+          return processRows(rowIndex + 1);
+        }
+
+        cy.log(`📝 กำลังทำแถวที่ ${rowIndex + 1}: ${quotaType}`);
+
+        const hasExceedRate = quotaType.includes('Limited Data (Pay per use)') ||
+          quotaType.includes('Limited Data (Stop Net)') ||
+          quotaType.includes('Pay per use only');
+
+        // คลิกปุ่ม Edit ในแถวหลัก
+        cy.wrap($currentRow).find('button.btn-warning').first().click();
+        cy.wait(2000);
+
+        // เลือกเฉพาะ Internet Quota ตัวสุดท้ายเท่านั้น
+        cy.get('table.table-hover.table-bordered').then(($subTable) => {
+          const $subRows = $subTable.find('tbody tr');
+
+          if ($subRows.length === 0) {
+            cy.log('⚠️ ไม่พบ Internet Quota ในตารางย่อย');
+            cy.get('button').contains('Cancel').click();
+            cy.wait(2000);
+            return processRows(rowIndex + 1);
+          }
+
+          // เลือกแถวสุดท้ายเท่านั้น
+          const $lastSubRow = $subRows.last();
+          const internetQuota = $lastSubRow.find('td:first').text().trim();
+          cy.log(`🎯 เลือกเฉพาะ Internet Quota ตัวสุดท้าย: ${internetQuota}`);
+
+          // คลิกปุ่ม Edit ของ Internet Quota ตัวสุดท้าย
+          cy.wrap($lastSubRow).find('button.btn-warning').first().click();
+          cy.wait(2000);
+
+          // หา panel ที่ visible และตรวจสอบว่ามี input ไหนบ้าง
+          cy.get('.panel-body').each(($panel) => {
+            cy.wrap($panel).then(($p) => {
+              if (!$p.is(':visible')) return;
+
+              // เช็ค Priority ปกติ (ถ้ามี)
+              const $priorityInput = $p.find('input[formcontrolname="priority"]');
+              if ($priorityInput.length > 0) {
+                cy.wrap($priorityInput).invoke('val').then((currentPriority) => {
+                  if (!currentPriority || currentPriority === '') {
+                    const randomNum = Math.floor(10000 + Math.random() * 90000);
+                    cy.wrap($priorityInput).clear().type(randomNum.toString());
+                    cy.log(`✅ ใส่ค่า Priority: ${randomNum}`);
+
+                    cy.wrap($p).find('button.btn-success').contains('Update').click();
+                    cy.log('✅ อัพเดท Priority เรียบร้อย');
+                    cy.wait(1500);
+                  } else {
+                    cy.log(`ℹ️ Priority มีค่าอยู่แล้ว: ${currentPriority}`);
+                  }
+                });
+              }
+
+              // เช็ค Exceed Rate Priority (สำหรับกรณี Pay per use only)
+              const $exceedInput = $p.find('input[formcontrolname="internetExceedRatePriority"]');
+              if ($exceedInput.length > 0) {
+                cy.wrap($exceedInput).invoke('val').then((currentExceed) => {
+                  if (!currentExceed || currentExceed === '') {
+                    const randomNum = Math.floor(10000 + Math.random() * 90000);
+                    cy.wrap($exceedInput).clear().type(randomNum.toString());
+                    cy.log(`✅ ใส่ค่า Exceed Priority: ${randomNum}`);
+
+                    // หาปุ่ม Update ที่อยู่ใน panel เดียวกัน
+                    cy.wrap($p).find('button.btn-success').contains('Update').click();
+                    cy.log('✅ อัพเดท Exceed Priority เรียบร้อย');
+                    cy.wait(1500);
+                  } else {
+                    cy.log(`ℹ️ Exceed Priority มีค่าอยู่แล้ว: ${currentExceed}`);
+
+                    // ถ้ามีค่าอยู่แล้ว กด Cancel
+                    if (!$priorityInput.length) {
+                      cy.get('button').contains('Cancel').click();
+                      cy.wait(5000);
+                    }
+                  }
+                });
+              }
+
+              // ถ้าไม่มีทั้งสอง input
+              if ($priorityInput.length === 0 && $exceedInput.length === 0) {
+                cy.log('⚠️ ไม่พบ Priority หรือ Exceed Priority input');
+              }
+            });
+          });
+
+          // ปิด modal
+          cy.get('button').contains('Cancel').click();
+          cy.wait(2000);
+
+          // ทำแถวถัดไป
+          processRows(rowIndex + 1);
+        });
+      });
+  };
+
+  processRows(0);
+  cy.log('🎉 เสร็จสิ้น');
 };

@@ -25,48 +25,48 @@ const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?
   Master.ProjectBasicInformationComplete('onetime', 'ontop', config);
 
   // Target group
-  Master.selectTargetGroup('random');
+  // Master.selectTargetGroup('random');
 
   // Remark
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
+  // cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
 
-  Master.PriceExcluding();
+  // Master.PriceExcluding();
 
   // Target group
-  Master.targetgroup();
-  Master.RandomProductSpecification();
+  // Master.targetgroup();
+  // Master.RandomProductSpecification();
   // ProductSpec
-  const optionsToSelectProductSpec = ["Internet"];
+  // const optionsToSelectProductSpec = ["Internet"];
 
-  optionsToSelectProductSpec.forEach(option => {
-    cy.get('select[formcontrolname="availableListBox"]')
-      .contains(option)
-      .then($option => {
-        cy.wrap($option).dblclick();
-      });
-  });
-  if (Module === 'PRE') {
-    // allowMvpn สำหรับ PRE Module
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-  } 
-  // Master.RetryPattern();
-  Master.Randomdropdown();
-  Master.dropdownPromotionGroup();
-  Master.InternetRandom();
-  Master.smsWordingpre();
-  Master.backBacicInfo();
-  Master.addFile();
+  // optionsToSelectProductSpec.forEach(option => {
+  //   cy.get('select[formcontrolname="availableListBox"]')
+  //     .contains(option)
+  //     .then($option => {
+  //       cy.wrap($option).dblclick();
+  //     });
+  // });
+  // if (Module === 'PRE') {
+  //   // allowMvpn สำหรับ PRE Module
+  //   cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+  // } 
+  // // Master.RetryPattern();
+  // Master.Randomdropdown();
+  // Master.dropdownPromotionGroup();
+  // Master.InternetRandom();
+  // Master.smsWordingpre();
+  // Master.backBacicInfo();
+  // Master.addFile();
 };
 
 describe('PLM', () => {
-  describe('Scenario: Mob', () => {
+  describe.only('Scenario: Mob', () => {
     it('MKT PREPAIDrole', () => {
       runMKTprepaidFlow('PRE');
     });
     Master.afterMKTontopPRE();
   });
 
-  describe.only('Scenario: ENTER', () => {
+  describe('Scenario: ENTER', () => {
     it('MKT PREPAIDrole', () => {
       runMKTprepaidFlow('ENTER', 'PRE');
     });

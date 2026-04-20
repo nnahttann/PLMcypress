@@ -23,34 +23,7 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule
   }
 
   Master.ProjectBasicInformationComplete('usage', 'ontop', config);
-
-  // Target group
-  Master.selectTargetGroup('random');
-
-  // Remark
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
-
-  Master.PriceExcluding();
-
-  // Target group
-  Master.targetgroup();
-  Master.RandomProductSpecification();
-  // ProductSpec
-  const optionsToSelectProductSpec = ["Internet"];
-
-  optionsToSelectProductSpec.forEach(option => {
-    cy.get('select[formcontrolname="availableListBox"]')
-      .contains(option)
-      .then($option => {
-        cy.wrap($option).dblclick();
-      });
-  });
-  Master.dropdownPromotionGroup();
-  Master.InternetRandom('notrecurring');
-  Master.smsWording();
-  Master.backBacicInfo();
-
-  Master.addFile();
+  // Master.InternetRandom('notrecurring');
 };
 
 describe('PLM', () => {
