@@ -12,13 +12,12 @@ beforeEach(() => {
 });
 
 // Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
+const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
   const config: any = {
     type: 'Ontop',
     Module: Module,
     autoSetDuration: true
   };
-
   if (subModule) {
     config.subModule = subModule;
   }
@@ -26,62 +25,57 @@ const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModul
   Master.ProjectBasicInformationComplete('recurring', 'ontop', config);
 
   // Target group
-  Master.selectTargetGroup('random');
+  // Master.selectTargetGroup('random');
 
   // Remark
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
+  // cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
 
-  Master.PriceExcluding();
+  // Master.PriceExcluding();
 
   // Target group
-  Master.targetgroup();
-
+  // Master.targetgroup();
+  // Master.RandomProductSpecification();
   // ProductSpec
-  const optionsToSelectProductSpec = ["Internet"];
+  // const optionsToSelectProductSpec = ["Internet"];
 
-  optionsToSelectProductSpec.forEach(option => {
-    cy.get('select[formcontrolname="availableListBox"]')
-      .contains(option)
-      .then($option => {
-        cy.wrap($option).dblclick();
-      });
-  });
-
-  if (Module === 'PRE') {
-    // allowMvpn สำหรับ PRE Module
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-    Master.ontopCondition();
-    Master.InternetRandom('recurring');
-  }
-  else {
-    Master.dropdownPromotionGroup();
-    Master.InternetRandom('notrecurring');
-  }
-  Master.RetryPattern();
-  Master.dropdownPromotionGroup();
-  Master.smsWordingpre();
-  Master.backBacicInfo();
-  Master.addFile();
+  // optionsToSelectProductSpec.forEach(option => {
+  //   cy.get('select[formcontrolname="availableListBox"]')
+  //     .contains(option)
+  //     .then($option => {
+  //       cy.wrap($option).dblclick();
+  //     });
+  // });
+  // if (Module === 'PRE') {
+  //   // allowMvpn สำหรับ PRE Module
+  //   cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
+  // } 
+  // // Master.RetryPattern();
+  // Master.Randomdropdown();
+  // Master.dropdownPromotionGroup();
+  // Master.InternetRandom();
+  // Master.smsWordingpre();
+  // Master.backBacicInfo();
+  // Master.addFile();
 };
 
 describe('PLM', () => {
-  describe('Scenario: Mob PRE', () => {
+  describe.only('Scenario: Mob', () => {
     it('MKT PREPAIDrole', () => {
-      runMKTPostpaidFlow('PRE');
+      runMKTprepaidFlow('PRE');
     });
     Master.afterMKTontopPRE();
   });
 
   describe('Scenario: ENTER', () => {
     it('MKT PREPAIDrole', () => {
-      runMKTPostpaidFlow('ENTER', 'PRE');
+      runMKTprepaidFlow('ENTER', 'PRE');
     });
     Master.afterMKTontopPREENTER();
   });
 
-  describe.only('Scenario: MUSIC', () => {
+  describe('Scenario: MUSIC', () => {
     it('MKT PREPAIDrole', () => {
-      runMKTPostpaidFlow('MUSIC', 'PRE');
+      runMKTprepaidFlow('MUSIC', 'PRE');
     });
     Master.afterMKTontopPREMUSIC();
   });

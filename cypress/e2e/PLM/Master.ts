@@ -2628,755 +2628,968 @@ export const Mms = (): void => {
 };
 
 // ========================
-// VERTICAL APP
+// UTILITY FUNCTION สำหรับสุ่มจำนวนรายการ
 // ========================
+const getRandomNumberOfEntries = (): number => {
+  const random = Math.random();
 
-export const VerticalApp = (): void => {
+  if (random < 0.95) {
+    // 95% chance: เพิ่ม 1 รายการ
+    return 1;
+  } else if (random < 0.98) {
+    // 3% chance: เพิ่ม 2 รายการ
+    return 2;
+  } else {
+    // 2% chance: เพิ่ม 3 รายการ
+    return 3;
+  }
+};
+
+// หรือแบบที่ปรับแต่งได้
+const getRandomNumberOfEntriesWithConfig = (config?: {
+  singleEntryProbability?: number;  // ค่าเริ่มต้น 0.95 (95%)
+  maxEntries?: number;              // ค่าเริ่มต้น 3
+}): number => {
+  const singleProb = config?.singleEntryProbability ?? 0.95;
+  const maxEntries = config?.maxEntries ?? 3;
+
+  const random = Math.random();
+
+  if (random < singleProb) {
+    return 1;
+  } else {
+    // กระจายโอกาสที่เหลือให้กับ 2 ถึง maxEntries
+    const remainingProb = 1 - singleProb;
+    const probPerExtra = remainingProb / (maxEntries - 1);
+
+    for (let i = 2; i <= maxEntries; i++) {
+      if (random < singleProb + (probPerExtra * (i - 1))) {
+        return i;
+      }
+    }
+    return maxEntries;
+  }
+};
+
+// ========================
+// VERTICAL APP (Robust)
+// ========================
+export const VerticalApp = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} Vertical App entries`);
+  
   cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
     .contains(/^Vertical App$/)
     .click({ force: true });
-  cy.wait(5000);
+  cy.wait(3000);
 
+  // เปิด panel และกด + ครั้งแรก
   cy.get('app-mass-mkt-vertical-app').within(() => {
     cy.get('.collapse-panel').then(($panel) => {
       if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
         cy.get('.panel-heading').click({ force: true });
+        cy.wait(1000);
       }
     });
-
     cy.get('button:has(.glyphicon-plus)').click({ force: true });
+    cy.wait(2000);
   });
 
-  cy.get('select[formcontrolname="VerticalAppUsageType"]')
-    .find('option:not([disabled])')
-    .then(($options) => {
-      const randomIndex = Cypress._.random(0, $options.length - 1);
-      const val = $options.eq(randomIndex).val() as string;
-      cy.get('select[formcontrolname="VerticalAppUsageType"]').select(val, { force: true });
-    });
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding Vertical App entry ${i + 1} of ${entriesToAdd}`);
 
-  cy.get('select[formcontrolname="VerticalAppQuotaType"]')
-    .find('option:not([disabled])')
-    .then(($options) => {
-      const randomIndex = Cypress._.random(0, $options.length - 1);
-      const val = $options.eq(randomIndex).val() as string;
-      cy.wrap(val).as('selectedQuotaValue');
-      cy.get('select[formcontrolname="VerticalAppQuotaType"]').select(val, { force: true });
-    });
+    if (i > 0) {
+      cy.get('app-mass-mkt-vertical-app').within(() => {
+        cy.get('button:has(.glyphicon-plus)').click({ force: true });
+      });
+      cy.wait(2000);
+    }
 
-  cy.contains('label', '*Vertical App :')
-    .closest('.form-group')
-    .find('mat-select .mat-select-trigger')
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.get('body')
-    .find('mat-option')
-    .not('.mat-option-disabled')
-    .then(($options) => {
-      const randomIndex = Cypress._.random(0, $options.length - 1);
-      cy.wrap($options).eq(randomIndex).scrollIntoView().click({ force: true });
-    });
-
-  cy.get('app-mass-mkt-vertical-app').within(() => {
-    const pick5G = Cypress._.random(0, 1) === 1;
-
-    cy.get('[formarrayname="vaNetworkCoverageCheckBox"] input[type="checkbox"]')
-      .each(($checkbox, index) => {
-        const should5GBeChecked = index === 0 && pick5G;
-        const shouldNo4GBeChecked = index === 1 && !pick5G;
-
-        if (should5GBeChecked || shouldNo4GBeChecked) {
-          cy.wrap($checkbox).check({ force: true });
-        } else {
-          cy.wrap($checkbox).uncheck({ force: true });
+    // เลือกทุก dropdown แบบ force: true
+    cy.get('app-mass-mkt-vertical-app').within(() => {
+      // เลือก Usage Type
+      cy.get('select').eq(0).then($select => {
+        if ($select.length > 0) {
+          cy.wrap($select).find('option:not([disabled])').then($options => {
+            if ($options.length > 0) {
+              const randomIndex = Cypress._.random(0, $options.length - 1);
+              const val = $options.eq(randomIndex).val() as string;
+              cy.wrap($select).select(val, { force: true });
+            }
+          });
         }
       });
+    });
 
-    cy.get('select[formcontrolname="commuSpeed"]')
-      .find('option:not([disabled])')
-      .then(($options) => {
-        const randomIndex = Cypress._.random(0, $options.length - 1);
-        const val = $options.eq(randomIndex).val() as string;
-        cy.get('select[formcontrolname="commuSpeed"]').select(val, { force: true });
-      });
+    cy.wait(500);
 
-    cy.get('@selectedQuotaValue').then((quotaValue) => {
-      if (String(quotaValue).includes('Throttling')) {
-        cy.get('select[formcontrolname="commuThrottlingSpeed"]')
-          .should('exist')
-          .find('option:not([disabled])')
-          .then(($options) => {
-            const randomIndex = Cypress._.random(0, $options.length - 1);
-            const val = $options.eq(randomIndex).val() as string;
-            cy.get('select[formcontrolname="commuThrottlingSpeed"]').select(val, { force: true });
+    cy.get('app-mass-mkt-vertical-app').within(() => {
+      // เลือก Quota Type
+      cy.get('select').eq(1).then($select => {
+        if ($select.length > 0) {
+          cy.wrap($select).find('option:not([disabled])').then($options => {
+            if ($options.length > 0) {
+              const randomIndex = Cypress._.random(0, $options.length - 1);
+              const val = $options.eq(randomIndex).val() as string;
+              cy.wrap($select).select(val, { force: true });
+            }
           });
+        }
+      });
+    });
+
+    cy.wait(500);
+
+    // Material Select
+    cy.contains('label', '*Vertical App :')
+      .closest('.form-group')
+      .find('mat-select')
+      .last()
+      .click({ force: true });
+
+    cy.get('body').find('mat-option').not('.mat-option-disabled').then($options => {
+      if ($options.length > 0) {
+        const randomIndex = Cypress._.random(0, $options.length - 1);
+        cy.wrap($options).eq(randomIndex).click({ force: true });
       }
     });
 
-    cy.contains('button', /^Add$/).click({ force: true });
-  });
+    cy.wait(500);
+
+    // Checkboxes
+    cy.get('app-mass-mkt-vertical-app').within(() => {
+      cy.get('input[type="checkbox"]').each($checkbox => {
+        const shouldCheck = Math.random() > 0.5;
+        if (shouldCheck) {
+          cy.wrap($checkbox).check({ force: true });
+        }
+      });
+    });
+
+    cy.wait(500);
+
+    // Communication Speed
+    cy.get('app-mass-mkt-vertical-app').within(() => {
+      cy.get('select').last().then($select => {
+        if ($select.length > 0) {
+          cy.wrap($select).find('option:not([disabled])').then($options => {
+            if ($options.length > 0) {
+              const randomIndex = Cypress._.random(0, $options.length - 1);
+              const val = $options.eq(randomIndex).val() as string;
+              cy.wrap($select).select(val, { force: true });
+            }
+          });
+        }
+      });
+    });
+
+    // Add button
+    cy.get('app-mass-mkt-vertical-app').within(() => {
+      cy.contains('button', /^Add$/).last().click({ force: true });
+    });
+
+    cy.wait(1500);
+  }
 };
 
 // ========================
-// CLOUD GAME
+// CLOUD GAME (Robust)
 // ========================
-
-export const CloudGame = (): void => {
+export const CloudGame = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} Cloud Game entries`);
+  
   cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
     .contains(/^Cloud Game$/)
     .click({ force: true });
+  cy.wait(3000);
 
-  cy.wait(5000);
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding Cloud Game entry ${i + 1} of ${entriesToAdd}`);
 
-  cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
-    .first()
-    .should('be.visible')
-    .within(() => {
-      cy.get('button .glyphicon-plus').first().parent().click();
+    cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+      .first()
+      .should('be.visible')
+      .within(() => {
+        if (i > 0) {
+          cy.get('button .glyphicon-plus').first().parent().click({ force: true });
+          cy.wait(1000);
+        }
 
-      cy.contains('label', '*Content :')
-        .closest('.col-md-12')
-        .find('.mat-select-trigger')
-        .click({ force: true });
-    });
+        cy.contains('label', '*Content :')
+          .closest('.col-md-12')
+          .find('.mat-select-trigger')
+          .last()
+          .click({ force: true });
+      });
 
-  cy.get('.cdk-overlay-container .mat-select-panel', { timeout: 10000 })
-    .should('be.visible');
+    cy.get('.cdk-overlay-container .mat-select-panel', { timeout: 10000 })
+      .should('be.visible');
 
-  cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
-    .should('have.length.greaterThan', 0)
-    .then(($options) => {
-      const count = $options.length;
-      const randomIndex = Math.floor(Math.random() * count);
-      cy.wrap($options).eq(randomIndex).click({ force: true });
-    });
+    cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
+      .should('have.length.greaterThan', 0)
+      .then(($options) => {
+        const randomIndex = Math.floor(Math.random() * $options.length);
+        cy.wrap($options).eq(randomIndex).click({ force: true });
+      });
 
-  cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
-    .first()
-    .should('be.visible')
-    .within(() => {
-      cy.get('button.btn-primary').contains('Add').click({ force: true });
-    });
+    cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+      .first()
+      .should('be.visible')
+      .within(() => {
+        cy.get('button.btn-primary').contains('Add').last().click({ force: true });
+      });
+
+    cy.wait(1500);
+  }
 };
 
 // ========================
-// ENTERTAINMENT PARTNERSHIP
+// WIFI (Robust)
 // ========================
+export const WiFi = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} WiFi entries`);
+  
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^WiFi$/)
+    .click({ force: true });
+  cy.wait(2000);
 
-export const EntertainmentPartnership = (platforms: Array<'Arcade' | 'TV Plus' | 'Youtube Premium'>): void => {
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding WiFi entry ${i + 1} of ${entriesToAdd}`);
+
+    if (i > 0) {
+      cy.get('app-mass-mkt-wifi')
+        .find('.glyphicon-plus')
+        .closest('button')
+        .click({ force: true });
+      cy.wait(1000);
+    }
+
+    // WiFi Usage Type
+    cy.get('app-mass-mkt-wifi').within(() => {
+      cy.get('select').eq(0).then($select => {
+        if ($select.length > 0) {
+          cy.wrap($select).find('option:not([disabled])').then($options => {
+            if ($options.length > 0) {
+              const randomIndex = Cypress._.random(0, $options.length - 1);
+              const val = $options.eq(randomIndex).val() as string;
+              cy.wrap($select).select(val, { force: true });
+            }
+          });
+        }
+      });
+    });
+
+    cy.wait(500);
+
+    // WiFi Quota Type
+    cy.get('app-mass-mkt-wifi').within(() => {
+      cy.get('select').eq(1).then($select => {
+        if ($select.length > 0) {
+          cy.wrap($select).find('option:not([disabled])').then($options => {
+            if ($options.length > 0) {
+              const randomIndex = Cypress._.random(0, $options.length - 1);
+              const val = $options.eq(randomIndex).val() as string;
+              cy.wrap($select).select(val, { force: true });
+            }
+          });
+        }
+      });
+    });
+
+    cy.wait(500);
+
+    // WiFi Material Select
+    cy.contains('label', '*WiFi :')
+      .closest('.form-group')
+      .find('mat-select')
+      .last()
+      .click({ force: true });
+
+    cy.get('.mat-select-panel').within(() => {
+      cy.get('mat-option').not('.mat-option-disabled').then($options => {
+        if ($options.length > 0) {
+          const randomIndex = Cypress._.random(0, $options.length - 1);
+          cy.wrap($options).eq(randomIndex).click({ force: true });
+        }
+      });
+    });
+
+    cy.wait(500);
+
+    // Add button
+    cy.contains('button', /^Add$/).last().click({ force: true });
+
+    cy.wait(1500);
+  }
+};
+
+// ========================
+// AI IP CAMERA (Robust)
+// ========================
+export const AIIPCamera = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} AI IP Camera entries`);
+  
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^AI IP Camera$/)
+    .click({ force: true });
+  cy.wait(2000);
+
+  // Get customer type first
+  let partnerCustomerType = 'Post-paid';
+  
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const label = String(selectedVal).includes(':') 
+        ? String(selectedVal).split(':')[1].trim() 
+        : String(selectedVal).trim();
+      
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      }
+    });
+
+  cy.wait(500);
+
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding AI IP Camera entry ${i + 1} of ${entriesToAdd}`);
+
+    if (i > 0) {
+      cy.get('app-mass-mkt-ai-ip-camera .panel-body .btn-primary .glyphicon-plus')
+        .first()
+        .parent()
+        .click({ force: true });
+      cy.wait(1000);
+    }
+
+    // CP Name
+    cy.get('app-mass-mkt-ai-ip-camera').within(() => {
+      cy.get('select[formcontrolname="cpName"]').last().then($select => {
+        if ($select.length > 0) {
+          cy.wrap($select).find('option:not([disabled])').then($options => {
+            const validOptions = $options.toArray().filter(opt => 
+              !(opt as HTMLOptionElement).disabled && 
+              (opt as HTMLOptionElement).value && 
+              (opt as HTMLOptionElement).value !== 'null'
+            );
+            if (validOptions.length > 0) {
+              const randomIndex = Math.floor(Math.random() * validOptions.length);
+              const val = (validOptions[randomIndex] as HTMLOptionElement).value;
+              cy.wrap($select).select(val, { force: true });
+            }
+          });
+        }
+      });
+    });
+
+    cy.wait(500);
+
+    // Partner App ID
+    cy.contains('.panel-heading', 'Partner App ID')
+      .closest('.panel')
+      .last()
+      .within(() => {
+        cy.get('.btn-xs .glyphicon-plus').last().click({ force: true });
+      });
+
+    cy.wait(500);
+
+    // Partner App ID Detail
+    cy.contains('.panel-heading', 'Partner App ID Detail')
+      .closest('.panel')
+      .last()
+      .within(() => {
+        cy.get('select[formcontrolname="customerType"]').then($select => {
+          if ($select.length > 0) {
+            cy.wrap($select).select(partnerCustomerType, { force: true });
+          }
+        });
+        cy.contains('button', /^Add$/).click({ force: true });
+      });
+
+    cy.wait(500);
+
+    // Main Add button
+    cy.get('app-mass-mkt-ai-ip-camera').within(() => {
+      cy.contains('button', /^Add$/).last().click({ force: true });
+    });
+
+    cy.wait(1500);
+  }
+};
+
+// ========================
+// KARAOKE (Robust)
+// ========================
+export const Karaoke = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} Karaoke entries`);
+  
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Karaoke$/)
+    .click({ force: true });
+  cy.wait(2000);
+
+  let partnerCustomerType = 'Post-paid';
+  
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const label = String(selectedVal).includes(':') 
+        ? String(selectedVal).split(':')[1].trim() 
+        : String(selectedVal).trim();
+      
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      }
+    });
+
+  cy.wait(500);
+
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding Karaoke entry ${i + 1} of ${entriesToAdd}`);
+
+    if (i > 0) {
+      cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
+        .first()
+        .parent()
+        .click({ force: true });
+      cy.wait(1000);
+    }
+
+    cy.get('app-mass-mkt-content-music-streaming').within(() => {
+      // CP Name
+      cy.get('select[formcontrolname="cpName"]').last().select('Karaoke_Bundle_PLAYPremium', { force: true });
+      cy.wait(500);
+
+      // Platform
+      const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
+      const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+      cy.get('select[formcontrolname="platform"]').last().select(randomPlatform, { force: true });
+      cy.wait(500);
+
+      // Partner App ID
+      cy.contains('h3', 'Partner App ID')
+        .closest('.panel')
+        .last()
+        .within(() => {
+          cy.get('button .glyphicon-plus').first().parent().click({ force: true });
+          cy.wait(300);
+          
+          cy.contains('h3', 'Partner App ID Detail')
+            .closest('.panel')
+            .within(() => {
+              cy.get('input[formcontrolname="partnerPackageName"]').clear({ force: true }).type('test', { force: true });
+              cy.get('select[formcontrolname="customerType"]').select(partnerCustomerType, { force: true });
+              cy.contains('button', /^Add$/).click({ force: true });
+            });
+        });
+
+      cy.wait(500);
+
+      // Add button
+      cy.contains('button', /^Add$/).last().click({ force: true });
+    });
+
+    cy.wait(1500);
+  }
+};
+
+// ========================
+// MUSIC STREAMING (Robust)
+// ========================
+export const MusicStreaming = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} Music Streaming entries`);
+  
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Music Streaming$/)
+    .click({ force: true });
+  cy.wait(2000);
+
+  let partnerCustomerType = 'Post-paid';
+  
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const label = String(selectedVal).includes(':') 
+        ? String(selectedVal).split(':')[1].trim() 
+        : String(selectedVal).trim();
+      
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      }
+    });
+
+  cy.wait(500);
+
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding Music Streaming entry ${i + 1} of ${entriesToAdd}`);
+
+    if (i > 0) {
+      cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
+        .first()
+        .parent()
+        .click({ force: true });
+      cy.wait(1000);
+    }
+
+    cy.get('app-mass-mkt-content-music-streaming').within(() => {
+      // CP Name
+      const cpOptions = ['GMM Plern', 'jooxvip', 'Apple'];
+      const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
+      
+      cy.get('select[formcontrolname="cpName"]').last().then($select => {
+        cy.wrap($select).find('option').then($options => {
+          const matched = $options.toArray().find(opt => opt.textContent?.includes(randomCp));
+          if (matched) {
+            cy.wrap($select).select((matched as HTMLOptionElement).value, { force: true });
+          }
+        });
+      });
+      cy.wait(500);
+
+      // Platform
+      const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
+      const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+      cy.get('select[formcontrolname="platform"]').last().select(randomPlatform, { force: true });
+      cy.wait(500);
+
+      // Partner App ID
+      cy.contains('h3', 'Partner App ID')
+        .closest('.panel')
+        .last()
+        .within(() => {
+          cy.get('button .glyphicon-plus').first().parent().click({ force: true });
+          cy.wait(300);
+          
+          cy.contains('h3', 'Partner App ID Detail')
+            .closest('.panel')
+            .within(() => {
+              cy.get('input[formcontrolname="partnerPackageName"]').clear({ force: true }).type('test', { force: true });
+              cy.get('select[formcontrolname="customerType"]').select(partnerCustomerType, { force: true });
+              cy.contains('button', /^Add$/).click({ force: true });
+            });
+        });
+
+      cy.wait(500);
+
+      // Add button
+      cy.contains('button', /^Add$/).last().click({ force: true });
+    });
+
+    cy.wait(1500);
+  }
+};
+
+// ========================
+// VRBT (Robust)
+// ========================
+export const VRBT = (numberOfEntries?: number): void => {
+  const entriesToAdd = numberOfEntries ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} VRBT entries`);
+  
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^VRBT$/)
+    .click({ force: true });
+  cy.wait(2000);
+
+  for (let i = 0; i < entriesToAdd; i++) {
+    cy.log(`📝 Adding VRBT entry ${i + 1} of ${entriesToAdd}`);
+
+    if (i > 0) {
+      cy.get('app-mass-mkt-vrbt')
+        .find('button.btn-primary .glyphicon-plus')
+        .parent()
+        .click({ force: true });
+      cy.wait(1500);
+    }
+
+    cy.get('app-mass-mkt-vrbt').within(() => {
+      cy.get('.panel').contains('h3', 'VRBT Detail')
+        .closest('.panel')
+        .last()
+        .within(() => {
+          // Product Name
+          cy.get('select[formcontrolname="productName"]').then($select => {
+            cy.wrap($select).find('option').then($options => {
+              const matched = $options.toArray().find(opt => opt.textContent?.includes('Platform Calling VDO'));
+              if (matched) {
+                cy.wrap($select).select((matched as HTMLOptionElement).value, { force: true });
+              }
+            });
+          });
+          cy.wait(500);
+
+          // Partner SKU
+          cy.get('ng2-dual-list-box[formcontrolname="partnerSku"]').within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').find('option').then($options => {
+              if ($options.length > 0) {
+                const randomIndex = Math.floor(Math.random() * $options.length);
+                const randomValue = $options.eq(randomIndex).val() as string;
+                cy.get('select[formcontrolname="availableListBox"]').select(randomValue, { force: true });
+                cy.wait(300);
+                cy.get('button.str').click({ force: true });
+              }
+            });
+          });
+          cy.wait(300);
+
+          // Add button
+          cy.contains('button', /^Add$/).click({ force: true });
+        });
+    });
+
+    cy.wait(1500);
+  }
+};
+
+// ========================
+// ENTERTAINMENT PARTNERSHIP (Robust)
+// ========================
+export const EntertainmentPartnership = (
+  platforms: Array<'Arcade' | 'TV Plus' | 'Youtube Premium'>,
+  entriesPerPlatform?: number
+): void => {
+  const entriesToAdd = entriesPerPlatform ?? getRandomNumberOfEntries();
+  cy.log(`🎲 Randomly selected to add ${entriesToAdd} entries per platform`);
+  
   cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
     .contains(/^Entertainment Partnership$/)
     .click({ force: true });
+  cy.wait(2000);
 
+  let partnerCustomerType = 'Post-paid';
+  
   cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
     .find('option:selected')
     .invoke('val')
     .then((selectedVal) => {
-      const rawVal = String(selectedVal);
-      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
-
-      let partnerCustomerType: string;
+      const label = String(selectedVal).includes(':') 
+        ? String(selectedVal).split(':')[1].trim() 
+        : String(selectedVal).trim();
+      
       if (label === 'Post-paid' || label === 'Hybrid-Post') {
         partnerCustomerType = 'Post-paid';
       } else if (label === 'Pre-paid') {
         partnerCustomerType = 'Pre-paid';
-      } else {
-        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
       }
-
-      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
-
-      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
-        .should('be.visible')
-        .within(() => {
-          platforms.forEach((platform) => {
-            const targetPlatform = platform === 'Youtube Premium' ? 'Google' : platform;
-
-            cy.get('button .glyphicon-plus').first().parent().click();
-
-            const cpOptions = ['Apple', 'GOOGLE IRELAND LIMITED'];
-            const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
-
-            cy.contains('label', 'CP Name')
-              .closest('.form-group')
-              .find('select[formcontrolname="cpName"]')
-              .select(randomCp);
-
-            cy.wait(2000);
-
-            cy.contains('label', 'Platform')
-              .closest('.form-group')
-              .find('select[formcontrolname="platform"]')
-              .select(targetPlatform);
-
-            cy.wait(2000);
-
-            cy.contains('h3', 'Partner App ID')
-              .closest('.panel')
-              .within(() => {
-                cy.get('button .glyphicon-plus').first().parent().click();
-
-                cy.contains('h3', 'Partner App ID Detail')
-                  .closest('.panel')
-                  .should('be.visible')
-                  .within(() => {
-                    cy.get('input[formcontrolname="partnerPackageName"]').clear().type('test');
-
-                    cy.get('select[formcontrolname="customerType"]')
-                      .should('be.visible')
-                      .find('option:not([disabled])')
-                      .then(($options) => {
-                        const options = $options.toArray() as HTMLOptionElement[];
-                        const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
-                        if (!matched) {
-                          throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
-                        }
-                        cy.get('select[formcontrolname="customerType"]')
-                          .select(matched.value.trim())
-                          .should('have.value', matched.value.trim());
-                        cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
-                      });
-
-                    cy.contains('button', /^Add$/).should('be.visible').click();
-                  });
-
-                cy.contains('h3', 'Partner App ID Detail')
-                  .closest('.panel')
-                  .should(($panel) => {
-                    const isHidden = $panel.attr('hidden') !== undefined ||
-                      $panel.css('display') === 'none' ||
-                      $panel.css('visibility') === 'hidden' ||
-                      !$panel.is(':visible');
-                    expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
-                  });
-              });
-
-            cy.wait(2000);
-
-            cy.get('button')
-              .filter(':visible')
-              .contains(/^Add$/)
-              .should('be.enabled')
-              .click({ force: true });
-          });
-        });
     });
-};
 
-// ========================
-// WIFI
-// ========================
+  cy.wait(500);
 
-export const WiFi = (): void => {
-  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
-    .contains(/^WiFi$/)
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.get('app-mass-mkt-wifi')
-    .find('.glyphicon-plus')
-    .closest('button')
-    .should('be.enabled')
-    .click();
-
-  // Wait for form to be fully rendered
-  cy.get('select[formcontrolname="wiFiUsageType"]').should('be.visible');
-
-  cy.get('select[formcontrolname="wiFiUsageType"]').then(($select) => {
-    const options = $select
-      .find('option:not([disabled])')
-      .toArray()
-      .map((el) => (el as HTMLOptionElement).value)
-      .filter((v) => v && v !== '0: null');
-
-    const randomUsage = Cypress._.sample(options)!;
-    cy.wrap($select).select(randomUsage);
-    cy.log(`Selected WiFi Usage Type: ${randomUsage}`);
-  });
-
-  cy.get('select[formcontrolname="wiFiQuotaType"]').then(($select) => {
-    const options = $select
-      .find('option:not([disabled])')
-      .toArray()
-      .map((el) => (el as HTMLOptionElement).value)
-      .filter((v) => v && v !== '0: null');
-
-    const randomQuota = Cypress._.sample(options)!;
-    cy.wrap($select).select(randomQuota);
-    cy.log(`Selected WiFi Quota Type: ${randomQuota}`);
-  });
-
-  // ✅ FIX: ใช้ Angular Material Select อย่างถูกต้อง
-  // 1. คลิกที่ mat-select trigger
-  cy.contains('label', '*WiFi :')
-    .closest('.form-group')
-    .find('mat-select')
-    .should('be.visible')
-    .click({ force: true }); // ใช้ force: true เพื่อข้าม validation blockers
-
-  // 2. รอให้ dropdown panel เปิดและ visible
-  cy.get('.mat-select-panel')
+  cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
     .should('be.visible')
     .within(() => {
-      // 3. หา mat-option ที่ไม่ disabled และคลิก
-      cy.get('mat-option')
-        .not('.mat-option-disabled')
-        .should('have.length.gt', 0)
-        .then(($options) => {
-          const randomIndex = Cypress._.random(0, $options.length - 1);
-          cy.wrap($options).eq(randomIndex).click();
-          cy.log(`Selected WiFi Option Index: ${randomIndex}`);
-        });
-    });
+      platforms.forEach((platform) => {
+        const targetPlatform = platform === 'Youtube Premium' ? 'Google' : platform;
 
-  // ✅ รอให้ form update และ validation ผ่าน
-  cy.get('mat-select').should('not.have.class', 'ng-invalid');
+        for (let i = 0; i < entriesToAdd; i++) {
+          cy.log(`📝 Adding ${platform} entry ${i + 1} of ${entriesToAdd}`);
 
-  // ✅ ซ่อน error message (ถ้ายังมีอยู่) ก่อนคลิก Add
-  cy.get('.alert-danger').should('not.exist');
-
-  cy.contains('button', /^Add$/)
-    .scrollIntoView()
-    .should('be.visible')
-    .and('be.enabled')
-    .click({ force: true });
-};
-// ========================
-// AI IP CAMERA
-// ========================
-
-export const AIIPCamera = (): void => {
-  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
-    .contains(/^AI IP Camera$/)
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.get('app-mass-mkt-ai-ip-camera .panel-body .btn-primary .glyphicon-plus')
-    .first()
-    .parent()
-    .should('be.enabled')
-    .click();
-
-  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
-    .find('option:selected')
-    .invoke('val')
-    .then((selectedVal) => {
-      const rawVal = String(selectedVal);
-      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
-
-      let partnerCustomerType: string;
-      if (label === 'Post-paid' || label === 'Hybrid-Post') {
-        partnerCustomerType = 'Post-paid';
-      } else if (label === 'Pre-paid') {
-        partnerCustomerType = 'Pre-paid';
-      } else {
-        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
-      }
-
-      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
-
-      cy.get('select[formcontrolname="cpName"]')
-        .should('be.visible')
-        .find('option')
-        .then(($options) => {
-          const validOptions = ($options.toArray() as HTMLOptionElement[]).filter(
-            (opt) => !opt.disabled && opt.value && opt.value !== 'null' && opt.value !== ''
-          );
-
-          if (validOptions.length === 0) {
-            throw new Error('No valid options found in CP Name dropdown');
+          if (i > 0 || platforms.indexOf(platform) > 0) {
+            cy.get('button .glyphicon-plus').first().parent().click({ force: true });
+            cy.wait(1000);
           }
 
-          const randomIndex = Math.floor(Math.random() * validOptions.length);
-          const randomValue = validOptions[randomIndex].value;
-
-          cy.get('select[formcontrolname="cpName"]').select(randomValue).should('have.value', randomValue);
-          cy.log(`Selected CP Name: ${randomValue}`);
-        });
-
-      cy.contains('.panel-heading', 'Partner App ID')
-        .closest('.panel')
-        .within(() => {
-          cy.get('.btn-xs .glyphicon-plus').last().should('be.visible').click();
-        });
-
-      cy.contains('.panel-heading', 'Partner App ID Detail')
-        .closest('.panel')
-        .should('be.visible')
-        .within(() => {
-          cy.get('select[formcontrolname="customerType"]')
-            .should('be.visible')
-            .find('option:not([disabled])')
-            .then(($options) => {
-              const options = $options.toArray() as HTMLOptionElement[];
-              const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
-              if (!matched) {
-                throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
-              }
-              cy.get('select[formcontrolname="customerType"]')
-                .select(matched.value.trim())
-                .should('have.value', matched.value.trim());
-              cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
-            });
-
-          cy.contains('button', /^Add$/).should('be.enabled').click();
-        });
-
-      cy.contains('.panel-heading', 'Partner App ID Detail')
-        .closest('.panel')
-        .should(($panel) => {
-          const isHidden = $panel.attr('hidden') !== undefined ||
-            $panel.css('display') === 'none' ||
-            $panel.css('visibility') === 'hidden' ||
-            !$panel.is(':visible');
-          expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
-        });
-
-      cy.get('app-mass-mkt-ai-ip-camera')
-        .within(() => {
-          cy.get('.row.ng-star-inserted')
-            .last()
-            .within(() => {
-              cy.contains('button', /^Add$/).should('be.enabled').click();
-            });
-        });
-    });
-};
-
-// ========================
-// KARAOKE
-// ========================
-
-export const Karaoke = (): void => {
-  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
-    .contains(/^Karaoke$/)
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
-    .first()
-    .parent()
-    .should('be.enabled')
-    .click();
-
-  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
-    .find('option:selected')
-    .invoke('val')
-    .then((selectedVal) => {
-      const rawVal = String(selectedVal);
-      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
-
-      let partnerCustomerType: string;
-      if (label === 'Post-paid' || label === 'Hybrid-Post') {
-        partnerCustomerType = 'Post-paid';
-      } else if (label === 'Pre-paid') {
-        partnerCustomerType = 'Pre-paid';
-      } else {
-        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
-      }
-
-      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
-
-      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
-        .should('be.visible')
-        .within(() => {
-          cy.get('select[formcontrolname="cpName"]')
-            .should('be.visible')
-            .select('Karaoke_Bundle_PLAYPremium')
-            .should('have.value', 'Karaoke_Bundle_PLAYPremium');
-
-          cy.log('Selected CP Name: Karaoke_Bundle_PLAYPremium');
-
-          const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
-          const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
-          const isAISPlayBox = randomPlatform === '3: AIS Play Box';
-
-          cy.get('select[formcontrolname="platform"]')
-            .should('be.visible')
-            .select(randomPlatform)
-            .should('have.value', randomPlatform);
-
-          cy.log(`Selected Platform: ${randomPlatform}`);
-
-          cy.wait(2000);
-
-          cy.contains('h3', 'Partner App ID')
-            .closest('.panel')
-            .within(() => {
-              cy.get('button .glyphicon-plus').first().parent().click();
-
-              cy.contains('h3', 'Partner App ID Detail')
-                .closest('.panel')
-                .should('be.visible')
-                .within(() => {
-                  cy.get('input[formcontrolname="partnerPackageName"]').should('be.visible').clear().type('test');
-
-                  cy.get('select[formcontrolname="customerType"]')
-                    .should('be.visible')
-                    .find('option:not([disabled])')
-                    .then(($options) => {
-                      const options = $options.toArray() as HTMLOptionElement[];
-                      const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
-                      if (!matched) {
-                        throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
-                      }
-                      cy.get('select[formcontrolname="customerType"]')
-                        .select(matched.value.trim())
-                        .should('have.value', matched.value.trim());
-                      cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
-                    });
-
-                  cy.contains('button', /^Add$/).should('be.visible').click();
-                });
-
-              cy.contains('h3', 'Partner App ID Detail')
-                .closest('.panel')
-                .should(($panel) => {
-                  const isHidden = $panel.attr('hidden') !== undefined ||
-                    $panel.css('display') === 'none' ||
-                    $panel.css('visibility') === 'hidden' ||
-                    !$panel.is(':visible');
-                  expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
-                });
-            });
-
-          cy.wait(2000);
-
-          if (isAISPlayBox) {
-            cy.contains('h3', 'Vimmi Product')
-              .closest('.panel')
-              .within(() => {
-                cy.get('button .glyphicon-plus').first().parent().click();
-
-                cy.contains('h4', 'Vimmi Product Detail')
-                  .closest('.panel')
-                  .should('be.visible')
-                  .within(() => {
-                    cy.get('input[formcontrolname="vimmiProductNameText"]').should('be.visible').clear().type('test');
-
-                    const random19Digits = Array.from({ length: 19 }, () => Math.floor(Math.random() * 10)).join('');
-                    cy.log(`Random Vimmi Product ID: ${random19Digits}`);
-
-                    cy.get('input[formcontrolname="vimmiProductId"]').should('be.visible').clear().type(random19Digits);
-
-                    cy.contains('button', /^Add$/).should('be.visible').click();
-                  });
-              });
-
-            cy.wait(2000);
+          // CP Name
+          let cpOptions: string[];
+          if (platform === 'Arcade') {
+            cpOptions = ['Apple', 'GOOGLE IRELAND LIMITED'];
+          } else if (platform === 'TV Plus') {
+            cpOptions = ['Apple', 'GOOGLE IRELAND LIMITED'];
+          } else {
+            cpOptions = ['GOOGLE IRELAND LIMITED'];
           }
-
-          cy.get('button')
-            .filter(':visible')
-            .contains(/^Add$/)
-            .should('be.enabled')
-            .click();
-        });
-    });
-};
-
-// ========================
-// MUSIC STREAMING
-// ========================
-
-export const MusicStreaming = (): void => {
-  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
-    .contains(/^Music Streaming$/)
-    .should('be.visible')
-    .click({ force: true });
-
-  cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
-    .first()
-    .parent()
-    .should('be.enabled')
-    .click();
-
-  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
-    .find('option:selected')
-    .invoke('val')
-    .then((selectedVal) => {
-      const rawVal = String(selectedVal);
-      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
-
-      let partnerCustomerType: string;
-      if (label === 'Post-paid' || label === 'Hybrid-Post') {
-        partnerCustomerType = 'Post-paid';
-      } else if (label === 'Pre-paid') {
-        partnerCustomerType = 'Pre-paid';
-      } else {
-        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
-      }
-
-      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
-
-      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
-        .should('be.visible')
-        .within(() => {
-          const cpOptions = ['GMM Plern', 'jooxvip', 'Apple'];
           const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
 
-          cy.get('select[formcontrolname="cpName"]')
-            .should('be.visible')
-            .find('option:not([disabled])')
-            .then(($options) => {
-              const options = $options.toArray() as HTMLOptionElement[];
-              const matched = options.find((opt) => opt.text.trim().includes(randomCp));
-              if (!matched) {
-                throw new Error(`No option matched "${randomCp}" in CP Name dropdown`);
-              }
-              cy.get('select[formcontrolname="cpName"]').select(matched.value.trim()).should('have.value', matched.value.trim());
-              cy.log(`Selected CP Name: ${matched.value.trim()}`);
-            });
+          cy.contains('label', 'CP Name')
+            .closest('.form-group')
+            .find('select[formcontrolname="cpName"]')
+            .last()
+            .select(randomCp, { force: true });
 
-          cy.wait(2000);
+          cy.wait(500);
 
-          const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
-          const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+          // Platform
+          cy.contains('label', 'Platform')
+            .closest('.form-group')
+            .find('select[formcontrolname="platform"]')
+            .last()
+            .select(targetPlatform, { force: true });
 
-          cy.get('select[formcontrolname="platform"]')
-            .should('be.visible')
-            .select(randomPlatform)
-            .should('have.value', randomPlatform);
+          cy.wait(500);
 
-          cy.log(`Selected Platform: ${randomPlatform}`);
-
-          cy.wait(2000);
-
+          // Partner App ID
           cy.contains('h3', 'Partner App ID')
             .closest('.panel')
+            .last()
             .within(() => {
-              cy.get('button .glyphicon-plus').first().parent().click();
+              cy.get('button .glyphicon-plus').first().parent().click({ force: true });
 
               cy.contains('h3', 'Partner App ID Detail')
                 .closest('.panel')
-                .should('be.visible')
                 .within(() => {
-                  cy.get('input[formcontrolname="partnerPackageName"]').should('be.visible').clear().type('test');
-
-                  cy.get('select[formcontrolname="customerType"]')
-                    .should('be.visible')
-                    .find('option:not([disabled])')
-                    .then(($options) => {
-                      const options = $options.toArray() as HTMLOptionElement[];
-                      const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
-                      if (!matched) {
-                        throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
-                      }
-                      cy.get('select[formcontrolname="customerType"]')
-                        .select(matched.value.trim())
-                        .should('have.value', matched.value.trim());
-                      cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
-                    });
-
-                  cy.contains('button', /^Add$/).should('be.visible').click();
-                });
-
-              cy.contains('h3', 'Partner App ID Detail')
-                .closest('.panel')
-                .should(($panel) => {
-                  const isHidden = $panel.attr('hidden') !== undefined ||
-                    $panel.css('display') === 'none' ||
-                    $panel.css('visibility') === 'hidden' ||
-                    !$panel.is(':visible');
-                  expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                  cy.get('input[formcontrolname="partnerPackageName"]').clear({ force: true }).type('test', { force: true });
+                  cy.get('select[formcontrolname="customerType"]').select(partnerCustomerType, { force: true });
+                  cy.contains('button', /^Add$/).click({ force: true });
                 });
             });
 
-          cy.wait(2000);
+          cy.wait(500);
 
-          cy.get('button')
-            .filter(':visible')
-            .contains(/^Add$/)
-            .should('be.enabled')
-            .click();
+          // Main Add button
+          cy.contains('button', /^Add$/).last().click({ force: true });
+
+          cy.wait(1000);
+        }
+      });
+    });
+};
+// ============ Constants ============
+const INTERNET_SPEEDS = [
+  '4Gbps/4Gbps', '3Gbps/3Gbps', 'Max Speed (5G 2Gbps/2Gbps)',
+  'Max Speed (5G Default 1Gbps/1Gbps)', '1000 Mbps', '450 Mbps',
+  '300 Mbps', '150 Mbps', '100 Mbps', '50 Mbps', '42 Mbps',
+  '40 Mbps', '30 Mbps', '21 Mbps', '20 Mbps', '15 Mbps',
+  '12 Mbps', '11 Mbps', '10 Mbps', '8 Mbps', '7.2 Mbps',
+  '6 Mbps', '5 Mbps', '4 Mbps', '3 Mbps', '2 Mbps', '1 Mbps',
+  '512 Kbps', '384 Kbps', '256 Kbps', '128 Kbps', '64 Kbps',
+  '10 Kbps', '0 Kbps'
+] as const;
+
+const THROTTLING_SPEEDS = [
+  '150 Mbps', '100 Mbps', '50 Mbps', '42 Mbps', '40 Mbps',
+  '30 Mbps', '21 Mbps', '20 Mbps', '15 Mbps', '12 Mbps',
+  '11 Mbps', '10 Mbps', '8 Mbps', '7.2 Mbps', '6 Mbps',
+  '5 Mbps', '4 Mbps', '3 Mbps', '2 Mbps', '1 Mbps',
+  '512 Kbps', '384 Kbps', '256 Kbps', '128 Kbps', '64 Kbps',
+  '10 Kbps', '0 Kbps'
+] as const;
+
+type InternetQuotaType = 
+  | 'Limited Data (Pay per use)'
+  | 'Limited Data (Stop Net)'
+  | 'Limited Data Only'
+  | 'Pay per use only'
+  | 'Unlimited Data (Fixed Speed)'
+  | 'Unlimited Data (Throttling Speed)';
+
+// ============ Core Utility Functions ============
+const selectDropdownOption = <T extends string>(
+  selector: string,
+  options: readonly T[],
+  config: {
+    exact?: boolean;
+    maxRetries?: number;
+    skipFirst?: boolean;
+    logPrefix?: string;
+  } = {}
+): void => {
+  const { exact = true, maxRetries = 3, skipFirst = true, logPrefix = '' } = config;
+  let attempts = 0;
+
+  const attemptSelection = (): void => {
+    cy.get(selector)
+      .filter(':visible')
+      .then($select => {
+        const $options = $select.find('option:not([disabled])');
+        const availableOptions = [...$options].filter((_, i) => !skipFirst || i > 0);
+        
+        const matchedOptions = availableOptions.filter(opt => {
+          const text = (opt as HTMLOptionElement).text.trim();
+          return exact 
+            ? options.includes(text as T)
+            : options.some(allowed => text.toLowerCase().includes(allowed.toLowerCase()));
         });
+
+        if (matchedOptions.length > 0) {
+          const randomOpt = matchedOptions[Math.floor(Math.random() * matchedOptions.length)] as HTMLOptionElement;
+          cy.wrap($select).select(randomOpt.value);
+          cy.wait(2000);
+          cy.log(`✅ ${logPrefix}Selected: ${randomOpt.text}`);
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxRetries) {
+          cy.log(`⚠️ ${logPrefix}No match, retry ${attempts}/${maxRetries}`);
+          cy.wait(1000);
+          attemptSelection();
+          return;
+        }
+
+        // Fallback
+        cy.log(`❌ ${logPrefix}Failed after ${maxRetries} attempts, using fallback`);
+        if (availableOptions.length > 0) {
+          const fallback = availableOptions[Math.floor(Math.random() * availableOptions.length)] as HTMLOptionElement;
+          cy.wrap($select).select(fallback.value);
+          cy.wait(2000);
+          cy.log(`⚠️ ${logPrefix}Fallback: ${fallback.text}`);
+        }
+      });
+  };
+
+  attemptSelection();
+};
+
+const selectMatOption = (
+  labelSelector: string,
+  optionFilter?: (text: string) => boolean
+): void => {
+  cy.contains('label', labelSelector)
+    .filter(':visible')
+    .closest('.row')
+    .find('mat-select .mat-select-trigger')
+    .click({ force: true });
+
+  cy.get('.cdk-overlay-pane mat-option', { timeout: 10000 })
+    .should('be.visible')
+    .then($options => {
+      const targetOptions = optionFilter 
+        ? $options.filter((_, opt) => optionFilter(Cypress.$(opt).text().trim()))
+        : $options;
+
+      if (targetOptions.length > 0) {
+        const randomOpt = targetOptions[Math.floor(Math.random() * targetOptions.length)];
+        cy.wrap(randomOpt).click({ force: true });
+      } else if ($options.length > 0) {
+        cy.wrap($options[0]).click({ force: true });
+      } else {
+        cy.get('.cdk-overlay-backdrop').click({ force: true });
+      }
+      cy.wait(2000);
     });
 };
 
-// ========================
-// VRBT
-// ========================
+const selectMatOptionWithValidation = (
+  labelSelector: string,
+  optionFilter?: (text: string) => boolean
+): void => {
+  cy.contains('label', labelSelector)
+    .closest('.row')
+    .find('mat-select')
+    .should('not.have.class', 'mat-select-disabled')
+    .click();
 
-export const VRBT = (): void => {
-  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
-    .contains(/^VRBT$/)
-    .should('be.visible')
-    .click({ force: true });
+  cy.get('.cdk-overlay-pane mat-option:not(.mat-option-disabled)', { timeout: 10000 })
+    .should('have.length.greaterThan', 0)
+    .then($options => {
+      const targetOptions = optionFilter 
+        ? $options.filter((_, opt) => optionFilter(Cypress.$(opt).text().trim()))
+        : $options;
 
-  cy.get('app-mass-mkt-vrbt')
-    .find('button.btn-primary')
-    .find('.glyphicon-plus')
-    .parent('button')
-    .should('be.enabled')
-    .click({ force: true });
+      if (targetOptions.length > 0) {
+        const randomOpt = targetOptions[Math.floor(Math.random() * targetOptions.length)];
+        cy.wrap(randomOpt).click({ force: true });
+      } else {
+        cy.wrap($options.first()).click({ force: true });
+      }
+    });
 
   cy.wait(2000);
 
-  cy.get('app-mass-mkt-vrbt', { timeout: 15000 })
-    .should('be.visible')
-    .within(() => {
-      cy.get('.panel')
-        .contains('h3', 'VRBT Detail')
-        .closest('.panel')
-        .should('not.have.attr', 'hidden')
-        .within(() => {
-          cy.get('select[formcontrolname="productName"]')
-            .should('be.visible')
-            .find('option:not([disabled])')
-            .then(($options) => {
-              const options = $options.toArray() as HTMLOptionElement[];
-              const matched = options.find((opt) => opt.text.trim() === 'Platform Calling VDO');
-              if (!matched) {
-                throw new Error('No option matched "Platform Calling VDO" in Product Name dropdown');
-              }
-              cy.get('select[formcontrolname="productName"]').select(matched.value.trim()).should('have.value', matched.value.trim());
-              cy.log(`Selected Product Name: ${matched.value.trim()}`);
-            });
-          cy.wait(2000);
-
-          cy.get('ng2-dual-list-box[formcontrolname="partnerSku"]')
-            .within(() => {
-              cy.get('select[formcontrolname="availableListBox"]')
-                .find('option')
-                .then(($options) => {
-                  const options = $options.toArray() as HTMLOptionElement[];
-                  if (options.length === 0) {
-                    throw new Error('No available options in Partner SKU list');
-                  }
-                  const randomIndex = Math.floor(Math.random() * options.length);
-                  const randomValue = options[randomIndex].value;
-                  cy.log(`Selected Partner SKU: ${options[randomIndex].text.trim()}`);
-                  cy.get('select[formcontrolname="availableListBox"]').select(randomValue);
-                  cy.wait(300);
-                  cy.get('button.str').click();
-                });
-            });
-          cy.wait(300);
-
-          cy.contains('button', /^Add$/).should('be.visible').should('be.enabled').click();
-        });
-    });
+  cy.contains('label', labelSelector)
+    .closest('.row')
+    .find('.mat-select-value-text, .mat-select-value')
+    .should('not.contain', 'Please Select');
 };
 
-// ========================
-// INTERNET RANDOM
-// ========================
-export const InternetRandom = (ProductClass: string, subModule?: string, Module?: string) => {
+const isPreModule = (productClass: string, subModule?: string): boolean => 
+  productClass === 'main' && subModule?.toLowerCase() === 'pre';
 
+// ============ Internet Quota Type Handlers ============
+const handleLimitedData = (productClass: string, subModule?: string) => {
+  selectMatOption('*Internet Quota :', text => text.startsWith('5G'));
+  selectDropdownOption('select[formcontrolname="internetSpeed"]', INTERNET_SPEEDS, { exact: true, logPrefix: '[Speed] ' });
+  if (productClass === 'main') {
+    selectMatOptionWithValidation('*Internet Exceed Rate :');
+  }
+};
+
+const handleLimitedDataOnly = (productClass: string, subModule?: string, Module?: string) => {
+  cy.log(`🔵 Case: Limited Data Only | ProductClass: ${productClass} | subModule: ${subModule}| Module: ${Module}`);
+  selectMatOption('*Internet Quota :', text => text.startsWith('5G'));
+  selectDropdownOption('select[formcontrolname="internetSpeed"]', INTERNET_SPEEDS, { exact: true, logPrefix: '[Speed] ' });
+  if (isPreModule(productClass, subModule)) {
+    cy.log('✅ Condition met → calling selectInternetExceedRate()');
+    selectMatOptionWithValidation('*Internet Exceed Rate :');
+  }
+};
+
+const handlePayPerUse = () => {
+  selectMatOptionWithValidation('*Internet Exceed Rate :');
+};
+
+const handleUnlimitedFixedSpeed = (productClass: string, subModule?: string) => {
+  const checkboxSelector = '[formarrayname="internetQuotaNetworkCoverageCheckBox"]';
+  
+  cy.get(checkboxSelector)
+    .filter(':visible')
+    .then($container => {
+      const $5gLabel = $container.find('label').filter((_, el) => 
+        Cypress.$(el).text().trim().includes('5G')
+      );
+      
+      if ($5gLabel.length > 0) {
+        cy.wrap($5gLabel).click({ force: true });
+        cy.wait(300);
+      }
+      
+      const logPrefix = $5gLabel.length > 0 ? '[5G] ' : '[Non-5G] ';
+      selectDropdownOption(
+        'select[formcontrolname="fixedSpeedInternetSpeed"]', 
+        INTERNET_SPEEDS, 
+        { exact: false, logPrefix }
+      );
+    });
+
+  if (isPreModule(productClass, subModule)) {
+    selectMatOptionWithValidation('*Internet Exceed Rate :');
+  }
+};
+
+const handleUnlimitedThrottling = (productClass: string, subModule?: string) => {
+  selectMatOption('*Internet Quota :', text => text.startsWith('5G'));
+  selectDropdownOption('select[formcontrolname="internetSpeed"]', INTERNET_SPEEDS, { exact: true, logPrefix: '[Speed] ' });
+  selectDropdownOption('select[formcontrolname="internetThrottlingSpeed"]', THROTTLING_SPEEDS, { exact: true, logPrefix: '[Throttling] ' });
+  
+  if (isPreModule(productClass, subModule)) {
+    selectMatOptionWithValidation('*Internet Exceed Rate :');
+  }
+};
+
+// ============ Main Export Function ============
+export const InternetRandom = (ProductClass: string, subModule?: string, Module?: string) => {
+  // Navigate and open form
   cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
   cy.scrollTo('bottom');
   cy.get('app-mass-mkt-internet button.btn-xs').find('.glyphicon-plus').filter(':visible').first().click();
 
-  const allowedOptions = [
-    // 'Limited Data (Pay per use)',
-    // 'Limited Data (Stop Net)',
-    // 'Limited Data Only',
+  // สุ่มจากทุก options ที่มี
+  const allowedOptions: InternetQuotaType[] = [
+    'Limited Data (Pay per use)',
+    'Limited Data (Stop Net)',
+    'Limited Data Only',
     'Pay per use only',
-    // 'Unlimited Data (Fixed Speed)',
-    // 'Unlimited Data (Throttling Speed)'
+    'Unlimited Data (Fixed Speed)',
+    'Unlimited Data (Throttling Speed)'
   ];
 
+  // Select quota type
   cy.get('app-mass-mkt-internet select[formcontrolname="InternetQuotaType"]')
     .filter(':visible')
     .last()
@@ -3384,75 +3597,33 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
       cy.wrap($select).find('option').then($options => {
         const availableOptions = [...$options]
           .map(opt => (opt as HTMLOptionElement).text.trim())
-          .filter(text => allowedOptions.includes(text));
+          .filter(text => allowedOptions.includes(text as InternetQuotaType));
 
-        const selectedValue = availableOptions[Math.floor(Math.random() * availableOptions.length)];
-        cy.wrap($select).select(selectedValue);
-        cy.wait(2000);
-
-        switch (selectedValue) {
-          case 'Limited Data (Pay per use)':
-          case 'Limited Data (Stop Net)':
-            selectRandomInternetQuota();
-            selectNativeDropdown('internetSpeed');
-
-            if (ProductClass === 'main') {
-              selectInternetExceedRate();
-            }
-            break;
-
-          case 'Limited Data Only':
-            cy.log(`🔵 Case: Limited Data Only | ProductClass: ${ProductClass} | subModule: ${subModule}| Module: ${Module}`);
-
-            selectRandomInternetQuota();
-            selectNativeDropdown('internetSpeed');
-            if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
-              cy.log('✅ Condition met → calling selectInternetExceedRate()');
-              selectInternetExceedRate();
-            }
-            break;
-
-          case 'Pay per use only':
-            selectInternetExceedRate();
-            break;
-
-          case 'Unlimited Data (Fixed Speed)':
-            const networkCoverageCheckbox = '[formarrayname="internetQuotaNetworkCoverageCheckBox"]';
-
-            cy.get(networkCoverageCheckbox)
-              .filter(':visible')
-              .then(($container) => {
-                const $5gLabel = $container.find('label').filter((_, el) =>
-                  Cypress.$(el).text().trim().includes('5G')
-                );
-
-                const has5G = $5gLabel.length > 0;
-
-                if (has5G) {
-                  cy.wrap($5gLabel).click({ force: true });
-                  cy.wait(300);
-                  selectAllFixedSpeeds(); // เปลี่ยนจาก selectFixedSpeedWith5G() เป็นเลือกทุกค่า
-                } else {
-                  selectAllFixedSpeeds(); // เปลี่ยนจาก selectFixedSpeedWithout5G() เป็นเลือกทุกค่า
-                }
-              });
-            if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
-              selectInternetExceedRate();
-            }
-            break;
-
-          case 'Unlimited Data (Throttling Speed)':
-            selectRandomInternetQuota();
-            selectSpecificInternetSpeed();
-            selectThrottlingSpeed();
-            if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
-              selectInternetExceedRate();
-            }
-            break;
+        if (availableOptions.length === 0) {
+          cy.log('❌ No allowed quota types available');
+          return;
         }
+
+        const selectedType = availableOptions[Math.floor(Math.random() * availableOptions.length)] as InternetQuotaType;
+        cy.wrap($select).select(selectedType);
+        cy.wait(2000);
+        cy.log(`📌 Selected Quota Type: ${selectedType}`);
+
+        // Route to appropriate handler
+        const handlers: Record<InternetQuotaType, () => void> = {
+          'Limited Data (Pay per use)': () => handleLimitedData(ProductClass, subModule),
+          'Limited Data (Stop Net)': () => handleLimitedData(ProductClass, subModule),
+          'Limited Data Only': () => handleLimitedDataOnly(ProductClass, subModule, Module),
+          'Pay per use only': handlePayPerUse,
+          'Unlimited Data (Fixed Speed)': () => handleUnlimitedFixedSpeed(ProductClass, subModule),
+          'Unlimited Data (Throttling Speed)': () => handleUnlimitedThrottling(ProductClass, subModule),
+        };
+
+        handlers[selectedType]?.();
       });
     });
 
+  // Submit form
   cy.get('app-mass-mkt-internet button.btn-primary')
     .filter(':visible')
     .each(($btn) => {
@@ -3463,123 +3634,29 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
     });
 };
 
+// ============ Legacy Functions (Kept for backward compatibility) ============
 const selectSpecificInternetSpeed = () => {
-  cy.get('select[formcontrolname="internetSpeed"]', { timeout: 10000 })
-    .should('be.visible')
-    .then(($select) => {
-      // Get all enabled options (excluding the disabled placeholder)
-      const $options = $select.find('option:not([disabled])');
-
-      if ($options.length > 0) {
-        // Loop through each option and select it
-        $options.each((index, option) => {
-          const value = (option as HTMLOptionElement).value;
-          const text = (option as HTMLOptionElement).text.trim();
-
-          cy.wrap($select).select(value);
-          cy.wait(2000);
-          cy.log(`Selected Speed ${index + 1}/${$options.length}: ${text}`);
-        });
-      } else {
-        cy.log('No internet speed options found');
-      }
-    });
+  selectDropdownOption('select[formcontrolname="internetSpeed"]', INTERNET_SPEEDS, { exact: true });
 };
 
 const selectRandomInternetQuota = () => {
-  cy.contains('label', '*Internet Quota :')
-    .filter(':visible')
-    .closest('.row')
-    .find('mat-select .mat-select-trigger')
-    .click({ force: true });
-
-  cy.get('.cdk-overlay-pane mat-option', { timeout: 10000 })
-    .should('be.visible')
-    .then(($options) => {
-      const targetOptions = $options.filter((index, option) =>
-        Cypress.$(option).text().trim().startsWith('5G')
-      );
-      if (targetOptions.length > 0) {
-        const randomIndex = Math.floor(Math.random() * targetOptions.length);
-        cy.wrap(targetOptions[randomIndex]).click({ force: true });
-        cy.wait(2000);
-      } else {
-        if ($options.length > 0) {
-          cy.wrap($options[0]).click({ force: true });
-          cy.wait(2000);
-        } else {
-          cy.get('.cdk-overlay-backdrop').click({ force: true });
-        }
-      }
-    });
+  selectMatOption('*Internet Quota :', text => text.startsWith('5G'));
 };
 
 const selectInternetExceedRate = () => {
-  cy.contains('label', '*Internet Exceed Rate :')
-    .closest('.row')
-    .find('mat-select')
-    .should('not.have.class', 'mat-select-disabled')
-    .click();
-
-  cy.get('.cdk-overlay-pane mat-option:not(.mat-option-disabled)', {
-    timeout: 10000,
-  })
-    .should('have.length.greaterThan', 0)
-    .first()
-    .click();
-
-  cy.wait(2000);
-
-  cy.contains('label', '*Internet Exceed Rate :')
-    .closest('.row')
-    .find('.mat-select-value-text, .mat-select-value')
-    .should('not.contain', 'Please Select');
+  selectMatOptionWithValidation('*Internet Exceed Rate :');
 };
 
 const selectThrottlingSpeed = () => {
-  cy.get('select[formcontrolname="internetThrottlingSpeed"]', { timeout: 10000 })
-    .should('be.visible')
-    .then(($select) => {
-      // Get all enabled options (excluding the disabled placeholder)
-      const $options = $select.find('option:not([disabled])');
-
-      if ($options.length > 0) {
-        // Loop through each option and select it
-        $options.each((index, option) => {
-          const value = (option as HTMLOptionElement).value;
-          const text = (option as HTMLOptionElement).text.trim();
-
-          cy.wrap($select).select(value);
-          cy.wait(2000);
-          cy.log(`Selected Throttling Speed ${index + 1}/${$options.length}: ${text}`);
-        });
-      } else {
-        cy.log('No throttling speed options found');
-      }
-    });
+  selectDropdownOption('select[formcontrolname="internetThrottlingSpeed"]', THROTTLING_SPEEDS, { exact: true });
 };
 
-const selectAllFixedSpeeds = () => {
-  cy.get('select[formcontrolname="fixedSpeedInternetSpeed"]', { timeout: 10000 })
-    .should('be.visible')
-    .then(($select) => {
-      // Get all enabled options (excluding the disabled placeholder)
-      const $options = $select.find('option:not([disabled])');
+const selectFixedSpeedWith5G = () => {
+  selectDropdownOption('select[formcontrolname="fixedSpeedInternetSpeed"]', INTERNET_SPEEDS, { exact: false, logPrefix: '[5G] ' });
+};
 
-      if ($options.length > 0) {
-        // Loop through each option and select it
-        $options.each((index, option) => {
-          const value = (option as HTMLOptionElement).value;
-          const text = (option as HTMLOptionElement).text.trim();
-
-          cy.wrap($select).select(value);
-          cy.wait(2000);
-          cy.log(`Selected Fixed Speed ${index + 1}/${$options.length}: ${text}`);
-        });
-      } else {
-        cy.log('No fixed speed options found');
-      }
-    });
+const selectFixedSpeedWithout5G = () => {
+  selectDropdownOption('select[formcontrolname="fixedSpeedInternetSpeed"]', INTERNET_SPEEDS, { exact: false, logPrefix: '[Non-5G] ' });
 };
 
 const selectNativeDropdown = (formControlName: string) => {
@@ -3595,9 +3672,8 @@ const selectNativeDropdown = (formControlName: string) => {
       }
     });
 };
-
 // ========================
-// CHECK AND FILL CONTENT TYPE (ASYNC HELPERS)
+// CHECK AND FILL CONTENT TYPE 
 // ========================
 
 function checkAndFillContentType(): void {
