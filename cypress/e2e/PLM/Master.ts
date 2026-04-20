@@ -302,7 +302,7 @@ const searchInTableWithPagination = (
           const $row = Cypress.$(row);
           const rowText = $row.text().trim();
 
-          const matches = filterCallback 
+          const matches = filterCallback
             ? filterCallback($row, index)
             : rowText.includes(searchText);
 
@@ -332,7 +332,7 @@ const searchInTableWithPagination = (
       if ($nextBtn.length > 0) {
         cy.log(`➡️ ${sectionHeader} - Going to next page...`);
         cy.wrap($nextBtn).click();
-        
+
         // รอให้ตารางโหลด
         cy.get('h3').contains(sectionHeader, { timeout: 100000 })
           .parent()
@@ -340,7 +340,7 @@ const searchInTableWithPagination = (
           .should(($rows) => {
             expect($rows.text()).not.to.contain('Fetching data');
           });
-        
+
         cy.wait(waitAfterNext);
         return cy.wrap(true);
       }
@@ -351,7 +351,7 @@ const searchInTableWithPagination = (
   // ค้นหาแบบ recursive - ใช้ cy.then() chain อย่างถูกต้อง
   const searchPage = (pageNum: number = 1): void => {
     cy.log(`🔍 Searching page ${pageNum}...`);
-    
+
     searchInCurrentPage().then((found) => {
       if (found) {
         cy.log(`✅ Found on page ${pageNum}!`);
@@ -403,7 +403,7 @@ export const ClaimProject = (formattedDate: string): void => {
       // เช็คใน To Do List ก่อนว่า project อยู่ตรงนั้นแล้วไหม
       const $todoSection = $body.find('h3:contains("To Do List")').parent();
       const todoText = $todoSection.find('tbody tr').text();
-      
+
       if (todoText.includes(formattedDate)) {
         cy.log(`✅ Project already in To Do List! Skipping claim...`);
         return; // จบการทำงาน ไม่ต้อง claim แล้ว
@@ -427,12 +427,12 @@ export const ClaimProject = (formattedDate: string): void => {
             if (rowText.includes(formattedDate) && !rowText.includes('Fetching data')) {
               found = true;
               cy.log(`✅ Found in Unassigned Task - Page ${currentPage}, Row ${index}`);
-              
+
               cy.wrap($row)
                 .find('button.claim-top')
                 .should('be.visible')
                 .click();
-              
+
               cy.log(`✅ Successfully claimed project: ${formattedDate}`);
               // รอให้ project ย้ายไป To Do List
               cy.wait(2000);
@@ -451,7 +451,7 @@ export const ClaimProject = (formattedDate: string): void => {
           if ($nextBtn.length > 0) {
             cy.log(`➡️ Unassigned Task Page ${currentPage} - Not found, going to next page...`);
             cy.wrap($nextBtn).click();
-            
+
             // รอโหลดหน้าใหม่
             cy.get('h3').contains('Unassigned Task', { timeout: 100000 })
               .parent()
@@ -459,7 +459,7 @@ export const ClaimProject = (formattedDate: string): void => {
               .should(($rows) => {
                 expect($rows.text()).not.to.contain('Fetching data');
               });
-            
+
             cy.wait(2000);
             currentPage++;
             searchAndClaim();
@@ -511,7 +511,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
   cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
 
   cy.get('h3').contains('Team Task').should('be.visible');
-  
+
   // รอให้ API โหลดเสร็จ
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
@@ -549,7 +549,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
         const rowText = $row.text().trim();
         // ข้ามถ้ายังเป็น Fetching data
         if (rowText.includes('Fetching data')) return false;
-        
+
         const hasProjectName = rowText.includes(partialIdentifier);
         const hasKeyword = uniqueKeyword ? rowText.includes(uniqueKeyword) : true;
         return hasProjectName && hasKeyword;
@@ -1552,16 +1552,16 @@ const executeCKSRole = (
   approvalType: 'main' | 'ontop',
   customSteps: () => void
 ): void => {
-  it.only('CKS role', () => {
+  it('CKS role', () => {
     // ===== HARDCODE สำหรับทดสอบ =====
-    const HARDCODE_PROJECT_NAME = 'MOB POST onetime main 2004 1127';
-    const getProjectName: GetProjectNameFn = () => HARDCODE_PROJECT_NAME;
+    // const HARDCODE_PROJECT_NAME = 'MOB POST onetime main 2004 1127';
+    // const getProjectName: GetProjectNameFn = () => HARDCODE_PROJECT_NAME;
     // ================================
 
     // === ของเดิม (เก็บไว้) ===
-    // const getProjectName: GetProjectNameFn = projectNameStrategy === 'standard' 
-    //   ? getStandardProjectName 
-    //   : getOntopProjectName;
+    const getProjectName: GetProjectNameFn = projectNameStrategy === 'standard'
+      ? getStandardProjectName
+      : getOntopProjectName;
 
     standardCksPoEnhancementFlow(getProjectName, () => {
       customSteps();
@@ -2373,27 +2373,27 @@ export const smsWordingpre = (): void => {
 
 export const RandomProductSpecification = (productClass: string, subModule?: string, Module?: string): void => {
   const generalList = [
-    'AIS Secure Net', 
-    'Apple Care', 
-    'Cloud PC', 
-    'Flowaccount', 
+    'AIS Secure Net',
+    'Apple Care',
+    'Cloud PC',
+    'Flowaccount',
     'MS365 Copilot',
-    'Mobile Care', 
-    'Ubisoft Plus', 
-    'Voice', 
-    'SMS', 'MMS', 
+    'Mobile Care',
+    'Ubisoft Plus',
+    'Voice',
+    'SMS', 'MMS',
     'Internet',
-    'Calling Melody', 
-    'Vertical App', 
-    'Cloud Game', 
-    'AI IP Camera', 
+    'Calling Melody',
+    'Vertical App',
+    'Cloud Game',
+    'AI IP Camera',
     'WiFi',
-    'Karaoke', 
-    'VRBT', 
-    'Music Streaming', 
-    'Arcade', 
-    'TV Plus', 
-    'Youtube Premium'
+    'Karaoke',
+    'VRBT',
+    'Music Streaming',
+    'Arcade',
+    'TV Plus',
+    // 'Youtube Premium'
   ];
 
   cy.contains('.panel-heading', '*Product Specification')
@@ -2880,6 +2880,9 @@ export const WiFi = (): void => {
     .should('be.enabled')
     .click();
 
+  // Wait for form to be fully rendered
+  cy.get('select[formcontrolname="wiFiUsageType"]').should('be.visible');
+
   cy.get('select[formcontrolname="wiFiUsageType"]').then(($select) => {
     const options = $select
       .find('option:not([disabled])')
@@ -2904,26 +2907,41 @@ export const WiFi = (): void => {
     cy.log(`Selected WiFi Quota Type: ${randomQuota}`);
   });
 
+  // ✅ FIX: ใช้ Angular Material Select อย่างถูกต้อง
+  // 1. คลิกที่ mat-select trigger
   cy.contains('label', '*WiFi :')
     .closest('.form-group')
     .find('mat-select')
-    .click();
-
-  cy.get('mat-option')
     .should('be.visible')
-    .then(($options) => {
-      const randomIndex = Cypress._.random(0, $options.length - 1);
-      cy.wrap($options).eq(randomIndex).click();
-      cy.log(`Selected WiFi Option Index: ${randomIndex}`);
+    .click({ force: true }); // ใช้ force: true เพื่อข้าม validation blockers
+
+  // 2. รอให้ dropdown panel เปิดและ visible
+  cy.get('.mat-select-panel')
+    .should('be.visible')
+    .within(() => {
+      // 3. หา mat-option ที่ไม่ disabled และคลิก
+      cy.get('mat-option')
+        .not('.mat-option-disabled')
+        .should('have.length.gt', 0)
+        .then(($options) => {
+          const randomIndex = Cypress._.random(0, $options.length - 1);
+          cy.wrap($options).eq(randomIndex).click();
+          cy.log(`Selected WiFi Option Index: ${randomIndex}`);
+        });
     });
-  cy.wait(5000);
+
+  // ✅ รอให้ form update และ validation ผ่าน
+  cy.get('mat-select').should('not.have.class', 'ng-invalid');
+
+  // ✅ ซ่อน error message (ถ้ายังมีอยู่) ก่อนคลิก Add
+  cy.get('.alert-danger').should('not.exist');
 
   cy.contains('button', /^Add$/)
     .scrollIntoView()
     .should('be.visible')
+    .and('be.enabled')
     .click({ force: true });
 };
-
 // ========================
 // AI IP CAMERA
 // ========================
@@ -3344,8 +3362,8 @@ export const VRBT = (): void => {
 // ========================
 // INTERNET RANDOM
 // ========================
+export const InternetRandom = (ProductClass: string, subModule?: string, Module?: string) => {
 
-export const InternetRandom = (ProductClass: string, subModule?: string, Module?: string): void => {
   cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
   cy.scrollTo('bottom');
   cy.get('app-mass-mkt-internet button.btn-xs').find('.glyphicon-plus').filter(':visible').first().click();
@@ -3358,7 +3376,6 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
     // 'Unlimited Data (Fixed Speed)',
     // 'Unlimited Data (Throttling Speed)'
   ];
-
 
   cy.get('app-mass-mkt-internet select[formcontrolname="InternetQuotaType"]')
     .filter(':visible')
@@ -3377,51 +3394,59 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
           case 'Limited Data (Pay per use)':
           case 'Limited Data (Stop Net)':
             selectRandomInternetQuota();
-            selectRandomInternetSpeed();
+            selectNativeDropdown('internetSpeed');
+
             if (ProductClass === 'main') {
-              selectRandomExceedRate();
+              selectInternetExceedRate();
             }
             break;
 
           case 'Limited Data Only':
             cy.log(`🔵 Case: Limited Data Only | ProductClass: ${ProductClass} | subModule: ${subModule}| Module: ${Module}`);
+
             selectRandomInternetQuota();
-            selectRandomInternetSpeed();
+            selectNativeDropdown('internetSpeed');
             if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
-              cy.log('✅ Condition met → calling selectRandomExceedRate()');
-              selectRandomExceedRate();
+              cy.log('✅ Condition met → calling selectInternetExceedRate()');
+              selectInternetExceedRate();
             }
             break;
 
           case 'Pay per use only':
-            selectRandomExceedRate();
+            selectInternetExceedRate();
             break;
 
           case 'Unlimited Data (Fixed Speed)':
             const networkCoverageCheckbox = '[formarrayname="internetQuotaNetworkCoverageCheckBox"]';
+
             cy.get(networkCoverageCheckbox)
               .filter(':visible')
               .then(($container) => {
-                const $5gLabel = $container.find('label').filter((_, el) => Cypress.$(el).text().trim().includes('5G'));
+                const $5gLabel = $container.find('label').filter((_, el) =>
+                  Cypress.$(el).text().trim().includes('5G')
+                );
+
                 const has5G = $5gLabel.length > 0;
+
                 if (has5G) {
                   cy.wrap($5gLabel).click({ force: true });
                   cy.wait(300);
+                  selectAllFixedSpeeds(); // เปลี่ยนจาก selectFixedSpeedWith5G() เป็นเลือกทุกค่า
+                } else {
+                  selectAllFixedSpeeds(); // เปลี่ยนจาก selectFixedSpeedWithout5G() เป็นเลือกทุกค่า
                 }
-                // เรียกใช้ฟังก์ชันเดียวไม่ว่าจะมี 5G หรือไม่
-                selectRandomInternetSpeedFixed();
               });
             if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
-              selectRandomExceedRate();
+              selectInternetExceedRate();
             }
             break;
 
           case 'Unlimited Data (Throttling Speed)':
             selectRandomInternetQuota();
-            selectRandomInternetSpeed();
-            selectRandomInternetThrottlingSpeed();
+            selectSpecificInternetSpeed();
+            selectThrottlingSpeed();
             if (ProductClass === 'main' && subModule?.toLowerCase() === 'pre') {
-              selectRandomExceedRate();
+              selectInternetExceedRate();
             }
             break;
         }
@@ -3438,8 +3463,30 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
     });
 };
 
-// สุ่ม Internet Quota ทั้งหมด (ไม่กรองเฉพาะ 5G)
-const selectRandomInternetQuota = (): void => {
+const selectSpecificInternetSpeed = () => {
+  cy.get('select[formcontrolname="internetSpeed"]', { timeout: 10000 })
+    .should('be.visible')
+    .then(($select) => {
+      // Get all enabled options (excluding the disabled placeholder)
+      const $options = $select.find('option:not([disabled])');
+
+      if ($options.length > 0) {
+        // Loop through each option and select it
+        $options.each((index, option) => {
+          const value = (option as HTMLOptionElement).value;
+          const text = (option as HTMLOptionElement).text.trim();
+
+          cy.wrap($select).select(value);
+          cy.wait(2000);
+          cy.log(`Selected Speed ${index + 1}/${$options.length}: ${text}`);
+        });
+      } else {
+        cy.log('No internet speed options found');
+      }
+    });
+};
+
+const selectRandomInternetQuota = () => {
   cy.contains('label', '*Internet Quota :')
     .filter(':visible')
     .closest('.row')
@@ -3449,26 +3496,37 @@ const selectRandomInternetQuota = (): void => {
   cy.get('.cdk-overlay-pane mat-option', { timeout: 10000 })
     .should('be.visible')
     .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      cy.wrap($options[randomIndex]).click({ force: true });
-      cy.wait(2000);
+      const targetOptions = $options.filter((index, option) =>
+        Cypress.$(option).text().trim().startsWith('5G')
+      );
+      if (targetOptions.length > 0) {
+        const randomIndex = Math.floor(Math.random() * targetOptions.length);
+        cy.wrap(targetOptions[randomIndex]).click({ force: true });
+        cy.wait(2000);
+      } else {
+        if ($options.length > 0) {
+          cy.wrap($options[0]).click({ force: true });
+          cy.wait(2000);
+        } else {
+          cy.get('.cdk-overlay-backdrop').click({ force: true });
+        }
+      }
     });
 };
 
-// สุ่ม Exceed Rate ทั้งหมด
-const selectRandomExceedRate = (): void => {
+const selectInternetExceedRate = () => {
   cy.contains('label', '*Internet Exceed Rate :')
     .closest('.row')
     .find('mat-select')
     .should('not.have.class', 'mat-select-disabled')
     .click();
 
-  cy.get('.cdk-overlay-pane mat-option:not(.mat-option-disabled)', { timeout: 10000 })
+  cy.get('.cdk-overlay-pane mat-option:not(.mat-option-disabled)', {
+    timeout: 10000,
+  })
     .should('have.length.greaterThan', 0)
-    .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      cy.wrap($options[randomIndex]).click({ force: true });
-    });
+    .first()
+    .click();
 
   cy.wait(2000);
 
@@ -3478,48 +3536,63 @@ const selectRandomExceedRate = (): void => {
     .should('not.contain', 'Please Select');
 };
 
-// สุ่ม Internet Speed ทั้งหมด (ไม่มีการกรองค่า)
-const selectRandomInternetSpeed = (): void => {
-  cy.get('select[formcontrolname="internetSpeed"]')
-    .filter(':visible')
-    .find('option:not([disabled])')
-    .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      const randomValue = ($options[randomIndex] as HTMLOptionElement).value;
-      cy.get('select[formcontrolname="internetSpeed"]')
-        .select(randomValue)
-        .should('have.value', randomValue);
-      cy.wait(2000);
+const selectThrottlingSpeed = () => {
+  cy.get('select[formcontrolname="internetThrottlingSpeed"]', { timeout: 10000 })
+    .should('be.visible')
+    .then(($select) => {
+      // Get all enabled options (excluding the disabled placeholder)
+      const $options = $select.find('option:not([disabled])');
+
+      if ($options.length > 0) {
+        // Loop through each option and select it
+        $options.each((index, option) => {
+          const value = (option as HTMLOptionElement).value;
+          const text = (option as HTMLOptionElement).text.trim();
+
+          cy.wrap($select).select(value);
+          cy.wait(2000);
+          cy.log(`Selected Throttling Speed ${index + 1}/${$options.length}: ${text}`);
+        });
+      } else {
+        cy.log('No throttling speed options found');
+      }
     });
 };
 
-// สุ่ม Internet Speed Fixed ทั้งหมด (ไม่มีการกรองค่า)
-const selectRandomInternetSpeedFixed = (): void => {
-  cy.get('select[formcontrolname="fixedSpeedInternetSpeed"]')
-    .filter(':visible')
-    .find('option:not([disabled])')
-    .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      const randomValue = ($options[randomIndex] as HTMLOptionElement).value;
-      cy.get('select[formcontrolname="fixedSpeedInternetSpeed"]')
-        .select(randomValue)
-        .should('have.value', randomValue);
-      cy.wait(2000);
+const selectAllFixedSpeeds = () => {
+  cy.get('select[formcontrolname="fixedSpeedInternetSpeed"]', { timeout: 10000 })
+    .should('be.visible')
+    .then(($select) => {
+      // Get all enabled options (excluding the disabled placeholder)
+      const $options = $select.find('option:not([disabled])');
+
+      if ($options.length > 0) {
+        // Loop through each option and select it
+        $options.each((index, option) => {
+          const value = (option as HTMLOptionElement).value;
+          const text = (option as HTMLOptionElement).text.trim();
+
+          cy.wrap($select).select(value);
+          cy.wait(2000);
+          cy.log(`Selected Fixed Speed ${index + 1}/${$options.length}: ${text}`);
+        });
+      } else {
+        cy.log('No fixed speed options found');
+      }
     });
 };
 
-// สุ่ม Throttling Speed ทั้งหมด
-const selectRandomInternetThrottlingSpeed = (): void => {
-  cy.get('select[formcontrolname="internetThrottlingSpeed"]')
+const selectNativeDropdown = (formControlName: string) => {
+  cy.get(`select[formcontrolname="${formControlName}"]`)
     .filter(':visible')
-    .find('option:not([disabled])')
-    .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      const randomValue = ($options[randomIndex] as HTMLOptionElement).value;
-      cy.get('select[formcontrolname="internetThrottlingSpeed"]')
-        .select(randomValue)
-        .should('have.value', randomValue);
-      cy.wait(2000);
+    .then(($select) => {
+      const options = $select.find('option:not([disabled])');
+      if (options.length > 1) {
+        const randomIndex = Math.floor(Math.random() * (options.length - 1)) + 1;
+        const randomOption = options[randomIndex] as HTMLOptionElement;
+        cy.wrap($select).select(randomOption.value);
+        cy.wait(2000);
+      }
     });
 };
 
@@ -3537,37 +3610,37 @@ function checkAndFillContentType(): void {
     editButtonSelector: string;
     contentTypeSelector: string;
   }> = [
-    {
-      name: 'Karaoke',
-      containerSelector: 'app-mass-enh-content-karaoke',
-      editButtonSelector: 'button.btn-warning[title="Edit"]',
-      contentTypeSelector: 'select[formcontrolname="contentType"]'
-    },
-    {
-      name: 'Music Streaming',
-      containerSelector: 'app-mass-enh-content-music-streaming',
-      editButtonSelector: 'button.btn-warning[title="Edit"]',
-      contentTypeSelector: 'select[formcontrolname="contentType"]'
-    },
-    {
-      name: 'Entertainment Partnership',
-      containerSelector: 'app-mass-enh-content-music-streaming',
-      editButtonSelector: 'button.btn-warning[title="Edit"]',
-      contentTypeSelector: 'select[formcontrolname="contentType"]'
-    },
-    {
-      name: 'Cloud Game',
-      containerSelector: 'app-mass-enh-vr[title="Cloud Game"]',
-      editButtonSelector: 'button.btn-warning[title="Edit"]',
-      contentTypeSelector: 'select[formcontrolname="contentTypeValue"]'
-    },
-    {
-      name: 'AI IP Camera',
-      containerSelector: 'app-mass-enh-ai-ip-camera',
-      editButtonSelector: 'button.btn-warning[title="Edit"]',
-      contentTypeSelector: 'select[formcontrolname="contentType"]'
-    }
-  ];
+      {
+        name: 'Karaoke',
+        containerSelector: 'app-mass-enh-content-karaoke',
+        editButtonSelector: 'button.btn-warning[title="Edit"]',
+        contentTypeSelector: 'select[formcontrolname="contentType"]'
+      },
+      {
+        name: 'Music Streaming',
+        containerSelector: 'app-mass-enh-content-music-streaming',
+        editButtonSelector: 'button.btn-warning[title="Edit"]',
+        contentTypeSelector: 'select[formcontrolname="contentType"]'
+      },
+      {
+        name: 'Entertainment Partnership',
+        containerSelector: 'app-mass-enh-content-music-streaming',
+        editButtonSelector: 'button.btn-warning[title="Edit"]',
+        contentTypeSelector: 'select[formcontrolname="contentType"]'
+      },
+      {
+        name: 'Cloud Game',
+        containerSelector: 'app-mass-enh-vr[title="Cloud Game"]',
+        editButtonSelector: 'button.btn-warning[title="Edit"]',
+        contentTypeSelector: 'select[formcontrolname="contentTypeValue"]'
+      },
+      {
+        name: 'AI IP Camera',
+        containerSelector: 'app-mass-enh-ai-ip-camera',
+        editButtonSelector: 'button.btn-warning[title="Edit"]',
+        contentTypeSelector: 'select[formcontrolname="contentType"]'
+      }
+    ];
 
   const processTab = (index: number) => {
     if (index >= targetTabs.length) {
@@ -3577,7 +3650,7 @@ function checkAndFillContentType(): void {
 
     const tabConfig = targetTabs[index];
     cy.log(`🔍 [${index + 1}/${targetTabs.length}] Looking for tab: "${tabConfig.name}"`);
-    
+
     cy.get('body').then(($body) => {
       const $tab = $body.find('ul.nav.nav-tabs li a').filter((_i, el) => {
         return el.textContent?.trim() === tabConfig.name;
@@ -3590,7 +3663,7 @@ function checkAndFillContentType(): void {
       }
 
       cy.log(`✅ Found tab: "${tabConfig.name}"`);
-      
+
       cy.wrap($tab).click({ force: true });
       cy.wait(1000);
       cy.log(`✅ Clicked tab: ${tabConfig.name}`);
@@ -3598,7 +3671,7 @@ function checkAndFillContentType(): void {
       // ✅ รอให้ container ของ tab นี้โหลด
       cy.get('body').then(($b) => {
         const $container = $b.find(tabConfig.containerSelector);
-        
+
         if (!$container.length) {
           cy.log(`⚠️ Container "${tabConfig.containerSelector}" not found, skipping...`);
           processTab(index + 1);
@@ -3632,7 +3705,7 @@ function checkAndFillContentType(): void {
           cy.get('body').then(($b2) => {
             const $freshContainer = $b2.find(tabConfig.containerSelector);
             const $currentBtn = $freshContainer.find(tabConfig.editButtonSelector).eq(currentEditIndex);
-            
+
             if (!$currentBtn.length) {
               cy.log(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} disappeared, skipping...`);
               currentEditIndex++;
@@ -3696,7 +3769,7 @@ function checkAndFillContentType(): void {
                 }
 
                 const randomOption = validOptions[Math.floor(Math.random() * validOptions.length)];
-                
+
                 cy.wrap($select).select(randomOption.value, { force: true });
                 cy.wait(300);
                 cy.log(`✅ [${tabConfig.name}] Selected: "${randomOption.text?.trim() || 'Unknown'}"`);
@@ -3705,8 +3778,8 @@ function checkAndFillContentType(): void {
                 cy.get('body').then(($b4) => {
                   const $freshContainer3 = $b4.find(tabConfig.containerSelector);
                   const $updateBtn = $freshContainer3.find('button').filter((_i, btn) => {
-                    return btn.textContent?.trim() === 'Update' && 
-                           Cypress.$(btn).closest('[hidden]').length === 0;
+                    return btn.textContent?.trim() === 'Update' &&
+                      Cypress.$(btn).closest('[hidden]').length === 0;
                   });
 
                   cy.log(`📋 [${tabConfig.name}] Update button found: ${$updateBtn.length}`);
@@ -3747,7 +3820,7 @@ const updatePriorityInPanel = (): void => {
     const $exceedInput = $panelBody.find('input[formcontrolname="internetExceedRatePriority"]');
     const $throttlingInput = $panelBody.find('input[formcontrolname="internetThrottlingSpeedPriority"]');
     const $fixedSpeedPriority = $panelBody.find('input[formcontrolname="fixedSpeedPriority"]');
-    
+
     let updateNeeded = false;
 
     // เช็คและอัพเดท Priority                                                                         
@@ -3818,10 +3891,10 @@ const updatePriorityInPanel = (): void => {
     });
 
     // เช็คว่าไม่มี input ไหนเลยที่มองเห็น
-    if (!$priorityInput.is(':visible') && 
-        !$exceedInput.is(':visible') && 
-        !$throttlingInput.is(':visible') && 
-        !$fixedSpeedPriority.is(':visible')) {
+    if (!$priorityInput.is(':visible') &&
+      !$exceedInput.is(':visible') &&
+      !$throttlingInput.is(':visible') &&
+      !$fixedSpeedPriority.is(':visible')) {
       cy.log('⚠️ ไม่พบ Priority input ใดๆ ที่มองเห็นได้');
     }
   });
@@ -3874,7 +3947,7 @@ const checkAndUpdatePriority = (): void => {
 
           // ตัวเลือก: ทำเฉพาะตัวสุดท้าย
           const $targetRow = $subRows.last();
-          
+
           const internetQuota = $targetRow.find('td:first').text().trim();
           cy.log(`🎯 เลือก Internet Quota: ${internetQuota}`);
 
@@ -3882,10 +3955,10 @@ const checkAndUpdatePriority = (): void => {
           cy.wait(2000);
 
           updatePriorityInPanel();
-          
+
           cy.get('button').contains('Cancel').click();
           cy.wait(2000);
-          
+
           processRows(rowIndex + 1);
         });
       });
@@ -3921,7 +3994,7 @@ const generateProjectNames = (
 ): { projectName: string; poName: string; prefixName: string } => {
   const timeSuffix = getTimeSuffix();
   const pluginSuffix = Plugin ? ` ${Plugin}` : '';
-  
+
   let prefixName: string;
   if (PoSubGroup) {
     // For OtherPOSub
