@@ -266,7 +266,7 @@ export const loginAndWaitReady = (username: string, password: string): void => {
 };
 
 // ========================
-// PAGINATION HELPER (REUSABLE) - FIXED
+// PAGINATION HELPER (REUSABLE) - FIXED SCOPE ISSUE
 // ========================
 
 /**
@@ -283,53 +283,78 @@ const searchInTableWithPagination = (
 ): void => {
   const { waitAfterNext = 3000, filterCallback } = options;
 
-  // ฟังก์ชันค้นหาในหน้าปัจจุบัน - คืนค่า boolean ว่าเจอหรือไม่
+  // ฟังก์ชันค้นหาในหน้าปัจจุบัน
   const findInCurrentPage = (): Cypress.Chainable<boolean> => {
-    return cy.get('tbody tr').then(($rows) => {
-      cy.log(`📊 ${sectionHeader} - Current page rows: ${$rows.length}`);
+    return cy.get('h3').contains(sectionHeader, { timeout: 100000 })
+      .parent()
+      .within(() => {
+        cy.get('tbody tr').then(($rows) => {
+          cy.log(`📊 ${sectionHeader} - Current page rows: ${$rows.length}`);
 
-      let found = false;
-      let matchingRow: JQuery<HTMLElement> | null = null;
-      let matchingIndex = -1;
+          let found = false;
+          let matchingRow: JQuery<HTMLElement> | null = null;
+          let matchingIndex = -1;
 
-      $rows.each((index, row) => {
-        if (found) return; // เจอแล้วไม่ต้องวนต่อ
+          $rows.each((index, row) => {
+            if (found) return;
 
-        const $row = Cypress.$(row);
-        const matches = filterCallback 
-          ? filterCallback($row, index)
-          : $row.text().trim().includes(searchText);
+            const $row = Cypress.$(row);
+            const matches = filterCallback 
+              ? filterCallback($row, index)
+              : $row.text().trim().includes(searchText);
 
-        if (matches) {
-          matchingRow = $row;
-          matchingIndex = index;
-          found = true;
-          cy.log(`✅ Found match at row ${index}`);
-        }
+            if (matches) {
+              matchingRow = $row;
+              matchingIndex = index;
+              found = true;
+              cy.log(`✅ Found match at row ${index}`);
+            }
+          });
+
+          if (found && matchingRow) {
+            rowCallback(matchingRow, matchingIndex);
+          }
+          
+          return cy.wrap(found);
+        });
       });
+  };
 
-      if (found && matchingRow) {
-        rowCallback(matchingRow, matchingIndex);
-        return true;
+  // เช็คว่ามีปุ่ม Next ใน section นี้ไหม (เรียกนอก within)
+  const hasNextPage = (): Cypress.Chainable<boolean> => {
+    return cy.get('body').then(($body) => {
+      const $section = $body.find(`h3:contains("${sectionHeader}")`).parent();
+      const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+      return $nextBtn.length > 0;
+    });
+  };
+
+  // คลิก Next (เรียกนอก within)
+  const clickNextPage = (): void => {
+    cy.get('body').then(($body) => {
+      const $section = $body.find(`h3:contains("${sectionHeader}")`).parent();
+      const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+      
+      if ($nextBtn.length > 0) {
+        cy.log(`➡️ ${sectionHeader} - Not found, going to next page...`);
+        cy.wrap($nextBtn).click();
+        cy.wait(waitAfterNext);
       }
-      return false;
     });
   };
 
   // Recursive ค้นหาทุกหน้า
   const searchRecursive = (): void => {
     findInCurrentPage().then((found) => {
-      if (found) return; // เจอแล้ว จบ
+      if (found) {
+        cy.log(`✅ ${sectionHeader} - Found and processed`);
+        return;
+      }
 
       // ไม่เจอในหน้านี้ ลองไปหน้าถัดไป
-      cy.get('body').then(($body) => {
-        const $section = $body.find(`h3:contains("${sectionHeader}")`).parent();
-        const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
-
-        if ($nextBtn.length > 0) {
-          cy.log(`➡️ ${sectionHeader} - Not found, going to next page...`);
-          cy.wrap($nextBtn).click();
-          cy.wait(waitAfterNext);
+      hasNextPage().then((hasNext) => {
+        if (hasNext) {
+          clickNextPage();
           searchRecursive();
         } else {
           cy.log(`❌ ${sectionHeader} - "${searchText}" not found in any page`);
@@ -338,12 +363,8 @@ const searchInTableWithPagination = (
     });
   };
 
-  // รอให้ section โหลดก่อนเริ่มค้นหา
-  cy.get('h3').contains(sectionHeader, { timeout: 100000 })
-    .parent()
-    .within(() => {
-      searchRecursive();
-    });
+  // เริ่มค้นหา
+  searchRecursive();
 };
 
 // ========================
@@ -383,6 +404,7 @@ export const approveProject = (projectName: string): void => {
             .should('be.visible')
             .click();
         });
+      cy.log(`✅ Successfully approved project: ${projectName}`);
     },
     {
       filterCallback: ($row) => $row.text().trim().includes(projectName)
@@ -427,6 +449,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
         cy.get('@assigneeDropdown').should('have.value', assignee);
         cy.get('span').contains('Set').click();
       });
+      cy.log(`✅ Successfully assigned ${assignee} to project`);
     },
     {
       waitAfterNext: 3000,
