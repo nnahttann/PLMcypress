@@ -266,12 +266,9 @@ export const loginAndWaitReady = (username: string, password: string): void => {
 };
 
 // ========================
-// PAGINATION HELPER (REUSABLE) - FIXED SCOPE ISSUE
+// PAGINATION HELPER - FIXED ASYNC CHAIN
 // ========================
 
-/**
- * ค้นหาข้อความในตารางและทำงาน callback เมื่อพบ โดยรองรับ pagination
- */
 const searchInTableWithPagination = (
   sectionHeader: string,
   searchText: string,
@@ -281,116 +278,207 @@ const searchInTableWithPagination = (
     filterCallback?: ($row: JQuery<HTMLElement>, index: number) => boolean;
   } = {}
 ): void => {
-  const { waitAfterNext = 3000, filterCallback } = options;
+  const { waitAfterNext = 2000, filterCallback } = options;
 
-  // ฟังก์ชันค้นหาในหน้าปัจจุบัน
-  const findInCurrentPage = (): Cypress.Chainable<boolean> => {
+  // ฟังก์ชันค้นหาในหน้าเดียว - ไม่ใช้ waitForTableLoad แยก
+  const searchInCurrentPage = (): Cypress.Chainable<boolean> => {
     return cy.get('h3').contains(sectionHeader, { timeout: 100000 })
       .parent()
-      .within(() => {
-        cy.get('tbody tr').then(($rows) => {
-          cy.log(`📊 ${sectionHeader} - Current page rows: ${$rows.length}`);
+      .find('tbody tr')
+      .should(($rows) => {
+        // รอให้ Fetching data หายไป
+        expect($rows.text()).not.to.contain('Fetching data');
+      })
+      .then(($rows) => {
+        cy.log(`📊 ${sectionHeader} - Current page rows: ${$rows.length}`);
 
-          let found = false;
-          let matchingRow: JQuery<HTMLElement> | null = null;
-          let matchingIndex = -1;
+        let found = false;
+        let matchingRow: JQuery<HTMLElement> | null = null;
+        let matchingIndex = -1;
 
-          $rows.each((index, row) => {
-            if (found) return;
+        $rows.each((index, row) => {
+          if (found) return;
 
-            const $row = Cypress.$(row);
-            const matches = filterCallback 
-              ? filterCallback($row, index)
-              : $row.text().trim().includes(searchText);
+          const $row = Cypress.$(row);
+          const rowText = $row.text().trim();
 
-            if (matches) {
-              matchingRow = $row;
-              matchingIndex = index;
-              found = true;
-              cy.log(`✅ Found match at row ${index}`);
-            }
-          });
+          const matches = filterCallback 
+            ? filterCallback($row, index)
+            : rowText.includes(searchText);
 
-          if (found && matchingRow) {
-            rowCallback(matchingRow, matchingIndex);
+          if (matches) {
+            matchingRow = $row;
+            matchingIndex = index;
+            found = true;
+            cy.log(`✅ Found match at row ${index}`);
           }
-          
-          return cy.wrap(found);
         });
+
+        if (found && matchingRow) {
+          rowCallback(matchingRow, matchingIndex);
+        }
+
+        // คืนค่า boolean ผ่าน cy.wrap
+        return cy.wrap(found);
       });
   };
 
-  // เช็คว่ามีปุ่ม Next ใน section นี้ไหม (เรียกนอก within)
-  const hasNextPage = (): Cypress.Chainable<boolean> => {
+  // คลิก Next และรอโหลด
+  const clickNextAndWait = (): Cypress.Chainable<boolean> => {
     return cy.get('body').then(($body) => {
       const $section = $body.find(`h3:contains("${sectionHeader}")`).parent();
       const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
-      return $nextBtn.length > 0;
-    });
-  };
 
-  // คลิก Next (เรียกนอก within)
-  const clickNextPage = (): void => {
-    cy.get('body').then(($body) => {
-      const $section = $body.find(`h3:contains("${sectionHeader}")`).parent();
-      const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
-      
       if ($nextBtn.length > 0) {
-        cy.log(`➡️ ${sectionHeader} - Not found, going to next page...`);
+        cy.log(`➡️ ${sectionHeader} - Going to next page...`);
         cy.wrap($nextBtn).click();
+        
+        // รอให้ตารางโหลด
+        cy.get('h3').contains(sectionHeader, { timeout: 100000 })
+          .parent()
+          .find('tbody tr')
+          .should(($rows) => {
+            expect($rows.text()).not.to.contain('Fetching data');
+          });
+        
         cy.wait(waitAfterNext);
+        return cy.wrap(true);
       }
+      return cy.wrap(false);
     });
   };
 
-  // Recursive ค้นหาทุกหน้า
-  const searchRecursive = (): void => {
-    findInCurrentPage().then((found) => {
+  // ค้นหาแบบ recursive - ใช้ cy.then() chain อย่างถูกต้อง
+  const searchPage = (pageNum: number = 1): void => {
+    cy.log(`🔍 Searching page ${pageNum}...`);
+    
+    searchInCurrentPage().then((found) => {
       if (found) {
-        cy.log(`✅ ${sectionHeader} - Found and processed`);
+        cy.log(`✅ Found on page ${pageNum}!`);
         return;
       }
 
-      // ไม่เจอในหน้านี้ ลองไปหน้าถัดไป
-      hasNextPage().then((hasNext) => {
+      // ไม่เจอในหน้านี้
+      clickNextAndWait().then((hasNext) => {
         if (hasNext) {
-          clickNextPage();
-          searchRecursive();
+          searchPage(pageNum + 1);
         } else {
-          cy.log(`❌ ${sectionHeader} - "${searchText}" not found in any page`);
+          cy.log(`❌ "${searchText}" not found after ${pageNum} page(s)`);
         }
       });
     });
   };
 
   // เริ่มค้นหา
-  searchRecursive();
+  searchPage();
 };
 
 // ========================
-// CLAIM PROJECT (ใช้ HELPER)
+// CLAIM PROJECT
 // ========================
+
 
 export const ClaimProject = (formattedDate: string): void => {
-  searchInTableWithPagination(
-    'Unassigned Task',
-    formattedDate,
-    ($row, index) => {
-      cy.log(`🎯 Clicking claim button at row ${index} for: "${formattedDate}"`);
-      cy.wrap($row)
-        .find('button.claim-top')
-        .should('be.visible')
-        .click();
-      cy.log(`✅ Successfully claimed project: ${formattedDate}`);
-    },
-    {
-      filterCallback: ($row) => $row.text().trim().includes(formattedDate)
-    }
-  );
-};
+  let currentPage = 1;
+  const MAX_PAGES = 5; // ป้องกัน infinite loop
 
+  const searchAndClaim = (): void => {
+    if (currentPage > MAX_PAGES) {
+      cy.log(`⚠️ Checked ${MAX_PAGES} pages in Unassigned Task, project might already be claimed or moved to To Do List`);
+      return;
+    }
+
+    cy.log(`🔍 [Claim] Searching Unassigned Task - Page ${currentPage}...`);
+
+    // รอให้ตารางโหลด
+    cy.get('h3').contains('Unassigned Task', { timeout: 100000 })
+      .parent()
+      .find('tbody tr')
+      .should(($rows) => {
+        expect($rows.text()).not.to.contain('Fetching data');
+      });
+
+    // ตรวจสอบว่า project อยู่ใน To Do List แล้วหรือยัง (ถูก claim แล้ว)
+    cy.get('body').then(($body) => {
+      // เช็คใน To Do List ก่อนว่า project อยู่ตรงนั้นแล้วไหม
+      const $todoSection = $body.find('h3:contains("To Do List")').parent();
+      const todoText = $todoSection.find('tbody tr').text();
+      
+      if (todoText.includes(formattedDate)) {
+        cy.log(`✅ Project already in To Do List! Skipping claim...`);
+        return; // จบการทำงาน ไม่ต้อง claim แล้ว
+      }
+
+      // ยังไม่อยู่ใน To Do List ค้นหาใน Unassigned Task ต่อ
+      cy.get('h3').contains('Unassigned Task', { timeout: 100000 })
+        .parent()
+        .find('tbody tr')
+        .then(($rows) => {
+          cy.log(`📊 Unassigned Task Page ${currentPage} - ${$rows.length} rows`);
+
+          let found = false;
+
+          $rows.each((index, row) => {
+            if (found) return;
+
+            const $row = Cypress.$(row);
+            const rowText = $row.text().trim();
+
+            if (rowText.includes(formattedDate) && !rowText.includes('Fetching data')) {
+              found = true;
+              cy.log(`✅ Found in Unassigned Task - Page ${currentPage}, Row ${index}`);
+              
+              cy.wrap($row)
+                .find('button.claim-top')
+                .should('be.visible')
+                .click();
+              
+              cy.log(`✅ Successfully claimed project: ${formattedDate}`);
+              // รอให้ project ย้ายไป To Do List
+              cy.wait(2000);
+              return;
+            }
+          });
+
+          if (found) {
+            return; // เจอและ claim แล้ว จบ
+          }
+
+          // ไม่เจอในหน้านี้ ไปหน้าถัดไป
+          const $section = $body.find('h3:contains("Unassigned Task")').parent();
+          const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+
+          if ($nextBtn.length > 0) {
+            cy.log(`➡️ Unassigned Task Page ${currentPage} - Not found, going to next page...`);
+            cy.wrap($nextBtn).click();
+            
+            // รอโหลดหน้าใหม่
+            cy.get('h3').contains('Unassigned Task', { timeout: 100000 })
+              .parent()
+              .find('tbody tr')
+              .should(($rows) => {
+                expect($rows.text()).not.to.contain('Fetching data');
+              });
+            
+            cy.wait(2000);
+            currentPage++;
+            searchAndClaim();
+          } else {
+            // หมดหน้าแล้ว และ project ไม่อยู่ใน To Do List ด้วย
+            cy.log(`⚠️ Project "${formattedDate}" not found in Unassigned Task or To Do List`);
+            cy.log(`💡 Possible reasons:`);
+            cy.log(`   1. Project name mismatch`);
+            cy.log(`   2. Project already processed by someone else`);
+            cy.log(`   3. Project is in different status`);
+          }
+        });
+    });
+  };
+
+  searchAndClaim();
+};
 // ========================
-// APPROVE PROJECT (ใช้ HELPER)
+// APPROVE PROJECT
 // ========================
 
 export const approveProject = (projectName: string): void => {
@@ -399,21 +487,23 @@ export const approveProject = (projectName: string): void => {
     projectName,
     ($row) => {
       cy.wrap($row)
-        .within(() => {
-          cy.get('span')
-            .should('be.visible')
-            .click();
-        });
+        .find('span')
+        .should('be.visible')
+        .click();
       cy.log(`✅ Successfully approved project: ${projectName}`);
     },
     {
-      filterCallback: ($row) => $row.text().trim().includes(projectName)
+      waitAfterNext: 2000,
+      filterCallback: ($row) => {
+        const rowText = $row.text().trim();
+        return rowText.includes(projectName) && !rowText.includes('Fetching data');
+      }
     }
   );
 };
 
 // ========================
-// ASSIGN TEAM TASK (ใช้ HELPER)
+// ASSIGN TEAM TASK
 // ========================
 
 export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueKeyword: string = ''): void {
@@ -421,6 +511,8 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
   cy.intercept('GET', '**/api/getGroupIdCGMDConfigurer/**').as('getAssigneeList');
 
   cy.get('h3').contains('Team Task').should('be.visible');
+  
+  // รอให้ API โหลดเสร็จ
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
 
   const partialIdentifier = taskIdentifier.split('_')[0];
@@ -449,12 +541,15 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
         cy.get('@assigneeDropdown').should('have.value', assignee);
         cy.get('span').contains('Set').click();
       });
-      cy.log(`✅ Successfully assigned ${assignee} to project`);
+      cy.log(`✅ Successfully assigned ${assignee}`);
     },
     {
-      waitAfterNext: 3000,
+      waitAfterNext: 2000,
       filterCallback: ($row) => {
         const rowText = $row.text().trim();
+        // ข้ามถ้ายังเป็น Fetching data
+        if (rowText.includes('Fetching data')) return false;
+        
         const hasProjectName = rowText.includes(partialIdentifier);
         const hasKeyword = uniqueKeyword ? rowText.includes(uniqueKeyword) : true;
         return hasProjectName && hasKeyword;
@@ -462,6 +557,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
     }
   );
 }
+
 // ========================
 // APPROVAL FLOW BASE FUNCTIONS
 // ========================
@@ -712,7 +808,6 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
     unregister();
     addauto5gCKS();
     checkAndFillContentType();
-    checkAndFillCloudGameContentType();
     checkAndUpdatePriority();
     CopyDeductFail();
     beforeapproveCKS();
@@ -734,7 +829,6 @@ export const afterMKTMainPRE_NotComplex = (): void => {
     unregister();
     addauto5gCKS();
     checkAndFillContentType();
-    checkAndFillCloudGameContentType();
     checkAndUpdatePriority();
     beforeapproveCKS();
   });
@@ -923,7 +1017,6 @@ export const afterMKTontopMUSIC = (): void => _afterMKTontopCommon('MUSIC');
 const _afterMKTontopCommon = (module: string): void => {
   executeCKSRole('standard', 'ontop', () => {
     checkAndFillContentType();
-    checkAndFillCloudGameContentType();
     checkAndUpdatePriority();
   });
   afterCKSCommon(module);
@@ -956,7 +1049,6 @@ const stepsOntopPRE = (): void => {
   dropdownRecurringCKS();
   diyflagCKS();
   checkAndFillContentType();
-  checkAndFillCloudGameContentType();
   cy.scrollTo('bottom');
   smsCKSPRE();
 };
@@ -1013,7 +1105,6 @@ const stepsOntopPREUsage = (): void => {
   dropdownRecurringCKS();
   diyflagCKS();
   checkAndFillContentType();
-  checkAndFillCloudGameContentType();
   checkAndUpdatePriority();
   cy.scrollTo('bottom');
   smsCKSPRE();
@@ -1444,7 +1535,6 @@ const performSimpleApprovalRole = (user: string, pass: string, approveFunction: 
 export const afterMKTMAINPOST = (): void => {
   executeCKSRole('standard', 'main', () => {
     checkAndFillContentType();
-    checkAndFillCloudGameContentType();
     checkAndUpdatePriority();
     Tariff();
   });
@@ -2152,37 +2242,36 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     });
 
     // --- SMS Promote Pack ---
-    cy.get('body').then(($body: any) => {
-      const selector = 'select[formcontrolname="smsPromotePackSendFlag"]';
+    // cy.get('body').then(($body: any) => {
+    //   const selector = 'select[formcontrolname="smsPromotePackSendFlag"]';
 
-      if ($body.find(selector).length > 0) {
-        const smsPromotePackVal = getRandomSendFlag();
+    //   if ($body.find(selector).length > 0) {
+    //     const smsPromotePackVal = getRandomSendFlag();
 
-        // เลือกค่าตามที่สุ่มได้
-        cy.get(selector).select(smsPromotePackVal, { force: true }).trigger('change', { force: true });
+    //     // เลือกค่าตามที่สุ่มได้
+    //     cy.get(selector).select(smsPromotePackVal, { force: true }).trigger('change', { force: true });
 
-        cy.wait(WAIT_TIME);
+    //     cy.wait(WAIT_TIME);
 
-        // ✅ แยกกรณี Send และ Don't Send ชัดเจน
-        if (smsPromotePackVal === 'Send') {
-          // กรณี Send: textarea ต้องมีอยู่และมีอย่างน้อย 2 อัน
-          cy.get('textarea[formcontrolname="smsPromotePack"]')
-            .should('have.length.at.least', 2)
-            .each(($el: any, index: number) => {
-              const prefix = index === 0 ? 'SMS Promote Package ENG:' : 'SMS Promote Package THA:';
-              cy.wrap($el)
-                .clear({ force: true })
-                .type(
-                  limit(`${prefix} ${finalProjectName}`, 250),
-                  { delay: 0, force: true }
-                );
-            });
-        } else {
-          // ✅ กรณี Don't Send: ไม่ต้องทำอะไรกับ textarea
-          cy.log('Selected "Don\'t Send" - skipping textarea input');
-        }
-      }
-    });
+    //     // ✅ แยกกรณี Send และ Don't Send ชัดเจน
+    //     if (smsPromotePackVal === 'Send') {
+    //       cy.get('textarea[formcontrolname="smsPromotePack"]')
+    //         .should('have.length.at.least', 2)
+    //         .each(($el: any, index: number) => {
+    //           const prefix = index === 0 ? 'SMS Promote Package ENG:' : 'SMS Promote Package THA:';
+    //           cy.wrap($el)
+    //             .clear({ force: true })
+    //             .type(
+    //               limit(`${prefix} ${finalProjectName}`, 250),
+    //               { delay: 0, force: true }
+    //             );
+    //         });
+    //     } else {
+    //       // ✅ กรณี Don't Send: ไม่ต้องทำอะไรกับ textarea
+    //       cy.log('Selected "Don\'t Send" - skipping textarea input');
+    //     }
+    //   }
+    // });
 
     // --- Section 9: Promotion Expired ---
     cy.get('body').then(($body: any) => {
@@ -3438,248 +3527,220 @@ const selectRandomInternetThrottlingSpeed = (): void => {
 // CHECK AND FILL CONTENT TYPE (ASYNC HELPERS)
 // ========================
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+function checkAndFillContentType(): void {
+  cy.log('🚀 checkAndFillContentType started');
 
-function findUpdateButton(): HTMLButtonElement | null {
-  const buttons = document.querySelectorAll<HTMLButtonElement>('button[type="button"]');
-  return (
-    Array.from(buttons).find((btn) => {
-      const text = btn.textContent?.trim().toLowerCase() ?? '';
-      return text === 'update' || text === 'save' || text === 'ok';
-    }) ?? null
-  );
-}
+  // ✅ รวมทุก tab ที่ต้องการ
+  const targetTabs: Array<{
+    name: string;
+    containerSelector: string;
+    editButtonSelector: string;
+    contentTypeSelector: string;
+  }> = [
+    {
+      name: 'Karaoke',
+      containerSelector: 'app-mass-enh-content-karaoke',
+      editButtonSelector: 'button.btn-warning[title="Edit"]',
+      contentTypeSelector: 'select[formcontrolname="contentType"]'
+    },
+    {
+      name: 'Music Streaming',
+      containerSelector: 'app-mass-enh-content-music-streaming',
+      editButtonSelector: 'button.btn-warning[title="Edit"]',
+      contentTypeSelector: 'select[formcontrolname="contentType"]'
+    },
+    {
+      name: 'Entertainment Partnership',
+      containerSelector: 'app-mass-enh-content-music-streaming',
+      editButtonSelector: 'button.btn-warning[title="Edit"]',
+      contentTypeSelector: 'select[formcontrolname="contentType"]'
+    },
+    {
+      name: 'Cloud Game',
+      containerSelector: 'app-mass-enh-vr[title="Cloud Game"]',
+      editButtonSelector: 'button.btn-warning[title="Edit"]',
+      contentTypeSelector: 'select[formcontrolname="contentTypeValue"]'
+    },
+    {
+      name: 'AI IP Camera',
+      containerSelector: 'app-mass-enh-ai-ip-camera',
+      editButtonSelector: 'button.btn-warning[title="Edit"]',
+      contentTypeSelector: 'select[formcontrolname="contentType"]'
+    }
+  ];
 
-function findCloudGameUpdateButton(container: HTMLElement): HTMLButtonElement | null {
-  const buttons = container.querySelectorAll<HTMLButtonElement>('button[type="button"], button[type="submit"]');
-  return (
-    Array.from(buttons).find((btn) => {
-      const text = btn.textContent?.trim().toLowerCase() ?? '';
-      return text === 'update' || text === 'save' || text === 'ok';
-    }) ?? null
-  );
-}
-
-async function checkAndFillContentType(): Promise<void> {
-  console.log('🚀 checkAndFillContentType started');
-
-  const targetTabs: string[] = ['Karaoke', 'Music Streaming', 'Entertainment Partnership'];
-
-  const tabs = document.querySelectorAll<HTMLAnchorElement>(
-    'app-mass-enh-product-offering-detail-tab li a'
-  );
-
-  console.log('📋 All tabs found:', tabs.length);
-
-  for (const tabName of targetTabs) {
-    console.log(`🔍 Looking for tab: "${tabName}"`);
-
-    const tab = Array.from(tabs).find(
-      (a) => a.textContent?.trim() === tabName
-    );
-
-    if (!tab) {
-      console.log(`⚠️ Tab "${tabName}" not found, skipping...`);
-      continue;
+  const processTab = (index: number) => {
+    if (index >= targetTabs.length) {
+      cy.log('🎉 All tabs processed');
+      return;
     }
 
-    tab.click();
-    await wait(500);
-    console.log(`✅ Clicked tab: ${tabName}`);
+    const tabConfig = targetTabs[index];
+    cy.log(`🔍 [${index + 1}/${targetTabs.length}] Looking for tab: "${tabConfig.name}"`);
+    
+    cy.get('body').then(($body) => {
+      const $tab = $body.find('ul.nav.nav-tabs li a').filter((_i, el) => {
+        return el.textContent?.trim() === tabConfig.name;
+      });
 
-    const editButtons = document.querySelectorAll<HTMLButtonElement>(
-      'button.btn-warning[title="Edit"]'
-    );
-
-    console.log(`📋 [${tabName}] Edit buttons found:`, editButtons.length);
-
-    if (editButtons.length === 0) {
-      console.log(`⚠️ No Edit button found in ${tabName}`);
-      continue;
-    }
-
-    for (let i = 0; i < editButtons.length; i++) {
-      editButtons[i].click();
-      await wait(500);
-      console.log(`✅ [${tabName}] Clicked Edit button #${i + 1}`);
-
-      const contentTypeSelect = document.querySelector<HTMLSelectElement>(
-        'select[formcontrolname="contentType"]'
-      );
-
-      console.log(`📋 [${tabName}] Content Type select found:`, !!contentTypeSelect);
-
-      if (!contentTypeSelect) {
-        console.log(`⚠️ [${tabName}] Content Type select not found`);
-        continue;
+      if (!$tab.length) {
+        cy.log(`⚠️ Tab "${tabConfig.name}" not found, skipping to next tab...`);
+        processTab(index + 1);
+        return;
       }
 
-      const selectedValue: string = contentTypeSelect.value;
-      const isEmpty: boolean =
-        selectedValue === 'null' ||
-        selectedValue === '' ||
-        selectedValue === '0: null' ||
-        contentTypeSelect.selectedIndex <= 0;
+      cy.log(`✅ Found tab: "${tabConfig.name}"`);
+      
+      cy.wrap($tab).click({ force: true });
+      cy.wait(1000);
+      cy.log(`✅ Clicked tab: ${tabConfig.name}`);
 
-      console.log(
-        `[${tabName}] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`
-      );
-
-      if (isEmpty) {
-        const validOptions = Array.from(contentTypeSelect.options).filter(
-          (opt: HTMLOptionElement) => !opt.disabled && opt.value !== 'null'
-        );
-
-        console.log(`📋 [${tabName}] Valid options:`, validOptions.map(o => o.text.trim()));
-
-        if (validOptions.length === 0) {
-          console.log(`⚠️ [${tabName}] No valid options to select`);
-          continue;
+      // ✅ รอให้ container ของ tab นี้โหลด
+      cy.get('body').then(($b) => {
+        const $container = $b.find(tabConfig.containerSelector);
+        
+        if (!$container.length) {
+          cy.log(`⚠️ Container "${tabConfig.containerSelector}" not found, skipping...`);
+          processTab(index + 1);
+          return;
         }
 
-        const randomOption: HTMLOptionElement =
-          validOptions[Math.floor(Math.random() * validOptions.length)];
+        cy.log(`✅ Container found: ${tabConfig.containerSelector}`);
 
-        contentTypeSelect.value = randomOption.value;
+        // ✅ หา Edit buttons เฉพาะภายใน container นี้
+        const $editButtons = $container.find(tabConfig.editButtonSelector);
+        cy.log(`📋 [${tabConfig.name}] Edit buttons found: ${$editButtons.length}`);
 
-        contentTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-        contentTypeSelect.dispatchEvent(new Event('input', { bubbles: true }));
-
-        console.log(
-          `✅ [${tabName}] Selected random Content Type: "${randomOption.text.trim()}"`
-        );
-
-        await wait(300);
-        const updateButton: HTMLButtonElement | null = findUpdateButton();
-
-        console.log(`📋 [${tabName}] Update button found:`, !!updateButton);
-
-        if (updateButton) {
-          updateButton.click();
-          console.log(`✅ [${tabName}] Clicked Update button`);
-          await wait(500);
-        } else {
-          console.log(`⚠️ [${tabName}] Update button not found`);
+        if ($editButtons.length === 0) {
+          cy.log(`⚠️ No Edit button found in ${tabConfig.name}, skipping...`);
+          processTab(index + 1);
+          return;
         }
 
-      } else {
-        const currentText =
-          contentTypeSelect.options[contentTypeSelect.selectedIndex]?.text.trim();
-        console.log(
-          `✅ [${tabName}] Content Type already has value: "${currentText}"`
-        );
-      }
-    }
-  }
+        let currentEditIndex = 0;
 
-  console.log('🎉 Done checking all tabs');
+        const processNextEditButton = () => {
+          if (currentEditIndex >= $editButtons.length) {
+            cy.log(`✅ [${tabConfig.name}] All ${$editButtons.length} Edit buttons processed`);
+            processTab(index + 1);
+            return;
+          }
+
+          cy.log(`📌 [${tabConfig.name}] Processing Edit button ${currentEditIndex + 1}/${$editButtons.length}`);
+
+          // ✅ Requery container และ Edit button ใหม่
+          cy.get('body').then(($b2) => {
+            const $freshContainer = $b2.find(tabConfig.containerSelector);
+            const $currentBtn = $freshContainer.find(tabConfig.editButtonSelector).eq(currentEditIndex);
+            
+            if (!$currentBtn.length) {
+              cy.log(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} disappeared, skipping...`);
+              currentEditIndex++;
+              processNextEditButton();
+              return;
+            }
+
+            const isHidden = Cypress.$($currentBtn).closest('[hidden]').length > 0;
+            if (isHidden) {
+              cy.log(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} is hidden, skipping...`);
+              currentEditIndex++;
+              processNextEditButton();
+              return;
+            }
+
+            cy.wrap($currentBtn).click({ force: true });
+            cy.wait(800);
+            cy.log(`✅ [${tabConfig.name}] Clicked Edit button #${currentEditIndex + 1}`);
+
+            // ✅ หา Content Type select ใน container
+            cy.get('body').then(($b3) => {
+              const $freshContainer2 = $b3.find(tabConfig.containerSelector);
+              const $allSelects = $freshContainer2.find(tabConfig.contentTypeSelector);
+              const $visibleSelects = $allSelects.filter((_i, el) => {
+                return Cypress.$(el).closest('[hidden]').length === 0;
+              });
+
+              cy.log(`📋 [${tabConfig.name}] Visible Content Type selects: ${$visibleSelects.length}`);
+
+              if (!$visibleSelects.length) {
+                cy.log(`⚠️ [${tabConfig.name}] No visible Content Type select found`);
+                currentEditIndex++;
+                processNextEditButton();
+                return;
+              }
+
+              const $select = $visibleSelects.first();
+              const select = $select[0] as unknown as HTMLSelectElement;
+              const selectedValue: string = select.value || '';
+              const isEmpty: boolean =
+                !selectedValue ||
+                selectedValue === 'null' ||
+                selectedValue === '' ||
+                selectedValue === '0: null' ||
+                select.selectedIndex <= 0;
+
+              cy.log(`[${tabConfig.name}] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`);
+
+              if (isEmpty) {
+                const validOptions = Array.from(select.options || []).filter(
+                  (opt: HTMLOptionElement) => opt && !opt.disabled && opt.value && opt.value !== 'null' && opt.value !== '0: null' && opt.value !== ''
+                );
+
+                cy.log(`📋 [${tabConfig.name}] Valid options: ${validOptions.length}`);
+
+                if (validOptions.length === 0) {
+                  cy.log(`⚠️ [${tabConfig.name}] No valid options to select`);
+                  currentEditIndex++;
+                  processNextEditButton();
+                  return;
+                }
+
+                const randomOption = validOptions[Math.floor(Math.random() * validOptions.length)];
+                
+                cy.wrap($select).select(randomOption.value, { force: true });
+                cy.wait(300);
+                cy.log(`✅ [${tabConfig.name}] Selected: "${randomOption.text?.trim() || 'Unknown'}"`);
+
+                // ✅ หา Update button ใน container
+                cy.get('body').then(($b4) => {
+                  const $freshContainer3 = $b4.find(tabConfig.containerSelector);
+                  const $updateBtn = $freshContainer3.find('button').filter((_i, btn) => {
+                    return btn.textContent?.trim() === 'Update' && 
+                           Cypress.$(btn).closest('[hidden]').length === 0;
+                  });
+
+                  cy.log(`📋 [${tabConfig.name}] Update button found: ${$updateBtn.length}`);
+
+                  if ($updateBtn.length) {
+                    cy.wrap($updateBtn.first()).click({ force: true });
+                    cy.log(`✅ [${tabConfig.name}] Clicked Update button`);
+                    cy.wait(1500);
+                    currentEditIndex++;
+                    processNextEditButton();
+                  } else {
+                    cy.log(`⚠️ [${tabConfig.name}] Update button not found`);
+                    currentEditIndex++;
+                    processNextEditButton();
+                  }
+                });
+              } else {
+                const currentText = select.options[select.selectedIndex]?.text?.trim() || 'Unknown';
+                cy.log(`✅ [${tabConfig.name}] Content Type already has value: "${currentText}"`);
+                currentEditIndex++;
+                processNextEditButton();
+              }
+            });
+          });
+        };
+
+        processNextEditButton();
+      });
+    });
+  };
+
+  processTab(0);
+  cy.log('🎉 Done checking all tabs');
 }
-
-async function checkAndFillCloudGameContentType(): Promise<void> {
-  
-  console.log('🚀 checkAndFillCloudGameContentType started');
-
-  const cloudGameComponent = document.querySelector<HTMLElement>(
-    'app-mass-enh-vr[title="Cloud Game"]'
-  );
-
-  console.log('📋 Cloud Game component found:', !!cloudGameComponent);
-
-  if (!cloudGameComponent) {
-    console.log('⚠️ Cloud Game component not found, skipping...');
-    return;
-  }
-
-  const editButtons = cloudGameComponent.querySelectorAll<HTMLButtonElement>(
-    'button.btn-warning[title="Edit"]'
-  );
-
-  console.log('📋 Edit buttons found:', editButtons.length);
-
-  if (editButtons.length === 0) {
-    console.log('⚠️ No Edit button found in Cloud Game');
-    return;
-  }
-
-  for (let i = 0; i < editButtons.length; i++) {
-    editButtons[i].click();
-    await wait(500);
-    console.log(`✅ [Cloud Game] Clicked Edit button #${i + 1}`);
-
-    const contentTypeSelect = cloudGameComponent.querySelector<HTMLSelectElement>(
-      'select[formcontrolname="contentTypeValue"]'
-    );
-
-    console.log(`📋 [Cloud Game] Content Type select found:`, !!contentTypeSelect);
-
-    if (!contentTypeSelect) {
-      console.log('⚠️ [Cloud Game] Content Type select not found');
-      continue;
-    }
-
-    const selectedValue: string = contentTypeSelect.value;
-    const isEmpty: boolean =
-      selectedValue === '' ||
-      selectedValue === 'null' ||
-      contentTypeSelect.selectedIndex < 0 ||
-      (contentTypeSelect.selectedIndex === 0 && contentTypeSelect.options[0]?.disabled);
-
-    console.log(
-      `[Cloud Game] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`
-    );
-
-    if (isEmpty) {
-      const validOptions = Array.from(contentTypeSelect.options).filter(
-        (opt: HTMLOptionElement) => !opt.disabled && opt.value !== '' && opt.value !== 'null'
-      );
-
-      console.log('📋 [Cloud Game] Valid options:', validOptions.map(o => o.text.trim()));
-
-      if (validOptions.length === 0) {
-        console.log('⚠️ [Cloud Game] No valid options to select');
-        continue;
-      }
-
-      const randomOption: HTMLOptionElement =
-        validOptions[Math.floor(Math.random() * validOptions.length)];
-
-      contentTypeSelect.value = randomOption.value;
-
-      contentTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-      contentTypeSelect.dispatchEvent(new Event('input', { bubbles: true }));
-
-      console.log(
-        `✅ [Cloud Game] Selected random Content Type: "${randomOption.text.trim()}"`
-      );
-
-      await wait(300);
-
-      const updateButton: HTMLButtonElement | null = findCloudGameUpdateButton(cloudGameComponent);
-
-      console.log('📋 [Cloud Game] Update button found:', !!updateButton);
-
-      if (updateButton) {
-        updateButton.click();
-        console.log('✅ [Cloud Game] Clicked Update button');
-        await wait(500);
-      } else {
-        console.log('⚠️ [Cloud Game] Update button not found');
-      }
-
-    } else {
-      const currentText =
-        contentTypeSelect.options[contentTypeSelect.selectedIndex]?.text.trim();
-      console.log(
-        `✅ [Cloud Game] Content Type already has value: "${currentText}"`
-      );
-    }
-  }
-
-  console.log('🎉 [Cloud Game] Done checking Content Type');
-}
-
 const updatePriorityInPanel = (): void => {
   cy.get('.panel-body').should('be.visible').then(($panelBody) => {
     const $priorityInput = $panelBody.find('input[formcontrolname="priority"]');
@@ -3689,7 +3750,7 @@ const updatePriorityInPanel = (): void => {
     
     let updateNeeded = false;
 
-    // เช็คและอัพเดท Priority
+    // เช็คและอัพเดท Priority                                                                         
     if ($priorityInput.length > 0 && $priorityInput.is(':visible')) {
       cy.wrap($priorityInput).invoke('val').then((val) => {
         if (!val || val === '') {
@@ -3766,10 +3827,9 @@ const updatePriorityInPanel = (): void => {
   });
 };
 
-// Main function
 const checkAndUpdatePriority = (): void => {
   cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
-  cy.wait(10000);
+  cy.wait(5000);
   cy.contains('th', 'Quota Type', { timeout: 15000 });
 
   const processRows = (rowIndex: number) => {
