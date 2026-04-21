@@ -32,14 +32,14 @@ describe('PLM', () => {
     Master.afterMKTontopPOST();
   });
 
-  describe.only('Scenario: ENTER', () => {
+  describe('Scenario: ENTER', () => {
     it('MKT POSTPAID role', () => {
       runMKTPostpaidFlow('ENTER', 'POST');
     });
     Master.afterMKTontopENTER();
   });
 
-  describe.only('Scenario: MUSIC', () => {
+  describe('Scenario: MUSIC', () => {
     it('MKT POSTPAID role', () => {
       runMKTPostpaidFlow('MUSIC', 'POST');
     });
