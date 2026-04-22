@@ -156,7 +156,7 @@ export const getCredentials = (module: Module): { user: string, pass: string } =
   return credMap[module] || credMap['POST'];
 };
 
-export const getTimeSuffix = (): string => `${day} ${month} ${hours} ${minutes}`;
+export const getTimeSuffix = (): string => `${day}${month} ${hours}${minutes}`;
 
 export const getTruncatedName = (baseName: string, suffix: string, maxLength: number): string => {
   let finalName = `${baseName} ${suffix}`;
@@ -1287,8 +1287,98 @@ export const approveProjectCGMD = (projectName: string): void => {
     'To Do List',
     '/cgmd/cgmd-configure',
     () => {
-      scrollAndWait();
+      // Helper function สำหรับสุ่มเลือก mat-option เพียง 1 ค่า (อัปเดตแก้ปัญหาคลิกไม่ติด)
+      const selectSingleRandomMatOption = () => {
+
+        // ดึงเฉพาะ option ที่สามารถคลิกได้ (ตัดตัวที่เป็น disabled หรือ search box ออก)
+        cy.get('.cdk-overlay-container mat-option:not(.mat-option-disabled)')
+          .should('have.length.greaterThan', 0)
+          .then(($options) => {
+
+            // สุ่ม index เพียง 1 ค่า
+            const randomIndex = Cypress._.random(0, $options.length - 1);
+
+            // นำ element ที่สุ่มได้มา เลื่อนหน้าจอให้เห็น และบังคับคลิก
+            cy.wrap($options.eq(randomIndex))
+              .scrollIntoView()
+              .click({ force: true });
+
+          });
+      };
+      // ---------------------------------------------------------
+      // Session DIY
+      // ---------------------------------------------------------
+      cy.get('body').then(($body) => {
+        if ($body.find('app-diy-description').length > 0) {
+          cy.log('พบ Session DIY - กำลังดำเนินการตั้งค่า');
+
+          // Click เปิด Session DIY
+          cy.get('app-diy-description .panel-heading').contains('DIY').click();
+
+          // สุ่ม SO ID (คลิกเปิด Dropdown แล้วเรียก Helper function)
+          cy.get('app-diy-description')
+            .contains('.col-md-1', 'SO ID :')
+            .next('.col-md-4')
+            .find('mat-select')
+            .click();
+          selectSingleRandomMatOption();
+
+          // สุ่ม Unit Name แบบ Dynamic (กวาดหาทุกแถวที่มี Dropdown)
+          cy.get('app-diy-description table tbody tr').each(($tr) => {
+
+            // เช็คว่าในแถวนี้มี mat-select ให้กดหรือไม่
+            if ($tr.find('mat-select').length > 0) {
+
+              const typeName = $tr.find('td.text-left').text().trim();
+              cy.log(`กำลังสุ่มเลือกข้อมูลให้กับ: ${typeName}`);
+
+              // กดเปิด Dropdown ในแถวนี้
+              cy.wrap($tr).find('mat-select').click();
+
+              // สุ่มเลือก Option 1 ค่า
+              selectSingleRandomMatOption();
+
+              // รอสักครู่ให้ Dropdown ปิดสนิทก่อนวนไปทำแถวถัดไป
+              cy.wait(500);
+            }
+          });
+
+          cy.get('app-diy-description button.btn-primary')
+            .contains('Save')
+            .scrollIntoView()         // เลื่อนหน้าจอลงไปหาปุ่มให้เจอ
+            .click({ force: true });
+
+        } else {
+          cy.log('ไม่พบ Session DIY');
+        }
+      });
+
+      // ---------------------------------------------------------
+      // SFF Product
+      // ---------------------------------------------------------
+      cy.get('body').then(($body) => {
+        if ($body.find('app-sff-template-cgmd-addition').length > 0) {
+          cy.log('พบ SFF Product - กำลังดำเนินการกรอกข้อมูล');
+
+          // สุ่มตัวเลขหรือข้อความ (ในที่นี้ใช้ตัวเลขสุ่ม 10 หลักเป็นตัวอย่าง)
+          const randomCommunityId = Cypress._.random(1000000000, 9999999999).toString();
+
+          // พิมพ์ค่าลงในช่อง Community Group ID
+          cy.get('app-sff-template-cgmd-addition input[formcontrolname="communityGroupId"]')
+            .should('be.visible')
+            .should('not.be.disabled')
+            .clear()
+            .type(randomCommunityId);
+
+          // กดปุ่ม Save ของส่วน SFF Product (ปุ่ม btn-success)
+          cy.get('app-sff-template-cgmd-addition button.btn-success').contains('Save').click();
+
+        } else {
+          cy.log('ไม่พบ SFF Product');
+        }
+      });
       handleAddToUSMP();
+      scrollAndWait();
       cy.get('button[name="CBS"]').should('be.visible', { timeout: 3000000 }).click();
       cy.contains('button', 'Yes').should('be.visible').click();
     },
@@ -1477,10 +1567,10 @@ const assignTaskViaTracking = (projectName: string, assignee: string, billingSys
   cy.get('a[href="#/new-report/home/tracking"]').click();
   cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
 
-  cy.get('table.table.table-condensed', { timeout: 20000 }).should('be.visible');
-  cy.get('table.table.table-condensed tbody tr', { timeout: 20000 })
+  cy.get('table.table.table-condensed', { timeout: 200000 }).should('be.visible');
+  cy.get('table.table.table-condensed tbody tr', { timeout: 200000 })
     .first().find('td').first().should('not.be.empty');
-  cy.contains('table.table.table-condensed tbody td', 'PLM', { timeout: 20000 }).should('be.visible');
+  cy.contains('table.table.table-condensed tbody td', 'PLM', { timeout: 200000 }).should('be.visible');
 
   assignTeamTask(projectName, assignee, billingSystem);
 };
@@ -1503,12 +1593,12 @@ const performRoleTaskWithAssignment = (
   // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.visit('/#/workspace-home/workspace');
   // cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-  // const projectNamePONAME= 'MOB POST onetime main 2104 1848';
-  const projectNamePONAME: string = getStandardProjectName();
+  const projectNamePONAME = 'MOB POST onetime main 2104 1100';
+  // const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
 
-  assignTaskViaTracking(projectNamePONAME, assignee, BillingSystem);
-  navigateToWorkspace();
+  // assignTaskViaTracking(projectNamePONAME, assignee, BillingSystem);
+  // navigateToWorkspace();
 
   cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
   approveFunction(projectNamePONAME);
@@ -1713,7 +1803,7 @@ export const beforeapproveCKSontop = (): void => {
 // ========================
 
 export const afterCKSPOST = (Module?: string): void => {
-  it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB'));
+  it.only('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB'));
   it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB'));
   it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM));
   it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER));
@@ -5727,8 +5817,8 @@ const generateProjectNames = (
     prefixName = `${ModulePart} ${PriceType} ${ProductClass} ${pluginSuffix}`;
   }
 
-  const projectName = getTruncatedName(prefixName,timeSuffix, 40);
-  const poName = getTruncatedName(prefixName,timeSuffix, 37);
+  const projectName = getTruncatedName(prefixName, timeSuffix, 40);
+  const poName = getTruncatedName(prefixName, timeSuffix, 37);
 
   return { projectName, poName, prefixName };
 };
@@ -5921,258 +6011,568 @@ const createPOWordingPools = (
     // ===== SHORT PROMOTION NAME =====
     shortPromotionName: {
       EN: [
-        `${p} Special Offer`,
-        `${p} Best Value`,
-        `${p} Limited Deal`,
-        `${p} Top Pick`,
-        `${p} Exclusive`,
-        `${p} Premium Choice`,
-        `Promo: ${p}`,
-        `Deal: ${p}`,
-        `Offer – ${p}`,
-        `Package: ${p}`,
-        `Special: ${p}`,
-        `Bundle: ${p}`,
-        `${p} Flash Sale`,
-        `${p} Hot Deal`,
-        `${p} Mega Saver`,
-        `${p} Pro`,
-        `${p} Max`,
-        `${p} Unlimited`,
-        `${p} ${dataAmount}`,
-        `${p} ${speed}`,
-        `${p} ${discount}% Off`,
+        `${p} Value Pack`,
+        `${p} Smart Deal`,
+        `${p} Power Plan`,
+        `${p} Daily Deal`,
+        `${p} Big Save`,
+        `${p} Speed Pack`,
+        `${p} Data King`,
+        `${p} Net Plus`,
+        `${p} Always On`,
+        `${p} Full Power`,
+        `${p} Next Level`,
+        `${p} My Choice`,
+        `${p} Go Extra`,
+        `${p} Double Up`,
+        `${p} Hero`,
+        `${p} Ace`,
+        `${p} Edge`,
+        `${p} Flex`,
+        `${p} Rise`,
+        `${p} Zone`,
+        `${p} Core Plus`,
+        `${p} Super Plan`,
+        `${p} Fast Lane`,
+        `${p} All Day`,
+        `${p} Family Plan`,
+        `${p} Business Pack`,
+        `${p} Weekend Pick`,
+        `${p} Monthly Star`,
+        `${p} Top Value`,
+        `${p} Best Buy`,
       ],
       TH: [
-        `${p} ข้อเสนอพิเศษ`,
-        `${p} คุ้มที่สุด`,
-        `${p} ดีลพิเศษ`,
-        `${p} แนะนำ`,
-        `${p} เอ็กซ์คลูซีฟ`,
-        `${p} พรีเมียม`,
-        `โปรฯ: ${p}`,
-        `ดีล: ${p}`,
-        `ข้อเสนอ – ${p}`,
-        `แพ็กเกจ: ${p}`,
-        `พิเศษ: ${p}`,
-        `บันเดิล: ${p}`,
-        `${p} แฟลชเซล`,
-        `${p} ดีลด่วน`,
-        `${p} เมกะเซฟเวอร์`,
-        `${p} โปร`,
-        `${p} แม็กซ์`,
-        `${p} ไม่จำกัด`,
-        `${p} ${dataAmount}`,
-        `${p} ${speed}`,
-        `${p} ลด ${discount}%`,
+        `${p} แพ็กคุ้ม`,
+        `${p} ดีลฉลาด`,
+        `${p} พลานพาวเวอร์`,
+        `${p} ดีลรายวัน`,
+        `${p} ประหยัดสุด`,
+        `${p} แพ็กความเร็ว`,
+        `${p} ดาต้าคิง`,
+        `${p} เน็ตพลัส`,
+        `${p} ออนตลอด`,
+        `${p} พลังเต็ม`,
+        `${p} ขั้นต่อไป`,
+        `${p} ของฉัน`,
+        `${p} โกเอ็กซ์ตร้า`,
+        `${p} ดับเบิลอัป`,
+        `${p} ฮีโร่`,
+        `${p} เอซ`,
+        `${p} เอดจ์`,
+        `${p} เฟล็กซ์`,
+        `${p} ไรส์`,
+        `${p} โซน`,
+        `${p} คอร์พลัส`,
+        `${p} ซูเปอร์แพลน`,
+        `${p} เลนเร็ว`,
+        `${p} ตลอดวัน`,
+        `${p} แพลนครอบครัว`,
+        `${p} แพ็กธุรกิจ`,
+        `${p} พิเศษวีคเอนด์`,
+        `${p} สตาร์ประจำเดือน`,
+        `${p} คุ้มสุดคุ้ม`,
+        `${p} ซื้อดีที่สุด`,
       ],
     },
 
     // ===== PROMOTION DESCRIPTION =====
     promotionDescription: {
       EN: [
-        `Subscribe to ${p} and enjoy ${dataAmount} of high-speed data at ${speed}. This ${modName.EN} package includes unlimited calls, ${benefit1}, and ${benefit2}. Only ${price} THB/month!`,
-        `${p} gives you the best value with ${dataAmount} data, ${speed} speeds, and premium features. ${benefit1} included. Sign up today!`,
-        `Experience seamless ${modName.EN} with ${p}. ${dataAmount} data allowance, unlimited domestic calls, and 5G ready. Special launch price: ${price} THB.`,
-        `${p}: More data, better experience. ${dataAmount} @ ${speed}, ${benefit1}, ${benefit2}. ${price} THB/month. Limited time offer!`,
-        `Get ${dataAmount} of high-speed ${modName.EN} data for just ${price} THB with ${p}. Includes ${benefit1} and ${benefit2}.`,
+        `Sign up for ${p} and get ${dataAmount} of data at ${speed} plus unlimited calls for just ${price} THB per month`,
+        `${p} is the ${modName.EN} package that gives you ${dataAmount} data ${speed} speeds and ${benefit1} all in one`,
+        `Get more done every day with ${p} featuring ${dataAmount} data at ${speed} and ${benefit2} included`,
+        `${p} is your complete ${modName.EN} solution with ${dataAmount} data unlimited calls and 5G access at ${price} THB`,
+        `Try ${p} and enjoy ${dataAmount} high speed data plus ${benefit1} and ${benefit2} for only ${price} THB monthly`,
+        `${p} gives you ${dataAmount} of ${modName.EN} data at ${speed} so you never slow down`,
+        `Choose ${p} for ${dataAmount} data ${speed} connectivity and top features at just ${price} THB a month`,
+        `Stay connected with ${p} and enjoy ${dataAmount} data ${benefit1} and unlimited domestic calls all day`,
+        `${p} is built for modern users offering ${dataAmount} data at ${speed} plus ${benefit1} and ${benefit2}`,
+        `Upgrade to ${p} today and get ${dataAmount} of data at ${speed} with full 5G support for ${price} THB`,
+        `${p} combines great speed and generous data giving you ${dataAmount} at ${speed} every single month`,
+        `Subscribe to ${p} and unlock ${dataAmount} data at ${speed} plus exclusive benefits for ${price} THB`,
+        `With ${p} you get ${dataAmount} of high speed data at ${speed} and the freedom to do more`,
+        `${p} packs in ${dataAmount} data ${speed} speeds unlimited calls and ${benefit1} at just ${price} THB per month`,
+        `Activate ${p} now and start enjoying ${dataAmount} data unlimited calls and ${benefit1} right away`,
+        `${p} brings you ${dataAmount} of fast ${modName.EN} data and premium features at an unbeatable price`,
+        `${p} is the all in one ${modName.EN} package with ${dataAmount} data ${benefit1} and ${benefit2} ready for you`,
+        `Take your connectivity to the next level with ${p} and enjoy ${dataAmount} data plus ${benefit2}`,
+        `${p} is designed for those who need ${dataAmount} data ${speed} and ${benefit1} without compromise`,
+        `Get everything you need with ${p} including ${dataAmount} data at ${speed} and ${benefit2} for ${price} THB`,
       ],
       TH: [
-        `สมัคร ${p} และรับเน็ตความเร็วสูง ${dataAmount} ที่ความเร็ว ${speed} แพ็กเกจ${modName.TH}นี้รวมโทรฟรีไม่จำกัด ${benefit1TH} และ${benefit2TH} เพียง ${price} บาท/เดือน!`,
-        `${p} ให้ความคุ้มค่าสูงสุดด้วยเน็ต ${dataAmount} ความเร็ว ${speed} และฟีเจอร์พรีเมียม ${benefit1TH} รวมอยู่แล้ว สมัครวันนี้!`,
-        `สัมผัสประสบการณ์${modName.TH}ที่ราบรื่นกับ ${p} เน็ต ${dataAmount} โทรฟรีทุกเครือข่ายไม่จำกัด รองรับ 5G ราคาเปิดตัวพิเศษ ${price} บาท`,
-        `${p}: เน็ตเยอะกว่า ประสบการณ์ดีกว่า ${dataAmount} @ ${speed} ${benefit1TH} ${benefit2TH} ${price} บาท/เดือน ข้อเสนอจำนวนจำกัด!`,
-        `รับเน็ต${modName.TH}ความเร็วสูง ${dataAmount} ในราคาเพียง ${price} บาท กับ ${p} รวม ${benefit1TH} และ ${benefit2TH}`,
+        `สมัคร ${p} รับเน็ต ${dataAmount} ความเร็ว ${speed} พร้อมโทรฟรีไม่จำกัดในราคาเพียง ${price} บาทต่อเดือน`,
+        `${p} คือแพ็กเกจ${modName.TH}ที่มอบเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}ครบในที่เดียว`,
+        `ทำได้มากขึ้นทุกวันด้วย ${p} ที่มีเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit2TH}รวมไว้แล้ว`,
+        `${p} คือโซลูชัน${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} โทรฟรีไม่จำกัด และ 5G ที่ ${price} บาท`,
+        `ลอง ${p} และเพลิดเพลินกับเน็ตความเร็วสูง ${dataAmount} พร้อม${benefit1TH}และ${benefit2TH}เพียง ${price} บาทต่อเดือน`,
+        `${p} มอบเน็ต${modName.TH} ${dataAmount} ที่ความเร็ว ${speed} ทำให้คุณไม่มีวันช้าลง`,
+        `เลือก ${p} สำหรับเน็ต ${dataAmount} การเชื่อมต่อ ${speed} และฟีเจอร์ชั้นยอดในราคาเพียง ${price} บาทต่อเดือน`,
+        `เชื่อมต่อกับ ${p} และเพลิดเพลินกับเน็ต ${dataAmount} ${benefit1TH} และโทรฟรีไม่จำกัดตลอดวัน`,
+        `${p} สร้างมาสำหรับผู้ใช้ยุคใหม่ มอบเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อม${benefit1TH}และ${benefit2TH}`,
+        `อัปเกรดเป็น ${p} วันนี้รับเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมรองรับ 5G เต็มรูปแบบในราคา ${price} บาท`,
+        `${p} ผสานความเร็วสูงและเน็ตปริมาณมากมอบ ${dataAmount} ที่ ${speed} ทุกเดือน`,
+        `สมัคร ${p} ปลดล็อกเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมสิทธิพิเศษในราคา ${price} บาท`,
+        `กับ ${p} คุณได้เน็ตความเร็วสูง ${dataAmount} ที่ ${speed} และอิสระในการทำสิ่งต่างๆ มากขึ้น`,
+        `${p} อัดแน่นด้วยเน็ต ${dataAmount} ความเร็ว ${speed} โทรฟรีไม่จำกัด และ${benefit1TH}ในราคาเพียง ${price} บาทต่อเดือน`,
+        `เปิดใช้ ${p} ตอนนี้และเริ่มเพลิดเพลินกับเน็ต ${dataAmount} โทรฟรีไม่จำกัด และ${benefit1TH}ได้ทันที`,
+        `${p} มอบเน็ต${modName.TH}ความเร็วสูง ${dataAmount} และฟีเจอร์พรีเมียมในราคาที่ไม่มีใครเทียบ`,
+        `${p} คือแพ็กเกจ${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} ${benefit1TH} และ${benefit2TH}พร้อมสำหรับคุณ`,
+        `ยกระดับการเชื่อมต่อด้วย ${p} และเพลิดเพลินกับเน็ต ${dataAmount} พร้อม${benefit2TH}`,
+        `${p} ออกแบบมาสำหรับผู้ที่ต้องการเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}โดยไม่ยอมรับน้อยกว่า`,
+        `ได้ทุกสิ่งที่ต้องการกับ ${p} รวมเน็ต ${dataAmount} ที่ความเร็ว ${speed} และ${benefit2TH}ในราคา ${price} บาท`,
       ],
     },
 
     // ===== GREETING LETTER =====
     greetingLetter: {
       EN: [
-        `Dear customer, thank you for subscribing to ${p}. Your ${modName.EN} package is now active with ${dataAmount} of high-speed data. Enjoy seamless connectivity and exclusive benefits!`,
-        `Hello! Welcome to ${p}. We're thrilled to have you on board. Your ${modName.EN} service includes ${dataAmount} data, unlimited calls, and more. Enjoy`,
-        `Congratulations on choosing ${p}! Your subscription is confirmed. ${dataAmount} data, ${speed} speeds, and premium features are ready for you.`,
-        `Welcome to the ${p} family! Your ${modName.EN} package is now live. Enjoy ${dataAmount} of data, ${benefit1}, and ${benefit2}.`,
-        `Thank you for joining ${p}. Your account is active and ready to use. ${dataAmount} data allowance, unlimited calls, and 5G access included.`,
+        `Dear customer we are glad to confirm that your ${p} subscription is now active and ready to use`,
+        `Hello and welcome to ${p} your ${modName.EN} package is live and all features are available to you`,
+        `Dear valued customer your ${p} plan has been successfully activated with ${dataAmount} of data ready for you`,
+        `Welcome to the ${p} family we are thrilled to have you and hope you enjoy every benefit included`,
+        `Dear customer your ${p} subscription has been confirmed and your ${dataAmount} data at ${speed} is now ready`,
+        `Hello we are happy to let you know that ${p} is now active on your account enjoy your benefits`,
+        `Dear customer thank you for trusting us with your ${modName.EN} needs we are proud to bring you ${p}`,
+        `Welcome aboard ${p} we have activated your ${dataAmount} data package and it is ready for you today`,
+        `Dear subscriber your ${p} plan is fully live including ${benefit1} and ${benefit2} starting from today`,
+        `Hello valued customer your ${p} subscription starts now enjoy ${dataAmount} of data at ${speed}`,
+        `Dear customer we are pleased to welcome you to ${p} your account is fully set up and ready`,
+        `Thank you for joining ${p} dear customer your ${modName.EN} package is now confirmed and active`,
+        `Dear customer ${p} is now yours enjoy ${dataAmount} data at ${speed} plus all the premium features included`,
+        `Hello welcome to ${p} we have set everything up for you so you can start enjoying your benefits today`,
+        `Dear customer your ${p} journey starts here we are excited to be part of your connected life`,
+        `Welcome to ${p} dear customer we hope this ${modName.EN} package brings great value to your everyday life`,
+        `Dear valued customer we confirm that ${p} is now running on your account with ${dataAmount} data ready`,
+        `Hello and thank you for choosing ${p} your ${modName.EN} subscription is active and all set for you`,
+        `Dear customer we are honored to have you on ${p} and we are committed to giving you the best experience`,
+        `Welcome dear customer ${p} is now active enjoy ${dataAmount} data ${speed} speeds and unlimited calls`,
+        `Dear customer your ${p} plan includes ${benefit1} and ${benefit2} and everything is ready for you now`,
+        `Hello ${p} is successfully activated on your number enjoy seamless ${modName.EN} service from today`,
+        `Dear subscriber welcome to ${p} your ${dataAmount} data and premium features are all set and ready`,
+        `Thank you for choosing ${p} dear customer we promise to deliver the best ${modName.EN} experience to you`,
+        `Dear customer your ${p} subscription is now live and we are here to support you every step of the way`,
+        `Welcome to ${p} we are glad you are here your package is active and all your benefits are unlocked`,
+        `Dear customer we have activated ${p} for you enjoy ${dataAmount} data at ${speed} starting right now`,
+        `Hello and welcome we are happy to confirm that ${p} is now part of your account`,
+        `Dear customer ${p} is set up and ready for you we hope you enjoy every feature of this package`,
+        `Welcome aboard dear customer ${p} is now live on your number and ready to serve you`,
       ],
       TH: [
-        `เรียนลูกค้า ขอบคุณที่สมัครใช้บริการ ${p} แพ็กเกจ${modName.TH}ของคุณพร้อมใช้งานแล้วด้วยเน็ตความเร็วสูง ${dataAmount} ขอให้เพลิดเพลินกับการเชื่อมต่อที่ราบรื่นและสิทธิพิเศษ`,
-        `สวัสดี! ยินดีต้อนรับสู่ ${p} เรายินดีที่คุณมาร่วมกับเรา บริการ${modName.TH}ของคุณรวมเน็ต ${dataAmount} โทรฟรีไม่จำกัด และอื่นๆ อีกมากมาย ขอให้สนุก`,
-        `ยินดีด้วยที่คุณเลือก ${p}! การสมัครของคุณได้รับการยืนยันแล้ว เน็ต ${dataAmount} ความเร็ว ${speed} และฟีเจอร์พรีเมียมพร้อมสำหรับคุณแล้ว`,
-        `ยินดีต้อนรับสู่ครอบครัว ${p}! แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ${benefit1TH} และ ${benefit2TH}`,
-        `ขอบคุณที่ร่วมใช้ ${p} บัญชีของคุณพร้อมใช้งานแล้ว เน็ต ${dataAmount} โทรฟรีไม่จำกัด และการเข้าถึง 5G รวมอยู่แล้ว`,
+        `เรียนลูกค้า เรายินดียืนยันว่าการสมัคร ${p} ของคุณพร้อมใช้งานแล้ว`,
+        `สวัสดีและยินดีต้อนรับสู่ ${p} แพ็กเกจ${modName.TH}ของคุณมีผลแล้วและฟีเจอร์ทั้งหมดพร้อมใช้`,
+        `เรียนลูกค้าที่มีคุณค่า แผน ${p} ของคุณถูกเปิดใช้งานสำเร็จพร้อมเน็ต ${dataAmount} รอคุณอยู่`,
+        `ยินดีต้อนรับสู่ครอบครัว ${p} เรารู้สึกตื่นเต้นที่มีคุณอยู่ด้วยและหวังว่าคุณจะสนุกกับทุกสิทธิพิเศษ`,
+        `เรียนลูกค้า การสมัคร ${p} ของคุณได้รับการยืนยันแล้ว เน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมแล้ว`,
+        `สวัสดี เรายินดีแจ้งให้ทราบว่า ${p} เปิดใช้งานบนบัญชีของคุณแล้ว ขอให้เพลิดเพลินกับสิทธิพิเศษ`,
+        `เรียนลูกค้า ขอบคุณที่ไว้วางใจเราดูแลความต้องการด้าน${modName.TH}ของคุณ เรายินดีนำเสนอ ${p}`,
+        `ยินดีต้อนรับสู่ ${p} เราได้เปิดใช้งานแพ็กเกจเน็ต ${dataAmount} ของคุณและพร้อมให้บริการวันนี้`,
+        `เรียนสมาชิก แผน ${p} ของคุณมีผลสมบูรณ์แล้ว รวมถึง${benefit1TH}และ${benefit2TH}ตั้งแต่วันนี้`,
+        `สวัสดีลูกค้าที่มีคุณค่า การสมัคร ${p} ของคุณเริ่มต้นแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ที่ ${speed}`,
+        `เรียนลูกค้า เรายินดีต้อนรับคุณสู่ ${p} บัญชีของคุณตั้งค่าครบถ้วนและพร้อมใช้งานแล้ว`,
+        `ขอบคุณที่ร่วมใช้ ${p} เรียนลูกค้า แพ็กเกจ${modName.TH}ของคุณได้รับการยืนยันและเปิดใช้งานแล้ว`,
+        `เรียนลูกค้า ${p} เป็นของคุณแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ที่ ${speed} พร้อมฟีเจอร์พรีเมียมทั้งหมด`,
+        `สวัสดี ยินดีต้อนรับสู่ ${p} เราจัดการทุกอย่างไว้ให้คุณแล้ว เริ่มเพลิดเพลินกับสิทธิพิเศษได้วันนี้`,
+        `เรียนลูกค้า การเดินทางกับ ${p} ของคุณเริ่มที่นี่ เรารู้สึกตื่นเต้นที่ได้เป็นส่วนหนึ่งของชีวิตที่เชื่อมต่อของคุณ`,
+        `ยินดีต้อนรับสู่ ${p} เรียนลูกค้า หวังว่าแพ็กเกจ${modName.TH}นี้จะมอบคุณค่าที่ยิ่งใหญ่ให้ชีวิตประจำวันของคุณ`,
+        `เรียนลูกค้าที่มีคุณค่า เรายืนยันว่า ${p} ทำงานบนบัญชีของคุณแล้วพร้อมเน็ต ${dataAmount}`,
+        `สวัสดีและขอบคุณที่เลือก ${p} การสมัคร${modName.TH}ของคุณมีผลและพร้อมสำหรับคุณแล้ว`,
+        `เรียนลูกค้า เรารู้สึกเป็นเกียรติที่มีคุณอยู่บน ${p} และมุ่งมั่นที่จะมอบประสบการณ์ที่ดีที่สุดให้คุณ`,
+        `ยินดีต้อนรับเรียนลูกค้า ${p} เปิดใช้งานแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ความเร็ว ${speed} และโทรฟรีไม่จำกัด`,
+        `เรียนลูกค้า แผน ${p} ของคุณรวม${benefit1TH}และ${benefit2TH}ทุกอย่างพร้อมสำหรับคุณแล้ว`,
+        `สวัสดี ${p} ถูกเปิดใช้งานบนเบอร์ของคุณสำเร็จแล้ว เพลิดเพลินกับบริการ${modName.TH}ที่ราบรื่นตั้งแต่วันนี้`,
+        `เรียนสมาชิก ยินดีต้อนรับสู่ ${p} เน็ต ${dataAmount} และฟีเจอร์พรีเมียมของคุณพร้อมทั้งหมดแล้ว`,
+        `ขอบคุณที่เลือก ${p} เรียนลูกค้า เราสัญญาว่าจะมอบประสบการณ์${modName.TH}ที่ดีที่สุดให้คุณ`,
+        `เรียนลูกค้า การสมัคร ${p} ของคุณมีผลแล้วและเราอยู่เคียงข้างคุณในทุกขั้นตอน`,
+        `ยินดีต้อนรับสู่ ${p} เรายินดีที่คุณอยู่ที่นี่ แพ็กเกจของคุณเปิดใช้งานแล้วและสิทธิพิเศษทั้งหมดพร้อมแล้ว`,
+        `เรียนลูกค้า เราเปิดใช้งาน ${p} ให้คุณแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ที่ ${speed} ตั้งแต่ตอนนี้`,
+        `สวัสดีและยินดีต้อนรับ เรายินดียืนยันว่า ${p} เป็นส่วนหนึ่งของบัญชีคุณแล้ว`,
+        `เรียนลูกค้า ${p} ตั้งค่าและพร้อมสำหรับคุณแล้ว หวังว่าคุณจะสนุกกับทุกฟีเจอร์ของแพ็กเกจนี้`,
+        `ยินดีต้อนรับเรียนลูกค้า ${p} เปิดใช้งานบนเบอร์ของคุณแล้วและพร้อมให้บริการ`,
       ],
     },
 
     // ===== YOUR PACKAGE NAME =====
     yourPackageName: {
       EN: [
-        `You are subscribed to ${p}`,
-        `Your package: ${p}`,
-        `Active plan: ${p}`,
-        `Current package: ${p}`,
-        `${p} (Active)`,
-        `${p} - ${dataAmount}`,
-        `${p} ${modName.EN} ${ptName.EN}`,
+        `Your plan: ${p}`,
+        `Currently on: ${p}`,
+        `Active subscription: ${p}`,
+        `Subscribed plan: ${p}`,
+        `Running package: ${p}`,
+        `Now on: ${p}`,
+        `Package in use: ${p}`,
+        `My plan: ${p}`,
+        `Signed up for: ${p}`,
+        `Live package: ${p}`,
+        `Enrolled plan: ${p}`,
+        `Chosen package: ${p}`,
+        `${p} is active`,
+        `${p} ${dataAmount} plan`,
+        `${p} ${modName.EN} ${ptName.EN} active`,
       ],
       TH: [
-        `คุณกำลังใช้งาน ${p}`,
-        `แพ็กเกจของคุณ: ${p}`,
-        `แผนปัจจุบัน: ${p}`,
-        `แพ็กเกจที่ใช้งาน: ${p}`,
-        `${p} (ใช้งานอยู่)`,
-        `${p} - ${dataAmount}`,
-        `${p} ${modName.TH} ${ptName.TH}`,
+        `แผนของคุณ: ${p}`,
+        `ใช้งานอยู่: ${p}`,
+        `การสมัครที่ใช้งาน: ${p}`,
+        `แผนที่สมัคร: ${p}`,
+        `แพ็กเกจที่รัน: ${p}`,
+        `ตอนนี้ใช้: ${p}`,
+        `แพ็กเกจที่ใช้: ${p}`,
+        `แผนของฉัน: ${p}`,
+        `สมัครอยู่กับ: ${p}`,
+        `แพ็กเกจที่มีผล: ${p}`,
+        `แผนที่ลงทะเบียน: ${p}`,
+        `แพ็กเกจที่เลือก: ${p}`,
+        `${p} ใช้งานอยู่`,
+        `${p} แผน ${dataAmount}`,
+        `${p} ${modName.TH} ${ptName.TH} ใช้งานอยู่`,
       ],
     },
 
     // ===== SMS GREETING =====
     smsGreeting: {
       EN: [
-        `Welcome to ${p}! Your subscription is now active. Enjoy ${dataAmount} data!`,
-        `Hi! You've successfully joined ${p}. ${dataAmount} data ready to use.`,
-        `${p} activated! Enjoy ${dataAmount} of high-speed data.`,
-        `Welcome! ${p} is live on your number. ${benefit1} included.`,
-        `Thanks for choosing ${p}! Your ${dataAmount} data package is ready.`,
-        `You're on ${p}! Enjoy ${speed} speeds and unlimited calls.`,
-        `${p}: Your ${modName.EN} package is active. Start exploring!`,
+        `Welcome to ${p} your package is now active and ready`,
+        `You have joined ${p} enjoy ${dataAmount} data starting today`,
+        `${p} is now on enjoy your ${modName.EN} benefits`,
+        `Your ${p} plan is live and all features are unlocked`,
+        `Thanks for choosing ${p} enjoy ${dataAmount} at ${speed}`,
+        `${p} is active on your number enjoy every benefit`,
+        `You are now on ${p} ${dataAmount} data is ready for you`,
+        `${p} subscription confirmed enjoy seamless connectivity`,
+        `Hello and welcome your ${p} package is active now`,
+        `${p} is running on your account enjoy your plan today`,
+        `Great choice ${p} is now live enjoy the full experience`,
+        `${p} activated and ${dataAmount} data ready for you`,
+        `Your journey with ${p} starts now enjoy every moment`,
+        `${p} is set up and ready go ahead and explore`,
+        `You are all set with ${p} start enjoying right now`,
+        `Welcome aboard ${p} your ${modName.EN} plan is live`,
+        `${p} is yours enjoy ${dataAmount} at ${speed} from today`,
+        `${p} is on and your ${dataAmount} data is waiting for you`,
+        `Your ${p} plan is active enjoy unlimited calls and ${benefit1}`,
+        `${p} is fully live welcome and enjoy all the perks`,
+        `You are officially on ${p} make the most of it`,
+        `${p} unlocked and ready enjoy ${dataAmount} data today`,
+        `Thank you for subscribing to ${p} enjoy your benefits`,
+        `${p} is now yours go explore everything it offers`,
+        `Your ${p} package is confirmed and active right now`,
+        `${p} is here for you enjoy ${modName.EN} service today`,
+        `All set ${p} is live and waiting for you`,
+        `You have ${p} now enjoy ${dataAmount} and ${benefit1}`,
+        `${p} is activated enjoy top speed and great value`,
+        `${p} your ${modName.EN} package is active start exploring`,
       ],
       TH: [
-        `ยินดีต้อนรับสู่ ${p}! แพ็กเกจของคุณพร้อมใช้งานแล้ว รับเน็ต ${dataAmount}!`,
-        `สวัสดี! คุณสมัคร ${p} สำเร็จแล้ว เน็ต ${dataAmount} พร้อมใช้งาน`,
-        `เปิดใช้งาน ${p} แล้ว! เพลิดเพลินกับเน็ตความเร็วสูง ${dataAmount}`,
-        `ยินดีต้อนรับ! ${p} พร้อมใช้งานบนเบอร์ของคุณแล้ว ${benefit1TH} รวมอยู่ด้วย`,
-        `ขอบคุณที่เลือก ${p}! แพ็กเกจเน็ต ${dataAmount} ของคุณพร้อมแล้ว`,
-        `คุณใช้ ${p} อยู่! เพลิดเพลินกับความเร็ว ${speed} และโทรฟรีไม่จำกัด`,
-        `${p}: แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เริ่มสำรวจได้เลย!`,
+        `ยินดีต้อนรับสู่ ${p} แพ็กเกจของคุณพร้อมใช้งานแล้ว`,
+        `คุณเข้าร่วม ${p} แล้ว เพลิดเพลินกับเน็ต ${dataAmount} ตั้งแต่วันนี้`,
+        `${p} เปิดแล้ว เพลิดเพลินกับสิทธิพิเศษ${modName.TH}ของคุณ`,
+        `แผน ${p} ของคุณมีผลแล้วและฟีเจอร์ทั้งหมดพร้อมใช้`,
+        `ขอบคุณที่เลือก ${p} เพลิดเพลินกับ ${dataAmount} ที่ ${speed}`,
+        `${p} เปิดใช้งานบนเบอร์ของคุณแล้ว เพลิดเพลินกับทุกสิทธิพิเศษ`,
+        `ตอนนี้คุณอยู่บน ${p} แล้ว เน็ต ${dataAmount} พร้อมสำหรับคุณ`,
+        `ยืนยันการสมัคร ${p} แล้ว เพลิดเพลินกับการเชื่อมต่อที่ราบรื่น`,
+        `สวัสดีและยินดีต้อนรับ แพ็กเกจ ${p} ของคุณเปิดใช้งานแล้ว`,
+        `${p} ทำงานบนบัญชีของคุณแล้ว เพลิดเพลินกับแผนของคุณวันนี้`,
+        `เลือกได้ดีมาก ${p} เปิดใช้งานแล้ว เพลิดเพลินกับประสบการณ์เต็มรูปแบบ`,
+        `${p} เปิดใช้งานแล้วและเน็ต ${dataAmount} พร้อมสำหรับคุณ`,
+        `การเดินทางกับ ${p} ของคุณเริ่มแล้ว เพลิดเพลินกับทุกช่วงเวลา`,
+        `${p} ตั้งค่าและพร้อมแล้ว ไปสำรวจได้เลย`,
+        `คุณพร้อมหมดแล้วกับ ${p} เริ่มเพลิดเพลินได้ตอนนี้`,
+        `ยินดีต้อนรับ ${p} แผน${modName.TH}ของคุณมีผลแล้ว`,
+        `${p} เป็นของคุณแล้ว เพลิดเพลินกับ ${dataAmount} ที่ ${speed} ตั้งแต่วันนี้`,
+        `${p} เปิดแล้วและเน็ต ${dataAmount} รอคุณอยู่`,
+        `แผน ${p} ของคุณพร้อมแล้ว เพลิดเพลินกับโทรฟรีไม่จำกัดและ${benefit1TH}`,
+        `${p} มีผลสมบูรณ์แล้ว ยินดีต้อนรับและเพลิดเพลินกับสิทธิพิเศษทั้งหมด`,
+        `คุณอยู่บน ${p} อย่างเป็นทางการแล้ว ใช้ให้คุ้มค่าที่สุด`,
+        `${p} ปลดล็อกแล้วและพร้อม เพลิดเพลินกับเน็ต ${dataAmount} วันนี้`,
+        `ขอบคุณที่สมัคร ${p} เพลิดเพลินกับสิทธิพิเศษของคุณ`,
+        `${p} เป็นของคุณแล้ว ไปสำรวจทุกสิ่งที่มีให้`,
+        `ยืนยันและเปิดใช้งานแพ็กเกจ ${p} ของคุณแล้ว`,
+        `${p} อยู่ที่นี่เพื่อคุณ เพลิดเพลินกับบริการ${modName.TH}วันนี้`,
+        `พร้อมหมดแล้ว ${p} เปิดใช้งานและรอคุณอยู่`,
+        `คุณมี ${p} แล้ว เพลิดเพลินกับ ${dataAmount} และ${benefit1TH}`,
+        `${p} เปิดใช้งานแล้ว เพลิดเพลินกับความเร็วสูงและความคุ้มค่ายอดเยี่ยม`,
+        `${p} แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เริ่มสำรวจได้เลย`,
       ],
     },
 
     // ===== SMS DELETE =====
     smsDelete: {
       EN: [
-        `Your ${p} package has been removed. Thank you for using our service.`,
-        `${p} has been unsubscribed. Hope to see you again!`,
-        `You have cancelled ${p}. We appreciate your loyalty.`,
-        `${p} is now deactivated. Thank you for being with us.`,
-        `Your ${p} subscription has ended. Come back anytime!`,
-        `${p} service stopped. Thanks for choosing us.`,
+        `Your ${p} package has been cancelled thank you for using our service`,
+        `${p} has been removed from your number we hope to see you again`,
+        `Your ${p} plan is now deactivated thank you for being with us`,
+        `We have cancelled ${p} on your account thank you for your loyalty`,
+        `${p} has been successfully unsubscribed we value your time with us`,
+        `Your request to cancel ${p} is complete we hope you enjoyed the service`,
+        `${p} is now off on your number feel free to rejoin anytime`,
+        `We confirm the removal of ${p} from your account`,
+        `Your ${p} subscription has ended we appreciate every moment you spent with us`,
+        `${p} removed we hope your experience was a great one`,
+        `Thank you for using ${p} your package has now been cancelled`,
+        `${p} is no longer active on your number come back whenever you are ready`,
+        `Your ${p} plan has been successfully deactivated as requested`,
+        `We have processed your ${p} cancellation thank you for choosing us`,
+        `${p} cancelled we hope to welcome you back someday`,
+        `Your ${p} package is now closed thank you for being our customer`,
+        `We confirm that ${p} has been removed from your account`,
+        `${p} is done on your number thank you for your support`,
+        `Your cancellation of ${p} is confirmed we will miss having you`,
+        `${p} is off we hope you enjoyed the benefits while you were with us`,
+        `Thank you for your time with ${p} your package is now cancelled`,
+        `${p} ended we appreciated having you on our network`,
+        `We have removed ${p} from your number it was great serving you`,
+        `${p} cancellation complete we hope to serve you again in the future`,
+        `Your ${p} plan is now closed thank you for your trust in us`,
+        `${p} removed from your account we appreciate you`,
+        `We confirm ${p} is now deactivated on your number`,
+        `Your subscription to ${p} has been cancelled come back anytime`,
+        `${p} is officially off thank you for being a valued customer`,
+        `${p} service ended thanks for choosing us we hope to see you again`,
       ],
       TH: [
-        `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการ`,
-        `${p} ถูกยกเลิกแล้ว หวังว่าจะพบกันใหม่!`,
-        `คุณยกเลิก ${p} แล้ว ขอบคุณที่ไว้วางใจเรา`,
-        `${p} ถูกปิดใช้งานแล้ว ขอบคุณที่อยู่กับเรา`,
-        `การสมัคร ${p} สิ้นสุดแล้ว กลับมาได้ทุกเมื่อ!`,
-        `บริการ ${p} หยุดแล้ว ขอบคุณที่เลือกเรา`,
+        `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการของเรา`,
+        `${p} ถูกลบออกจากเบอร์ของคุณแล้ว หวังว่าจะพบกันใหม่`,
+        `แผน ${p} ของคุณถูกปิดใช้งานแล้ว ขอบคุณที่อยู่กับเรา`,
+        `เราได้ยกเลิก ${p} บนบัญชีของคุณแล้ว ขอบคุณสำหรับความไว้วางใจ`,
+        `${p} ถูกยกเลิกสำเร็จแล้ว เราขอบคุณในทุกช่วงเวลาที่ผ่านมา`,
+        `คำขอยกเลิก ${p} ของคุณเสร็จสมบูรณ์แล้ว หวังว่าคุณจะพอใจกับบริการ`,
+        `${p} ปิดแล้วบนเบอร์ของคุณ สามารถสมัครใหม่ได้ตลอดเวลา`,
+        `เรายืนยันการลบ ${p} ออกจากบัญชีของคุณ`,
+        `การสมัคร ${p} ของคุณสิ้นสุดแล้ว เราขอบคุณทุกช่วงเวลาที่คุณอยู่กับเรา`,
+        `ลบ ${p} แล้ว หวังว่าประสบการณ์ของคุณจะยอดเยี่ยม`,
+        `ขอบคุณที่ใช้ ${p} แพ็กเกจของคุณถูกยกเลิกแล้ว`,
+        `${p} ไม่ได้ทำงานบนเบอร์ของคุณแล้ว กลับมาได้เมื่อพร้อม`,
+        `แผน ${p} ของคุณถูกปิดใช้งานสำเร็จตามที่ร้องขอ`,
+        `เราดำเนินการยกเลิก ${p} ของคุณแล้ว ขอบคุณที่เลือกเรา`,
+        `ยกเลิก ${p} แล้ว หวังว่าจะได้ต้อนรับคุณกลับมาสักวัน`,
+        `แพ็กเกจ ${p} ของคุณปิดแล้ว ขอบคุณที่เป็นลูกค้าของเรา`,
+        `เรายืนยันว่า ${p} ถูกลบออกจากบัญชีของคุณแล้ว`,
+        `${p} สิ้นสุดบนเบอร์ของคุณแล้ว ขอบคุณสำหรับการสนับสนุน`,
+        `การยกเลิก ${p} ของคุณได้รับการยืนยันแล้ว เราจะคิดถึงคุณ`,
+        `${p} ปิดแล้ว หวังว่าคุณจะสนุกกับสิทธิพิเศษในช่วงที่อยู่กับเรา`,
+        `ขอบคุณสำหรับเวลากับ ${p} แพ็กเกจของคุณถูกยกเลิกแล้ว`,
+        `${p} สิ้นสุดแล้ว เราขอบคุณที่มีคุณอยู่บนเครือข่ายของเรา`,
+        `เราลบ ${p} ออกจากเบอร์ของคุณแล้ว เป็นเกียรติที่ได้ให้บริการคุณ`,
+        `ยกเลิก ${p} เสร็จสมบูรณ์ หวังว่าจะได้ให้บริการคุณอีกในอนาคต`,
+        `แผน ${p} ของคุณปิดแล้ว ขอบคุณสำหรับความไว้วางใจ`,
+        `ลบ ${p} ออกจากบัญชีของคุณแล้ว เราขอบคุณคุณ`,
+        `เรายืนยันว่า ${p} ถูกปิดใช้งานบนเบอร์ของคุณแล้ว`,
+        `การสมัคร ${p} ของคุณถูกยกเลิกแล้ว กลับมาได้ทุกเวลา`,
+        `${p} ปิดอย่างเป็นทางการแล้ว ขอบคุณที่เป็นลูกค้าที่มีคุณค่า`,
+        `บริการ ${p} สิ้นสุดแล้ว ขอบคุณที่เลือกเรา หวังว่าจะพบกันใหม่`,
       ],
     },
 
     // ===== WORDING IN STATEMENT =====
     wordingInStatement: {
       EN: [
-        `${p} - ${modName.EN} ${ptName.EN} Package`,
-        `${p} | ${dataAmount} | ${speed}`,
-        `${p} (${price} THB/month)`,
-        `${p} - Thank you for your payment`,
-        `${p} Subscription Fee`,
-        `${p} Monthly Charge`,
-        `Service: ${p}`,
+        `${p} ${modName.EN} ${ptName.EN} monthly charge`,
+        `${p} data package ${dataAmount} at ${speed}`,
+        `${p} subscription ${price} THB`,
+        `Monthly fee ${p}`,
+        `${p} service charge`,
+        `${p} billing ${price} THB per month`,
+        `${p} ${ptName.EN} plan charge`,
+        `Payment for ${p}`,
+        `${p} plan ${dataAmount} monthly`,
+        `${p} subscription fee ${price} THB`,
+        `Charge for ${p} ${modName.EN}`,
+        `${p} account deduction`,
+        `${p} recurring charge`,
+        `${p} monthly package fee`,
+        `Billed: ${p}`,
+        `${p} ${modName.EN} service fee`,
+        `${p} data plan ${price} THB`,
+        `${p} thank you for your payment`,
+        `${p} plan renewal charge`,
+        `${p} ${ptName.EN} monthly billing`,
       ],
       TH: [
-        `${p} - แพ็กเกจ${modName.TH} ${ptName.TH}`,
-        `${p} | ${dataAmount} | ${speed}`,
-        `${p} (${price} บาท/เดือน)`,
-        `${p} - ขอบคุณสำหรับการชำระเงิน`,
-        `ค่าบริการ ${p}`,
+        `ค่าบริการรายเดือน ${p} ${modName.TH} ${ptName.TH}`,
+        `แพ็กเกจเน็ต ${p} ${dataAmount} ที่ ${speed}`,
+        `การสมัคร ${p} ${price} บาท`,
         `ค่าบริการรายเดือน ${p}`,
-        `บริการ: ${p}`,
+        `ค่าบริการ ${p}`,
+        `การเรียกเก็บเงิน ${p} ${price} บาทต่อเดือน`,
+        `ค่าบริการแผน ${p} ${ptName.TH}`,
+        `ชำระเงินสำหรับ ${p}`,
+        `แผน ${p} ${dataAmount} รายเดือน`,
+        `ค่าสมัคร ${p} ${price} บาท`,
+        `ค่าบริการ ${p} ${modName.TH}`,
+        `การหักบัญชี ${p}`,
+        `ค่าบริการประจำ ${p}`,
+        `ค่าแพ็กเกจรายเดือน ${p}`,
+        `เรียกเก็บ: ${p}`,
+        `ค่าบริการ${modName.TH} ${p}`,
+        `แผนเน็ต ${p} ${price} บาท`,
+        `${p} ขอบคุณสำหรับการชำระเงิน`,
+        `ค่าต่ออายุแผน ${p}`,
+        `ค่าบริการรายเดือน ${p} ${ptName.TH}`,
       ],
     },
 
     // ===== DESCRIPTION =====
     description: {
       EN: [
-        `${p} is a ${ptName.EN} ${modName.EN} package offering ${dataAmount} of high-speed data, unlimited domestic calls, and 5G network access.`,
-        `${p}: Comprehensive ${modName.EN} solution with ${dataAmount} data allowance at ${speed}. Includes ${benefit1} and ${benefit2}.`,
-        `${p} provides exceptional value with ${dataAmount} data, unlimited calls, and premium features for just ${price} THB/month.`,
-        `${p} - The ultimate ${modName.EN} experience. ${dataAmount} data, ${speed} speeds, 5G ready.`,
+        `${p} is a ${ptName.EN} ${modName.EN} package with ${dataAmount} data ${speed} speeds and unlimited domestic calls`,
+        `${p} offers ${dataAmount} of high speed ${modName.EN} data at ${speed} including ${benefit1} and ${benefit2}`,
+        `${p} is the ${ptName.EN} plan for modern users delivering ${dataAmount} data ${speed} and 5G access`,
+        `${p} provides ${dataAmount} data at ${speed} plus unlimited calls and premium features for ${price} THB monthly`,
+        `${p} is a ${modName.EN} package designed to give you ${dataAmount} data ${benefit1} and ${benefit2} at great value`,
+        `${p} includes ${dataAmount} of fast data at ${speed} with full 5G support and unlimited domestic calls`,
+        `${p} is the smart ${ptName.EN} choice offering ${dataAmount} data ${speed} connectivity and exclusive benefits`,
+        `${p} delivers ${dataAmount} data ${speed} speeds and ${benefit1} in one comprehensive ${modName.EN} plan`,
+        `${p} is a feature packed ${modName.EN} package with ${dataAmount} data ${benefit1} and ${benefit2} at ${price} THB`,
+        `${p} brings you ${dataAmount} of ${modName.EN} data at ${speed} with top tier connectivity and great value`,
+        `${p} is a complete ${modName.EN} solution with ${dataAmount} data ${speed} unlimited calls and 5G ready`,
+        `${p} gives you the ultimate ${ptName.EN} ${modName.EN} experience with ${dataAmount} data and ${benefit1}`,
+        `${p} is your go to ${modName.EN} package with ${dataAmount} data at ${speed} for just ${price} THB`,
+        `${p} combines ${dataAmount} data ${speed} and ${benefit2} in one powerful ${modName.EN} package`,
+        `${p} is a reliable ${ptName.EN} ${modName.EN} plan with ${dataAmount} data and unlimited domestic calls`,
       ],
       TH: [
-        `${p} เป็นแพ็กเกจ${modName.TH}แบบ${ptName.TH} มอบเน็ตความเร็วสูง ${dataAmount} โทรฟรีทุกเครือข่ายไม่จำกัด และการเข้าถึงเครือข่าย 5G`,
-        `${p}: โซลูชัน${modName.TH}ที่ครอบคลุมด้วยปริมาณเน็ต ${dataAmount} ความเร็ว ${speed} รวม ${benefit1TH} และ ${benefit2TH}`,
-        `${p} มอบความคุ้มค่าที่ยอดเยี่ยมด้วยเน็ต ${dataAmount} โทรฟรีไม่จำกัด และฟีเจอร์พรีเมียมในราคาเพียง ${price} บาท/เดือน`,
-        `${p} - ประสบการณ์${modName.TH}ขั้นสุด เน็ต ${dataAmount} ความเร็ว ${speed} พร้อม 5G`,
+        `${p} คือแพ็กเกจ${modName.TH}แบบ${ptName.TH}ด้วยเน็ต ${dataAmount} ความเร็ว ${speed} และโทรฟรีทุกเครือข่ายไม่จำกัด`,
+        `${p} มอบเน็ต${modName.TH}ความเร็วสูง ${dataAmount} ที่ ${speed} รวมถึง${benefit1TH}และ${benefit2TH}`,
+        `${p} คือแผน${ptName.TH}สำหรับผู้ใช้ยุคใหม่ มอบเน็ต ${dataAmount} ความเร็ว ${speed} และการเข้าถึง 5G`,
+        `${p} มอบเน็ต ${dataAmount} ที่ ${speed} พร้อมโทรฟรีไม่จำกัดและฟีเจอร์พรีเมียมในราคา ${price} บาทต่อเดือน`,
+        `${p} คือแพ็กเกจ${modName.TH}ที่ออกแบบมาเพื่อมอบเน็ต ${dataAmount} ${benefit1TH}และ${benefit2TH}ในราคาที่คุ้มค่า`,
+        `${p} รวมเน็ตความเร็วสูง ${dataAmount} ที่ ${speed} พร้อมรองรับ 5G เต็มรูปแบบและโทรฟรีไม่จำกัด`,
+        `${p} คือตัวเลือก${ptName.TH}ที่ฉลาด มอบเน็ต ${dataAmount} การเชื่อมต่อ ${speed} และสิทธิพิเศษเฉพาะ`,
+        `${p} ส่งมอบเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}ในแผน${modName.TH}ที่ครอบคลุม`,
+        `${p} คือแพ็กเกจ${modName.TH}ที่เต็มไปด้วยฟีเจอร์ด้วยเน็ต ${dataAmount} ${benefit1TH}และ${benefit2TH}ในราคา ${price} บาท`,
+        `${p} มอบเน็ต${modName.TH} ${dataAmount} ที่ ${speed} พร้อมการเชื่อมต่อระดับสูงสุดและความคุ้มค่าที่ยอดเยี่ยม`,
+        `${p} คือโซลูชัน${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} ความเร็ว ${speed} โทรฟรีไม่จำกัดและรองรับ 5G`,
+        `${p} มอบประสบการณ์${ptName.TH}${modName.TH}ขั้นสุดด้วยเน็ต ${dataAmount} และ${benefit1TH}`,
+        `${p} คือแพ็กเกจ${modName.TH}ที่ใช่สำหรับคุณด้วยเน็ต ${dataAmount} ที่ ${speed} ในราคาเพียง ${price} บาท`,
+        `${p} ผสานเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit2TH}ในแพ็กเกจ${modName.TH}อันทรงพลัง`,
+        `${p} คือแผน${ptName.TH}${modName.TH}ที่เชื่อถือได้ด้วยเน็ต ${dataAmount} และโทรฟรีไม่จำกัด`,
       ],
     },
 
     // ===== OTHER CONDITION =====
     otherCondition: {
       EN: [
-        `Offer valid for new ${modName.EN} subscribers only.`,
-        `Promotion valid for ${validity} days from activation.`,
-        `Fair usage policy applies after ${dataAmount}.`,
-        `Cannot be combined with other promotions.`,
-        `Subject to credit approval.`,
-        `Auto-renewal applies unless cancelled.`,
-        `Terms and conditions apply.`,
-        `Limited time offer while supplies last.`,
-        `Valid for Thai nationals and residents only.`,
-        `Minimum contract term: ${contractMonths} months.`,
+        `Promotion is valid for new ${modName.EN} customers only`,
+        `This offer is available for a limited time only`,
+        `Valid for ${validity} days from the date of activation`,
+        `Fair usage policy applies once the ${dataAmount} data limit is reached`,
+        `This promotion cannot be combined with any other offer`,
+        `Subject to credit check and approval`,
+        `Auto renews each month unless cancelled before the renewal date`,
+        `Terms and conditions of this promotion apply`,
+        `Available to Thai nationals and residents only`,
+        `Minimum contract period of ${contractMonths} months applies`,
+        `Network availability may vary by location`,
+        `Prices are inclusive of VAT unless stated otherwise`,
+        `Package must be activated within ${validity} days of subscription`,
+        `Data speed may be reduced after reaching ${dataAmount} limit`,
+        `This offer applies to personal use accounts only`,
+        `Promotional pricing valid for the first ${contractMonths} months`,
+        `Service subject to network coverage in your area`,
+        `One promotional package per customer account`,
+        `Package features and pricing are subject to change without notice`,
+        `Data allowance resets at the start of each billing cycle`,
       ],
       TH: [
-        `ข้อเสนอสำหรับลูกค้าใหม่${modName.TH}เท่านั้น`,
-        `โปรโมชันมีอายุ ${validity} วันนับจากวันเปิดใช้งาน`,
-        `ใช้นโยบายการใช้งานที่เหมาะสมหลังใช้ครบ ${dataAmount}`,
-        `ไม่สามารถใช้ร่วมกับโปรโมชันอื่นได้`,
-        `ขึ้นอยู่กับการอนุมัติเครดิต`,
-        `ต่ออายุอัตโนมัติหากไม่ยกเลิก`,
-        `เป็นไปตามข้อกำหนดและเงื่อนไข`,
-        `ข้อเสนอจำนวนจำกัด`,
-        `สำหรับบุคคลสัญชาติไทยและผู้มีถิ่นพำนักในไทยเท่านั้น`,
-        `ระยะสัญญาขั้นต่ำ ${contractMonths} เดือน`,
+        `โปรโมชันสำหรับลูกค้า${modName.TH}ใหม่เท่านั้น`,
+        `ข้อเสนอนี้มีระยะเวลาจำกัดเท่านั้น`,
+        `มีอายุ ${validity} วันนับจากวันที่เปิดใช้งาน`,
+        `นโยบายการใช้งานที่เหมาะสมมีผลเมื่อใช้เน็ตครบ ${dataAmount}`,
+        `โปรโมชันนี้ไม่สามารถใช้ร่วมกับข้อเสนออื่นได้`,
+        `ขึ้นอยู่กับการตรวจสอบและอนุมัติเครดิต`,
+        `ต่ออายุอัตโนมัติทุกเดือนหากไม่ยกเลิกก่อนวันต่ออายุ`,
+        `ข้อกำหนดและเงื่อนไขของโปรโมชันนี้มีผลบังคับใช้`,
+        `สำหรับบุคคลสัญชาติไทยและผู้มีถิ่นพำนักในประเทศไทยเท่านั้น`,
+        `มีระยะสัญญาขั้นต่ำ ${contractMonths} เดือน`,
+        `ความครอบคลุมเครือข่ายอาจแตกต่างกันตามพื้นที่`,
+        `ราคารวมภาษีมูลค่าเพิ่มแล้วหากไม่ระบุเป็นอย่างอื่น`,
+        `ต้องเปิดใช้งานแพ็กเกจภายใน ${validity} วันหลังการสมัคร`,
+        `ความเร็วอินเทอร์เน็ตอาจลดลงหลังใช้ครบ ${dataAmount}`,
+        `ข้อเสนอนี้ใช้ได้กับบัญชีส่วนตัวเท่านั้น`,
+        `ราคาโปรโมชันใช้ได้สำหรับ ${contractMonths} เดือนแรก`,
+        `บริการขึ้นอยู่กับการครอบคลุมสัญญาณในพื้นที่ของคุณ`,
+        `หนึ่งแพ็กเกจโปรโมชันต่อบัญชีลูกค้าหนึ่งราย`,
+        `ฟีเจอร์และราคาของแพ็กเกจอาจเปลี่ยนแปลงได้โดยไม่ต้องแจ้งล่วงหน้า`,
+        `ปริมาณเน็ตจะรีเซ็ตในช่วงต้นรอบการเรียกเก็บเงินใหม่แต่ละรอบ`,
       ],
     },
 
     // ===== MEMO DESCRIPTION =====
     memoDescription: {
       EN: [
-        `${p} - Internal notes for configuration reference.`,
-        `${p}: ${modName.EN} ${ptName.EN}. PO: ${po}.`,
-        `Product config: ${dataAmount}, ${speed}, ${price} THB.`,
-        `${p} - Created for testing and validation purposes.`,
-        `Memo: ${p} setup completed with standard parameters.`,
+        `${p} internal configuration notes for reference and validation`,
+        `${p} ${modName.EN} ${ptName.EN} setup memo PO ${po}`,
+        `Product parameters: ${dataAmount} data at ${speed} price ${price} THB`,
+        `${p} created for system testing and quality validation`,
+        `Memo: ${p} configuration completed with standard settings`,
+        `${p} package details: ${dataAmount} ${speed} ${price} THB for internal use`,
+        `Internal reference: ${p} ${ptName.EN} ${modName.EN} PO ${po}`,
+        `${p} setup record: data ${dataAmount} speed ${speed} monthly ${price} THB`,
+        `Validation memo for ${p} ${modName.EN} package configuration`,
+        `${p} created and verified for deployment PO ${po}`,
       ],
       TH: [
-        `${p} - บันทึกภายในสำหรับอ้างอิงการกำหนดค่า`,
-        `${p}: ${modName.TH} ${ptName.TH}. PO: ${po}`,
-        `การกำหนดค่าผลิตภัณฑ์: ${dataAmount}, ${speed}, ${price} บาท`,
-        `${p} - สร้างเพื่อวัตถุประสงค์ในการทดสอบและตรวจสอบ`,
-        `บันทึก: การตั้งค่า ${p} เสร็จสมบูรณ์ด้วยพารามิเตอร์มาตรฐาน`,
+        `บันทึกการกำหนดค่าภายในสำหรับ ${p} เพื่อใช้อ้างอิงและตรวจสอบ`,
+        `บันทึกการตั้งค่า ${p} ${modName.TH} ${ptName.TH} PO ${po}`,
+        `พารามิเตอร์ผลิตภัณฑ์: เน็ต ${dataAmount} ที่ ${speed} ราคา ${price} บาท`,
+        `${p} สร้างขึ้นเพื่อการทดสอบระบบและการตรวจสอบคุณภาพ`,
+        `บันทึก: การกำหนดค่า ${p} เสร็จสมบูรณ์ด้วยการตั้งค่ามาตรฐาน`,
+        `รายละเอียดแพ็กเกจ ${p}: เน็ต ${dataAmount} ${speed} ${price} บาทสำหรับใช้ภายใน`,
+        `อ้างอิงภายใน: ${p} ${ptName.TH} ${modName.TH} PO ${po}`,
+        `บันทึกการตั้งค่า ${p}: เน็ต ${dataAmount} ความเร็ว ${speed} รายเดือน ${price} บาท`,
+        `บันทึกการตรวจสอบสำหรับการกำหนดค่าแพ็กเกจ ${p} ${modName.TH}`,
+        `${p} สร้างและตรวจสอบพร้อมสำหรับการใช้งาน PO ${po}`,
       ],
     },
 
     // ===== DISCOUNT NAME =====
     discountName: {
       EN: [
-        `${p} Launch Discount`,
-        `${p} Welcome Offer`,
-        `${p} ${discount}% Off`,
-        `${p} First Month Free`,
-        `${p} Cashback`,
-        `${p} Rebate`,
-        `${p} Promo`,
-        `${p} Special`,
+        `${p} New Member Discount`,
+        `${p} Loyalty Reward`,
+        `${p} Activation Saving`,
+        `${p} Early Bird Saving`,
+        `${p} Seasonal Offer`,
+        `${p} Bundle Saving`,
+        `${p} Data Bonus`,
+        `${p} Speed Upgrade`,
+        `${p} Referral Reward`,
+        `${p} Renewal Discount`,
+        `${p} First Month Saving`,
+        `${p} Annual Discount`,
+        `${p} Intro Rate`,
+        `${p} Welcome Discount`,
+        `${p} Sign Up Saving`,
+        `${p} Upgrade Benefit`,
+        `${p} Member Privilege`,
+        `${p} Value Boost`,
+        `${p} Price Cut`,
+        `${p} Trade In Offer`,
       ],
       TH: [
-        `ส่วนลดเปิดตัว ${p}`,
-        `ข้อเสนอต้อนรับ ${p}`,
-        `${p} ลด ${discount}%`,
-        `${p} ฟรีเดือนแรก`,
-        `${p} เงินคืน`,
-        `${p} ส่วนลด`,
-        `${p} โปรโมชัน`,
-        `${p} พิเศษ`,
+        `ส่วนลดสมาชิกใหม่ ${p}`,
+        `รางวัลความภักดี ${p}`,
+        `ส่วนลดเปิดใช้งาน ${p}`,
+        `ส่วนลดจองล่วงหน้า ${p}`,
+        `ข้อเสนอตามฤดูกาล ${p}`,
+        `ประหยัดจากบันเดิล ${p}`,
+        `โบนัสเน็ต ${p}`,
+        `อัปเกรดความเร็ว ${p}`,
+        `รางวัลแนะนำเพื่อน ${p}`,
+        `ส่วนลดต่ออายุ ${p}`,
+        `ประหยัดเดือนแรก ${p}`,
+        `ส่วนลดรายปี ${p}`,
+        `ราคาแนะนำ ${p}`,
+        `ส่วนลดต้อนรับ ${p}`,
+        `ประหยัดจากการสมัคร ${p}`,
+        `สิทธิพิเศษอัปเกรด ${p}`,
+        `สิทธิพิเศษสมาชิก ${p}`,
+        `เพิ่มคุณค่า ${p}`,
+        `ลดราคา ${p}`,
+        `ข้อเสนอเปลี่ยนเครือข่าย ${p}`,
       ],
     },
   };
