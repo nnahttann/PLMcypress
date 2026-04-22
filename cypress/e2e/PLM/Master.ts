@@ -156,7 +156,7 @@ export const getCredentials = (module: Module): { user: string, pass: string } =
   return credMap[module] || credMap['POST'];
 };
 
-export const getTimeSuffix = (): string => `${day}${month} ${hours}${minutes}`;
+export const getTimeSuffix = (): string => `${day} ${month} ${hours} ${minutes}`;
 
 export const getTruncatedName = (baseName: string, suffix: string, maxLength: number): string => {
   let finalName = `${baseName} ${suffix}`;
@@ -524,7 +524,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
 
   // รอให้ API โหลดเสร็จ
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
- cy.wait(5000);
+  cy.wait(5000);
   const partialIdentifier = taskIdentifier.split('_')[0];
   cy.log(`🔍 Searching for Project: "${partialIdentifier}" with Keyword: "${uniqueKeyword}"`);
 
@@ -3111,7 +3111,7 @@ export const RandomRemark = (
   };
   const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
   const WAIT_TIME = 2000;
-  
+
   const scrollToElement = (selector: string, sectionName: string) => {
     cy.log(`📌 Scrolling to: ${sectionName}`);
     cy.get(selector).first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
@@ -3476,7 +3476,7 @@ export const RandomRemark = (
         // เลือกข้อความหลัก (บางครั้งสุ่มเลือกหลายข้อความมา combine)
         let remarkText: string;
         const shouldCombine = lengthType === 'long' && Math.random() < 0.3;
-        
+
         if (shouldCombine && !useThai) {
           // Combine multiple medium texts for extra long variety
           const texts = pickMultiple(remarkPools.medium.EN, randomInt(2, 3));
@@ -3495,7 +3495,7 @@ export const RandomRemark = (
         // เพิ่ม Metadata (ปรับความน่าจะเป็นตามความยาว)
         const addMetadataProb = lengthType === 'short' ? 0.6 : (lengthType === 'medium' ? 0.8 : 0.9);
         const addMetadata = Math.random() < addMetadataProb;
-        
+
         if (addMetadata) {
           const metadataLines: string[] = [];
           const metaCount = lengthType === 'short' ? randomInt(1, 2) : (lengthType === 'medium' ? randomInt(2, 4) : randomInt(3, 6));
@@ -3595,7 +3595,7 @@ export const RandomRemark = (
           if (metadataLines.length > 0) {
             const separator = lengthType === 'short' ? ' | ' : '\n';
             const prefix = lengthType === 'short' ? ' | ' : (useThai ? '\n\nข้อมูลเพิ่มเติม:\n' : '\n\nAdditional Information:\n');
-            
+
             if (lengthType === 'short') {
               remarkText += prefix + metadataLines.join(separator);
             } else {
@@ -3648,7 +3648,7 @@ export const RandomProjectDescription = (
   const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
   const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
   const WAIT_TIME = 2000;
-  
+
   const scrollToElement = (selector: string, sectionName: string) => {
     cy.log(`📌 Scrolling to: ${sectionName}`);
     cy.get(selector).first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
@@ -3706,7 +3706,7 @@ export const RandomProjectDescription = (
         const priceAmount = randomInt(199, 2999);
         const validityPeriod = pickRandom(['1 Day', '7 Days', '30 Days', '90 Days', '180 Days', '365 Days']);
         const targetCustomers = pickRandom([
-          'General Consumers', 'Young Professionals', 'Families', 'Students', 
+          'General Consumers', 'Young Professionals', 'Families', 'Students',
           'Business Users', 'Heavy Data Users', 'Budget-Conscious', 'Premium Segment',
           'Digital Natives', 'Urban Residents', 'Suburban Families', 'SME Owners'
         ]);
@@ -3756,24 +3756,24 @@ export const RandomProjectDescription = (
           medium: {
             EN: [
               `${pName} is a ${smDisplay.EN} ${pcDisplay.EN} for ${modDisplay.EN} customers. This package includes ${dataVolume} of high-speed data at up to ${maxSpeed}, unlimited on-net calls, and 5G network access at no additional cost. Priced at ${priceAmount} THB/month with ${ptDisplay.EN.toLowerCase()} billing.`,
-              
+
               `${pName} offers exceptional value for ${targetCustomers}. The package features ${dataVolume} data allowance, ${keyBenefit1}, and ${keyBenefit2}. Available on ${smDisplay.EN} ${modDisplay.EN} with flexible ${validityPeriod} validity options. Monthly fee: ${priceAmount} THB.`,
-              
+
               `${pName} is designed to meet the needs of modern ${modDisplay.EN.toLowerCase()} users. Subscribers enjoy ${dataVolume} of 5G data, unlimited voice calls, and access to exclusive promotions. This ${pcDisplay.EN.toLowerCase()} operates on ${smDisplay.EN.toLowerCase()} billing with auto-renewal capability.`,
-              
+
               `${pName} - A comprehensive ${modDisplay.EN.toLowerCase()} solution featuring ${dataVolume} data (${maxSpeed}), unlimited calls, and premium support. Ideal for ${targetCustomers} seeking reliable connectivity. ${ptDisplay.EN} at ${priceAmount} THB per billing cycle.`,
-              
+
               `${pName} brings together speed, value, and flexibility. With ${dataVolume} of data at ${maxSpeed}, subscribers can stream, browse, and connect without limits. This ${smDisplay.EN.toLowerCase()} ${pcDisplay.EN.toLowerCase()} includes ${keyBenefit1} and ${keyBenefit2} as standard features.`,
             ],
             TH: [
               `${pName} เป็น${pcDisplay.TH}${smDisplay.TH}สำหรับลูกค้า${modDisplay.TH} แพ็กเกจนี้รวมเน็ตความเร็วสูง ${dataVolume} ที่ความเร็วสูงสุด ${maxSpeed} โทรฟรีในเครือข่ายไม่จำกัด และการเข้าถึงเครือข่าย 5G โดยไม่มีค่าใช้จ่ายเพิ่มเติม ราคา ${priceAmount} บาท/เดือน คิดค่าบริการ${ptDisplay.TH}`,
-              
+
               `${pName} มอบความคุ้มค่าที่ยอดเยี่ยมสำหรับ${targetCustomersTH} แพ็กเกจประกอบด้วยเน็ต ${dataVolume} ${keyBenefit1TH} และ${keyBenefit2TH} มีให้บริการบน${modDisplay.TH}${smDisplay.TH} พร้อมตัวเลือกระยะเวลา ${validityPeriod} ค่าบริการ ${priceAmount} บาท/เดือน`,
-              
+
               `${pName} ออกแบบมาเพื่อตอบสนองความต้องการของผู้ใช้${modDisplay.TH}ยุคใหม่ สมาชิกจะได้เพลิดเพลินกับเน็ต 5G ${dataVolume} โทรฟรีไม่จำกัด และการเข้าถึงโปรโมชันพิเศษ ${pcDisplay.TH}นี้ทำงานบนระบบ${smDisplay.TH}พร้อมความสามารถต่ออายุอัตโนมัติ`,
-              
+
               `${pName} - โซลูชัน${modDisplay.TH}ที่ครอบคลุม นำเสนอเน็ต ${dataVolume} (ความเร็ว ${maxSpeed}) โทรฟรีไม่จำกัด และการสนับสนุนระดับพรีเมียม เหมาะสำหรับ${targetCustomersTH}ที่ต้องการการเชื่อมต่อที่เชื่อถือได้ ${ptDisplay.TH} ${priceAmount} บาทต่อรอบบิล`,
-              
+
               `${pName} ผสานความเร็ว ความคุ้มค่า และความยืดหยุ่นเข้าด้วยกัน ด้วยเน็ต ${dataVolume} ที่ความเร็ว ${maxSpeed} สมาชิกสามารถสตรีม ท่องเว็บ และเชื่อมต่อได้อย่างไร้ขีดจำกัด ${pcDisplay.TH}${smDisplay.TH}นี้รวม${keyBenefit1TH}และ${keyBenefit2TH}เป็นคุณสมบัติมาตรฐาน`,
             ],
           },
@@ -5724,11 +5724,11 @@ const generateProjectNames = (
   } else {
     // For standard ProjectBasicInformationComplete
     const ModulePart = (Module === 'ENTER' || Module === 'MUSIC') ? `${prefix} ${subModule}` : `${prefix} ${Module}`;
-    prefixName = `${ModulePart} ${PriceType} ${ProductClass}${pluginSuffix}`;
+    prefixName = `${ModulePart} ${PriceType} ${ProductClass} ${pluginSuffix}`;
   }
 
-  const projectName = getTruncatedName(prefixName, timeSuffix, 40);
-  const poName = getTruncatedName(prefixName, timeSuffix, 37);
+  const projectName = getTruncatedName(prefixName,timeSuffix, 40);
+  const poName = getTruncatedName(prefixName,timeSuffix, 37);
 
   return { projectName, poName, prefixName };
 };
@@ -5766,7 +5766,7 @@ const createProjectBase = (
   }
 
   cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
-  RandomProjectDescription(projectName,subModule, Module);
+  RandomProjectDescription(projectName, subModule, Module);
 
   cy.get('button[type="button"]').contains('Save').click();
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
@@ -5807,11 +5807,6 @@ const pickMultiple = <T>(arr: T[], count: number): T[] => {
 
 // ===== HELPER: Random integer =====
 const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
-
-// ===== HELPER: Random float with decimals =====
-const randomFloat = (min: number, max: number, decimals: number = 2): string => {
-  return (Math.random() * (max - min) + min).toFixed(decimals);
-};
 
 // ===== HELPER: Clean text for English fields =====
 const cleanEnglishText = (str: string): string => {
@@ -5995,14 +5990,14 @@ const createPOWordingPools = (
     greetingLetter: {
       EN: [
         `Dear customer, thank you for subscribing to ${p}. Your ${modName.EN} package is now active with ${dataAmount} of high-speed data. Enjoy seamless connectivity and exclusive benefits!`,
-        `Hello! Welcome to ${p}. We're thrilled to have you on board. Your ${modName.EN} service includes ${dataAmount} data, unlimited calls, and more. Enjoy!`,
+        `Hello! Welcome to ${p}. We're thrilled to have you on board. Your ${modName.EN} service includes ${dataAmount} data, unlimited calls, and more. Enjoy`,
         `Congratulations on choosing ${p}! Your subscription is confirmed. ${dataAmount} data, ${speed} speeds, and premium features are ready for you.`,
         `Welcome to the ${p} family! Your ${modName.EN} package is now live. Enjoy ${dataAmount} of data, ${benefit1}, and ${benefit2}.`,
         `Thank you for joining ${p}. Your account is active and ready to use. ${dataAmount} data allowance, unlimited calls, and 5G access included.`,
       ],
       TH: [
-        `เรียนลูกค้า ขอบคุณที่สมัครใช้บริการ ${p} แพ็กเกจ${modName.TH}ของคุณพร้อมใช้งานแล้วด้วยเน็ตความเร็วสูง ${dataAmount} ขอให้เพลิดเพลินกับการเชื่อมต่อที่ราบรื่นและสิทธิพิเศษ!`,
-        `สวัสดี! ยินดีต้อนรับสู่ ${p} เรายินดีที่คุณมาร่วมกับเรา บริการ${modName.TH}ของคุณรวมเน็ต ${dataAmount} โทรฟรีไม่จำกัด และอื่นๆ อีกมากมาย ขอให้สนุก!`,
+        `เรียนลูกค้า ขอบคุณที่สมัครใช้บริการ ${p} แพ็กเกจ${modName.TH}ของคุณพร้อมใช้งานแล้วด้วยเน็ตความเร็วสูง ${dataAmount} ขอให้เพลิดเพลินกับการเชื่อมต่อที่ราบรื่นและสิทธิพิเศษ`,
+        `สวัสดี! ยินดีต้อนรับสู่ ${p} เรายินดีที่คุณมาร่วมกับเรา บริการ${modName.TH}ของคุณรวมเน็ต ${dataAmount} โทรฟรีไม่จำกัด และอื่นๆ อีกมากมาย ขอให้สนุก`,
         `ยินดีด้วยที่คุณเลือก ${p}! การสมัครของคุณได้รับการยืนยันแล้ว เน็ต ${dataAmount} ความเร็ว ${speed} และฟีเจอร์พรีเมียมพร้อมสำหรับคุณแล้ว`,
         `ยินดีต้อนรับสู่ครอบครัว ${p}! แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ${benefit1TH} และ ${benefit2TH}`,
         `ขอบคุณที่ร่วมใช้ ${p} บัญชีของคุณพร้อมใช้งานแล้ว เน็ต ${dataAmount} โทรฟรีไม่จำกัด และการเข้าถึง 5G รวมอยู่แล้ว`,
@@ -6196,7 +6191,7 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
 
   const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
   const pOName = poName || 'ServicePO';
-  
+
   const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
 
   // Wording In Statement
@@ -6209,7 +6204,7 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
   const smsFlags = ['Send', "Don't Send"];
   const randomSmsFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
   cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(randomSmsFlag);
-  
+
   if (randomSmsFlag === 'Send') {
     cy.get('textarea[formcontrolname="smsGreetingEn"]')
       .clear().type(limitAndCleanEN(pickRandom(pools.smsGreeting.EN), 400));
@@ -6220,7 +6215,7 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
   // SMS Delete
   const randomDeleteFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
   cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(randomDeleteFlag);
-  
+
   if (randomDeleteFlag === 'Send') {
     cy.get('textarea[formcontrolname="smsDeleteEn"]')
       .clear().type(limitAndCleanEN(pickRandom(pools.smsDelete.EN), 250));
@@ -6237,13 +6232,13 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
   cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
 
   selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
-  
+
   // Other Condition
   const conditionCount = Math.floor(Math.random() * 5) + 2;
   const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
   cy.get('textarea[formcontrolname="otherCondition"]')
     .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
-  
+
   // Memo Description
   cy.get('textarea[formcontrolname="memoDescription"]')
     .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
@@ -6255,7 +6250,7 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
 const fillCashBackPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
   const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
   const pOName = poName || 'CashBackPO';
-  
+
   const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
 
   // Short Promotion Name
@@ -6263,25 +6258,25 @@ const fillCashBackPOFields = (Module: Module, PriceType: string, projectName?: s
     .clear().type(limitAndCleanEN(pickRandom(pools.shortPromotionName.EN), 100));
   cy.get('textarea[formcontrolname="shortPromotionNameTh"]')
     .clear().type(limitAndCleanTH(pickRandom(pools.shortPromotionName.TH), 100));
-  
+
   // Promotion Description
   cy.get('textarea[formcontrolname="promotionDescriptionEn"]')
     .clear().type(limitAndCleanEN(pickRandom(pools.promotionDescription.EN), 500));
   cy.get('textarea[formcontrolname="promotionDescriptionTh"]')
     .clear().type(limitAndCleanTH(pickRandom(pools.promotionDescription.TH), 500));
-  
+
   // Greeting Letter
   cy.get('textarea[formcontrolname="greetingLetterEn"]')
     .clear().type(limitAndCleanEN(pickRandom(pools.greetingLetter.EN), 500));
   cy.get('textarea[formcontrolname="greetingLetterTh"]')
     .clear().type(limitAndCleanTH(pickRandom(pools.greetingLetter.TH), 500));
-  
+
   // Your Package Name
   cy.get('textarea[formcontrolname="yourPackageNameEn"]')
     .clear().type(limitAndCleanEN(pickRandom(pools.yourPackageName.EN), 100));
   cy.get('textarea[formcontrolname="yourPackageNameTh"]')
     .clear().type(limitAndCleanTH(pickRandom(pools.yourPackageName.TH), 100));
-  
+
   selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
 };
 
@@ -6295,7 +6290,7 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
 
   const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
   const pOName = poName || 'StandardPO';
-  
+
   const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
 
   // Wording In Statement
@@ -6303,7 +6298,7 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
     .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
   cy.get('textarea[formcontrolname="wordingInStatementTh"]')
     .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
-  
+
   // Description
   cy.get('textarea[formcontrolname="descriptionEn"]')
     .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
@@ -6312,13 +6307,13 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
 
   cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
   selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
-  
+
   // Other Condition
   const conditionCount = Math.floor(Math.random() * 5) + 2;
   const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
   cy.get('textarea[formcontrolname="otherCondition"]')
     .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
-  
+
   // Memo Description
   cy.get('textarea[formcontrolname="memoDescription"]')
     .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
@@ -6330,15 +6325,15 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
 const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectName?: string, poName?: string): void => {
   const pName = projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`;
   const pOName = poName || 'CashBackDiscount';
-  
+
   const pools = createPOWordingPools(pName, pOName, Module, PriceType);
-  
+
   // Duration
   const durationOptions = [1, 3, 6, 12, 24, 36];
   const randomDuration = durationOptions[Math.floor(Math.random() * durationOptions.length)];
   cy.get('input[formcontrolname="duration"]').clear().type(randomDuration.toString());
   cy.get('button[class*="btn-primary"][type="button"]').first().click();
-  
+
   // Duration From
   const durationFromOptions = [0, 1, 2, 3];
   const randomDurationFrom = durationFromOptions[Math.floor(Math.random() * durationFromOptions.length)];
@@ -6369,7 +6364,7 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
 
   if (randomIndex === 0) {
     const cashbackTypes = Math.floor(Math.random() * 2);
-    
+
     if (cashbackTypes === 0) {
       cy.get('input[formcontrolname="cashBackType"]').first().check({ force: true });
       const totalUsage = getRandomNumber(1000, 5000);
@@ -6387,7 +6382,7 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
     cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
     cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
   }
-  
+
   cy.get('button.btn.btn-primary').contains('Add').click();
   cy.wait(1000);
   cy.get('button.btn.btn-primary').contains('Add').click();
@@ -6515,7 +6510,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
   cy.get('input[aria-label="Date input field"]').type(formattedDate);
   cy.wait(2000);
   cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
-
+  RandomProjectDescription(projectName, Module);
   cy.get('button[type="button"]').contains('Save').click();
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
   cy.wait(4000);
