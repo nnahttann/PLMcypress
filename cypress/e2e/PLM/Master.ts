@@ -524,7 +524,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
 
   // รอให้ API โหลดเสร็จ
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-
+ cy.wait(5000);
   const partialIdentifier = taskIdentifier.split('_')[0];
   cy.log(`🔍 Searching for Project: "${partialIdentifier}" with Keyword: "${uniqueKeyword}"`);
 
@@ -532,6 +532,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
     'Team Task',
     partialIdentifier,
     ($row) => {
+      cy.wait(5000);
       cy.wrap($row).scrollIntoView().should('be.visible');
 
       cy.wrap($row).within(() => {
@@ -1287,20 +1288,7 @@ export const approveProjectCGMD = (projectName: string): void => {
     '/cgmd/cgmd-configure',
     () => {
       scrollAndWait();
-      cy.get('button').then(($buttons) => {
-        const usmpBtn = $buttons.filter((_, el) => el.textContent?.trim() === 'Add to USMP');
-        if (usmpBtn.length > 0) {
-          cy.log('Found Add to USMP button, clicking...');
-          cy.wrap(usmpBtn.first()).click();
-          cy.wait(5000);
-          cy.get('.modal, .mat-dialog-container, div[role="dialog"]').should('be.visible').within(() => {
-            cy.contains('button', /Close|OK|ปิด/i).click();
-          });
-          cy.wait(5000);
-        } else {
-          cy.log('Add to USMP button not found, skipping...');
-        }
-      });
+      handleAddToUSMP();
       cy.get('button[name="CBS"]').should('be.visible', { timeout: 3000000 }).click();
       cy.contains('button', 'Yes').should('be.visible').click();
     },
@@ -1325,6 +1313,7 @@ export const approveProjectCGMDPRE = (projectName: string): void => {
       scrollAndWait();
       cy.contains('button', 'Approve To CGMD', { timeout: 3000000 }).should('be.visible').click({ force: true });
       cy.contains('button', 'Yes').should('be.visible').click({ force: true });
+      handleAddToUSMP();
     },
     'AlertAndLogout'
   );
@@ -1514,7 +1503,7 @@ const performRoleTaskWithAssignment = (
   // cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.visit('/#/workspace-home/workspace');
   // cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-
+  // const projectNamePONAME= 'MOB POST onetime main 2104 1848';
   const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
 
@@ -2064,9 +2053,62 @@ const closeSuccessModal = (): void => {
 };
 
 const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
+
+  // ==================== UTILITY FUNCTIONS ====================
+
+  /**
+   * Clean text for English fields - remove Thai chars, special chars, double spaces, trim
+   */
+  const cleanEnglishText = (str: string): string => {
+    if (!str) return '';
+    return str
+      .replace(/[^\x00-\x7F\s]/g, '')           // ลบ non-ASCII (รวมภาษาไทย)
+      .replace(/[^\w\s-]/g, '')                 // ลบ special characters ยกเว้นขีดกลาง
+      .replace(/\s+/g, ' ')                     // ยุบ double space เป็น single space
+      .trim();                                  // ตัดหัวท้าย
+  };
+
+  /**
+   * Clean text for Thai fields - keep Thai/English, remove special chars, double spaces, trim
+   */
+  const cleanThaiText = (str: string): string => {
+    if (!str) return '';
+    return str
+      .replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '') // เก็บเฉพาะไทย อังกฤษ ตัวเลข ช่องว่าง ขีดกลาง
+      .replace(/\s+/g, ' ')
+      .trim();
+  };
+
+  /**
+   * Limit string length and ensure no trailing space
+   */
   const limit = (str: string, maxLen: number): string => {
     if (!str) return '';
-    return str.length > maxLen ? str.substring(0, maxLen) : str;
+    let result = str.length > maxLen ? str.substring(0, maxLen) : str;
+    // ถ้าลงท้ายด้วยช่องว่างให้ตัดออก
+    result = result.trimEnd();
+    // ถ้าตัดแล้วคำขาด ให้ตัดย้อนไปช่องว่างสุดท้าย (optional แต่ดีกว่า)
+    if (result.length === maxLen && !result.endsWith(' ') && result.includes(' ')) {
+      const lastSpace = result.lastIndexOf(' ');
+      if (lastSpace > maxLen * 0.7) { // ตัดเฉพาะถ้าคำสุดท้ายสั้นเกินไป
+        result = result.substring(0, lastSpace);
+      }
+    }
+    return result;
+  };
+
+  /**
+   * Limit and clean English text in one go
+   */
+  const limitAndCleanEN = (str: string, maxLen: number): string => {
+    return limit(cleanEnglishText(str), maxLen);
+  };
+
+  /**
+   * Limit and clean Thai text in one go
+   */
+  const limitAndCleanTH = (str: string, maxLen: number): string => {
+    return limit(cleanThaiText(str), maxLen);
   };
 
   const getRandomSendFlag = (): string => {
@@ -2076,7 +2118,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
   const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-  const WAIT_TIME = 3000;
+  const WAIT_TIME = 2000;
   const SCROLL_DELAY = 500;
 
   // สุ่ม flags ทั้งหมด
@@ -2114,7 +2156,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   cy.scrollTo('bottom');
   cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
   cy.get('textarea, select', { timeout: 15000 }).should('exist');
-  cy.wait(5000);
+  cy.wait(2000);
 
   cy.then(() => {
     const finalProjectName = Cypress.env('formattedDateMain') ||
@@ -2124,10 +2166,12 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       Cypress.env('formattedDateOntopPONAME') ||
       Cypress.env('poName');
 
-    const p = finalProjectName;
+    const p = finalProjectName || 'Product';
 
-    // ==================== WORDING POOLS ====================
+    // ==================== WORDING POOLS (ขยายและเพิ่มข้อความสมจริง) ====================
     const wordingPools = {
+
+      // ===== SHORT PROMOTION NAME =====
       shortPromotionName: {
         EN: [
           `Promo: ${p}`, `Deal: ${p}`, `Offer – ${p}`, `Package: ${p}`,
@@ -2139,7 +2183,10 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `${p} Pro`, `${p} Lite`, `${p} Plus+`, `Turbo ${p}`, `Smart ${p}`,
           `Easy ${p}`, `Quick ${p}`, `Best ${p}`, `Top ${p}`, `Mega ${p}`,
           `Flash ${p}`, `Swift ${p}`, `Peak ${p}`, `Elite ${p}`, `Core ${p}`,
-          `Power ${p}`, `Fresh ${p}`, `Pure ${p}`,
+          `Power ${p}`, `Fresh ${p}`, `Pure ${p}`, `New ${p}`, `The ${p}`,
+          `${p} Now`, `${p} Go`, `${p} Max`, `${p} 5G`, `${p} Unlimited`,
+          `${p} Saver`, `${p} Combo`, `${p} Family`, `${p} Business`,
+          `${p} Essential`, `${p} Basic`, `${p} Advanced`, `${p} Premium`,
         ],
         TH: [
           `โปรโมชัน: ${p}`, `ดีล: ${p}`, `ข้อเสนอ – ${p}`, `แพ็กเกจ: ${p}`,
@@ -2151,10 +2198,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `${p} ของฉัน`, `${p} โปร`, `${p} ไลท์`, `${p} พลัส+`, `เทอร์โบ ${p}`,
           `สมาร์ท ${p}`, `ง่ายๆ ${p}`, `ควิก ${p}`, `เบสท์ ${p}`, `ท็อป ${p}`,
           `เมกะ ${p}`, `แฟลช ${p}`, `สวิฟท์ ${p}`, `พีค ${p}`, `อีลิท ${p}`,
-          `คอร์ ${p}`, `พาวเวอร์ ${p}`, `เฟรช ${p}`, `เพียว ${p}`,
+          `คอร์ ${p}`, `พาวเวอร์ ${p}`, `เฟรช ${p}`, `เพียว ${p}`, `ใหม่ ${p}`,
+          `${p} เลย`, `${p} ไม่จำกัด`, `${p} เซฟเวอร์`, `${p} คอมโบ`,
+          `${p} ครอบครัว`, `${p} ธุรกิจ`, `${p} พื้นฐาน`, `${p} ขั้นสูง`,
         ],
       },
 
+      // ===== CMS DISPLAY =====
       cmsDisplay: {
         EN: [
           `Enjoy exclusive benefits with ${p}`, `Get the most out of ${p} today`,
@@ -2175,6 +2225,12 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `Unleash the power of ${p}`, `${p} changes everything`,
           `Welcome to a new era with ${p}`, `${p} fits your vibe`,
           `Get more with ${p} every day`, `${p} – the upgrade you've been waiting for`,
+          `${p} brings you closer to what matters`, `Your journey with ${p} starts here`,
+          `${p} is your ticket to better connectivity`, `Experience seamless service with ${p}`,
+          `${p} delivers unmatched value`, `Join thousands of happy ${p} users`,
+          `${p} is the key to unlimited possibilities`, `Elevate your experience with ${p}`,
+          `${p} combines speed and reliability`, `Enjoy peace of mind with ${p}`,
+          `${p} is your partner in connectivity`, `Discover the true meaning of value with ${p}`,
         ],
         TH: [
           `เพลิดเพลินกับสิทธิพิเศษจาก ${p}`, `รับประโยชน์สูงสุดจาก ${p} วันนี้`,
@@ -2195,9 +2251,16 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `ปลดปล่อยพลังของ ${p}`, `${p} เปลี่ยนทุกสิ่ง`,
           `ยินดีต้อนรับสู่ยุคใหม่กับ ${p}`, `${p} ตรงกับสไตล์คุณ`,
           `ได้มากขึ้นทุกวันกับ ${p}`, `${p} – การอัปเกรดที่คุณรอคอย`,
+          `${p} พาคุณเข้าใกล้สิ่งที่สำคัญ`, `การเดินทางกับ ${p} เริ่มที่นี่`,
+          `${p} คือตั๋วสู่การเชื่อมต่อที่ดีกว่า`, `สัมผัสบริการที่ราบรื่นกับ ${p}`,
+          `${p} มอบคุณค่าที่ไม่มีใครเทียบ`, `ร่วมเป็นส่วนหนึ่งกับผู้ใช้ ${p} นับพัน`,
+          `${p} คือกุญแจสู่ความเป็นไปได้ไม่จำกัด`, `ยกระดับประสบการณ์ด้วย ${p}`,
+          `${p} ผสานความเร็วและความน่าเชื่อถือ`, `อุ่นใจทุกการใช้งานกับ ${p}`,
+          `${p} คือคู่หูการเชื่อมต่อของคุณ`, `ค้นพบความหมายที่แท้จริงของความคุ้มค่ากับ ${p}`,
         ],
       },
 
+      // ===== PROMOTION DESCRIPTION =====
       promotionDescription: {
         EN: [
           `Subscribe to ${p} and enjoy unlimited access`, `${p} gives you the best value for your money`,
@@ -2217,6 +2280,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `Stay ahead of the curve with ${p}`, `${p} – because you deserve the best`,
           `Transform your daily experience with ${p}`, `${p} is the game changer you need`,
           `Go further with ${p} by your side`, `${p} empowers you every step of the way`,
+          `${p} is designed for those who demand more`, `Your search for the perfect plan ends with ${p}`,
+          `${p} offers unparalleled speed and reliability`, `Make the smart choice – choose ${p} today`,
+          `${p} brings innovation to your fingertips`, `Enjoy premium features without the premium price with ${p}`,
+          `${p} is the ultimate connectivity solution`, `Never miss a moment with ${p}`,
+          `${p} provides exceptional value for modern lifestyles`, `Experience true freedom with ${p}`,
         ],
         TH: [
           `สมัคร ${p} และรับสิทธิ์ใช้งานไม่จำกัด`, `${p} คุ้มค่าที่สุดสำหรับคุณ`,
@@ -2236,9 +2304,55 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `ก้าวนำทุกเส้นทางด้วย ${p}`, `${p} – เพราะคุณสมควรได้รับสิ่งที่ดีที่สุด`,
           `เปลี่ยนประสบการณ์ในแต่ละวันด้วย ${p}`, `${p} คือตัวเปลี่ยนเกมที่คุณต้องการ`,
           `ไปได้ไกลขึ้นกับ ${p} ที่เคียงข้างคุณ`, `${p} สร้างพลังให้คุณทุกย่างก้าว`,
+          `${p} ออกแบบมาสำหรับผู้ที่ต้องการมากกว่า`, `การค้นหาแผนที่สมบูรณ์แบบสิ้นสุดที่ ${p}`,
+          `${p} มอบความเร็วและความน่าเชื่อถือที่ไร้เทียมทาน`, `เลือกอย่างฉลาด – เลือก ${p} วันนี้`,
+          `${p} นำนวัตกรรมมาสู่ปลายนิ้วคุณ`, `เพลิดเพลินกับฟีเจอร์พรีเมียมในราคาที่คุ้มค่ากับ ${p}`,
+          `${p} คือโซลูชันการเชื่อมต่อขั้นสุด`, `ไม่พลาดทุกช่วงเวลากับ ${p}`,
+          `${p} มอบคุณค่าพิเศษสำหรับไลฟ์สไตล์ยุคใหม่`, `สัมผัสอิสรภาพที่แท้จริงกับ ${p}`,
         ],
       },
 
+      // ===== SMS CHECK CURRENT =====
+      smsCheckCurrent: {
+        EN: [
+          `Check your current plan: ${p}`, `Your active package: ${p}`,
+          `Currently subscribed to: ${p}`, `Package in use: ${p}`,
+          `Your plan today: ${p}`, `Active now: ${p}`,
+          `Running package: ${p}`, `Your service: ${p}`,
+          `On plan: ${p}`, `Subscribed: ${p}`,
+          `Live package: ${p}`, `In effect: ${p}`,
+          `Current deal: ${p}`, `Now active: ${p}`,
+          `Your current offer: ${p}`, `Status: ${p} active`,
+          `Using: ${p}`, `Your chosen plan: ${p}`,
+          `Ongoing package: ${p}`, `Enrolled in: ${p}`,
+          `You're on: ${p}`, `Currently: ${p}`,
+          `Active plan: ${p}`, `Now using: ${p}`,
+          `Your package: ${p}`, `Current subscription: ${p}`,
+          `Plan active: ${p}`, `Service running: ${p}`,
+          `${p} is your plan`, `You have: ${p}`,
+          `Active service: ${p}`, `Your active subscription: ${p}`,
+        ],
+        TH: [
+          `ตรวจสอบแพ็กเกจปัจจุบัน: ${p}`, `แพ็กเกจที่ใช้งานอยู่: ${p}`,
+          `กำลังสมัครใช้งาน: ${p}`, `แพ็กเกจที่เปิดใช้: ${p}`,
+          `แพ็กเกจวันนี้ของคุณ: ${p}`, `ใช้งานอยู่: ${p}`,
+          `แพ็กเกจที่รันอยู่: ${p}`, `บริการของคุณ: ${p}`,
+          `อยู่ในแผน: ${p}`, `สมัครอยู่: ${p}`,
+          `แพ็กเกจที่มีผล: ${p}`, `ใช้งานจริง: ${p}`,
+          `ดีลปัจจุบัน: ${p}`, `กำลังใช้งาน: ${p}`,
+          `ข้อเสนอปัจจุบัน: ${p}`, `สถานะ: ${p} ใช้งานอยู่`,
+          `ใช้อยู่: ${p}`, `แผนที่เลือก: ${p}`,
+          `แพ็กเกจที่ดำเนินอยู่: ${p}`, `ลงทะเบียนอยู่ใน: ${p}`,
+          `คุณใช้: ${p}`, `ปัจจุบัน: ${p}`,
+          `แผนที่ใช้งาน: ${p}`, `กำลังใช้: ${p}`,
+          `แพ็กเกจของคุณ: ${p}`, `การสมัครปัจจุบัน: ${p}`,
+          `แผนใช้งาน: ${p}`, `บริการกำลังทำงาน: ${p}`,
+          `${p} คือแผนของคุณ`, `คุณมี: ${p}`,
+          `บริการที่ใช้งาน: ${p}`, `การสมัครที่ใช้งานอยู่: ${p}`,
+        ],
+      },
+
+      // ===== SMS GREETING =====
       smsGreeting: {
         EN: [
           `Welcome to ${p}! Your subscription is now active.`,
@@ -2271,6 +2385,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `Welcome to the ${p} family. We're happy to have you!`,
           `Your ${p} adventure starts now. Enjoy every bit of it!`,
           `Cheers! ${p} is ready. Make today awesome!`,
+          `Welcome! ${p} is now live on your account. Enjoy the perks!`,
+          `You've made a great choice with ${p}. Welcome!`,
+          `${p} is now active. We're excited to have you with us!`,
+          `Thank you for subscribing to ${p}. Your benefits are ready!`,
+          `Your ${p} plan is now active. Enjoy seamless connectivity!`,
         ],
         TH: [
           `ยินดีต้อนรับสู่ ${p}! แพ็กเกจของคุณพร้อมใช้งานแล้ว`,
@@ -2303,9 +2422,15 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `ยินดีต้อนรับสู่ครอบครัว ${p} เราดีใจที่มีคุณ`,
           `การผจญภัยกับ ${p} ของคุณเริ่มแล้ว ขอให้สนุกทุกส่วนของมัน!`,
           `ไชโย! ${p} พร้อมแล้ว ทำให้วันนี้ยอดเยี่ยม!`,
+          `ยินดีต้อนรับ! ${p} พร้อมใช้งานบนบัญชีคุณแล้ว สนุกกับสิทธิพิเศษ!`,
+          `คุณเลือก ${p} ได้ดีมาก ยินดีต้อนรับ!`,
+          `${p} เปิดใช้งานแล้ว เราตื่นเต้นที่มีคุณอยู่กับเรา!`,
+          `ขอบคุณที่สมัคร ${p} สิทธิประโยชน์ของคุณพร้อมแล้ว!`,
+          `แผน ${p} ของคุณเปิดใช้งานแล้ว สนุกกับการเชื่อมต่อที่ราบรื่น!`,
         ],
       },
 
+      // ===== SMS DELETE PRE =====
       smsDeletePRE: {
         EN: [
           `Your ${p} package has been removed. Thank you for using our service.`,
@@ -2338,6 +2463,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `${p} is officially off. Thank you for being a valued customer.`,
           `You've successfully unsubscribed from ${p}. Until next time!`,
           `${p} cancellation complete. We hope you'll return someday.`,
+          `Your request to cancel ${p} has been processed. Thank you.`,
+          `${p} has been removed from your account. We'll miss you!`,
+          `Goodbye for now. Your ${p} package has been cancelled.`,
+          `We're sorry to see you leave ${p}. Come back soon!`,
+          `${p} deactivation confirmed. Thank you for choosing us.`,
         ],
         TH: [
           `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการ`,
@@ -2370,9 +2500,15 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `${p} ปิดอย่างเป็นทางการแล้ว ขอบคุณที่เป็นลูกค้าที่มีค่า`,
           `คุณยกเลิก ${p} สำเร็จแล้ว เจอกันใหม่คราวหน้า!`,
           `ยกเลิก ${p} เสร็จสมบูรณ์ หวังว่าคุณจะกลับมาสักวัน`,
+          `คำขอยกเลิก ${p} ได้รับการดำเนินการแล้ว ขอบคุณ`,
+          `${p} ถูกลบออกจากบัญชีคุณแล้ว เราจะคิดถึงคุณ!`,
+          `ลาก่อนก่อนนะ แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว`,
+          `เสียใจที่เห็นคุณออกจาก ${p} กลับมาเร็วๆ นะ!`,
+          `ยืนยันการปิดใช้งาน ${p} ขอบคุณที่เลือกเรา`,
         ],
       },
 
+      // ===== SMS DELETE POST =====
       smsDeletePOST: {
         EN: [
           `Your ${p} package has been cancelled. We hope to serve you again.`,
@@ -2405,6 +2541,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `${p} deactivation complete. Feel free to rejoin anytime.`,
           `Thanks for being with ${p}. Your package has been removed.`,
           `${p} cancelled. Wishing you all the best until we meet again!`,
+          `Postpaid ${p} has been deactivated successfully. Thank you.`,
+          `We're sorry to see you go. ${p} has been cancelled.`,
+          `Your ${p} postpaid service has ended. Hope to see you back!`,
+          `${p} removal confirmed. Thank you for your business.`,
+          `Your ${p} plan is no longer active. We valued your patronage.`,
         ],
         TH: [
           `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว หวังว่าจะได้ให้บริการอีกครั้ง`,
@@ -2432,51 +2573,20 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           `การสมัคร ${p} ของคุณปิดแล้ว ขอบคุณสำหรับความไว้วางใจ`,
           `${p} ออกจากบัญชีของคุณแล้ว แล้วพบกันใหม่เร็วๆ นี้!`,
           `เราดำเนินการลบ ${p} ตามคำขอของคุณแล้ว ดูแลตัวเองด้วยนะ!`,
-          `ลบ ${p} ออกจากแผนโพสต์เพดของคุณแล้ว ดีใจที่ได้有你`,
+          `ลบ ${p} ออกจากแผนโพสต์เพดของคุณแล้ว ดีใจที่ได้มีคุณ`,
           `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว เราขอบคุณคุณ!`,
           `ปิดการใช้งาน ${p} เสร็จสมบูรณ์ สามารถสมัครใหม่ได้ตลอดเวลา`,
           `ขอบคุณที่ใช้ ${p} แพ็กเกจของคุณถูกลบแล้ว`,
           `ยกเลิก ${p} แล้ว ขอให้คุณโชคดีจนกว่าเราจะพบกันใหม่!`,
+          `โพสต์เพด ${p} ถูกปิดใช้งานเรียบร้อยแล้ว ขอบคุณ`,
+          `เสียใจที่เห็นคุณจากไป ${p} ถูกยกเลิกแล้ว`,
+          `บริการโพสต์เพด ${p} ของคุณสิ้นสุดแล้ว หวังว่าจะได้พบคุณอีก!`,
+          `ยืนยันการลบ ${p} ขอบคุณที่ใช้บริการ`,
+          `แผน ${p} ของคุณไม่ทำงานแล้ว เราขอบคุณที่ไว้วางใจเรา`,
         ],
       },
 
-      smsCheckCurrent: {
-        EN: [
-          `Check your current plan: ${p}`, `Your active package: ${p}`,
-          `Currently subscribed to: ${p}`, `Package in use: ${p}`,
-          `Your plan today: ${p}`, `Active now: ${p}`,
-          `Running package: ${p}`, `Your service: ${p}`,
-          `On plan: ${p}`, `Subscribed: ${p}`,
-          `Live package: ${p}`, `In effect: ${p}`,
-          `Current deal: ${p}`, `Now active: ${p}`,
-          `Your current offer: ${p}`, `Status: ${p} active`,
-          `Using: ${p}`, `Your chosen plan: ${p}`,
-          `Ongoing package: ${p}`, `Enrolled in: ${p}`,
-          `You're on: ${p}`, `Currently: ${p}`,
-          `Active plan: ${p}`, `Now using: ${p}`,
-          `Your package: ${p}`, `Current subscription: ${p}`,
-          `Plan active: ${p}`, `Service running: ${p}`,
-          `${p} is your plan`, `You have: ${p}`,
-        ],
-        TH: [
-          `ตรวจสอบแพ็กเกจปัจจุบัน: ${p}`, `แพ็กเกจที่ใช้งานอยู่: ${p}`,
-          `กำลังสมัครใช้งาน: ${p}`, `แพ็กเกจที่เปิดใช้: ${p}`,
-          `แพ็กเกจวันนี้ของคุณ: ${p}`, `ใช้งานอยู่: ${p}`,
-          `แพ็กเกจที่รันอยู่: ${p}`, `บริการของคุณ: ${p}`,
-          `อยู่ในแผน: ${p}`, `สมัครอยู่: ${p}`,
-          `แพ็กเกจที่มีผล: ${p}`, `ใช้งานจริง: ${p}`,
-          `ดีลปัจจุบัน: ${p}`, `กำลังใช้งาน: ${p}`,
-          `ข้อเสนอปัจจุบัน: ${p}`, `สถานะ: ${p} ใช้งานอยู่`,
-          `ใช้อยู่: ${p}`, `แผนที่เลือก: ${p}`,
-          `แพ็กเกจที่ดำเนินอยู่: ${p}`, `ลงทะเบียนอยู่ใน: ${p}`,
-          `คุณใช้: ${p}`, `ปัจจุบัน: ${p}`,
-          `แผนที่ใช้งาน: ${p}`, `กำลังใช้: ${p}`,
-          `แพ็กเกจของคุณ: ${p}`, `การสมัครปัจจุบัน: ${p}`,
-          `แผนใช้งาน: ${p}`, `บริการกำลังทำงาน: ${p}`,
-          `${p} คือแผนของคุณ`, `คุณมี: ${p}`,
-        ],
-      },
-
+      // ===== MARKETING NAME =====
       marketingName: [
         `${p} Special Offer`, `${p} Best Value`, `${p} Limited Deal`,
         `${p} Top Pick`, `${p} Exclusive`, `${p} Premium Choice`,
@@ -2495,7 +2605,17 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         `${p} Community Fave`, `${p} Top Rated`,
         `${p} Budget Hero`, `${p} Value Champ`,
         `${p} Smart Saver`, `${p} Money Saver`,
+        `${p} Mega Deal`, `${p} Super Saver`,
+        `${p} Ultimate Plan`, `${p} Premium Deal`,
+        `${p} VIP Offer`, `${p} Gold Package`,
+        `${p} Platinum Deal`, `${p} Diamond Offer`,
+        `${p} Elite Plan`, `${p} Signature Package`,
+        `${p} Essential Pick`, `${p} Everyday Value`,
+        `${p} Great Value`, `${p} Super Value`,
+        `${p} Amazing Deal`, `${p} Fantastic Offer`,
       ],
+
+      // ===== YOUR PACKAGE =====
       yourPackage: {
         EN: [
           `You are subscribed to ${p}. Enjoy your package benefits.`,
@@ -2563,70 +2683,71 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         ],
       },
 
+      // ===== GREETING LETTER =====
       greetingLetter: {
         EN: [
-          `Dear customer, thank you for subscribing to ${p}.`,
-          `Hello! We're glad you've chosen ${p}. Welcome aboard.`,
-          `Dear valued customer, your ${p} subscription is confirmed.`,
-          `Hi there! ${p} is now ready for your use. Enjoy!`,
-          `Welcome! We're excited to have you on ${p}.`,
-          `Dear customer, your ${p} plan is now active. Enjoy!`,
-          `Hello and welcome to ${p}! We're happy you're here.`,
-          `Greetings! Thank you for activating ${p} with us.`,
-          `Dear subscriber, ${p} is live on your account. Enjoy!`,
-          `Hi! We're delighted to welcome you to ${p}.`,
-          `Dear customer, it's great to have you on ${p}!`,
-          `Hello! Your ${p} journey starts now. We're with you.`,
-          `Welcome to ${p}, dear customer. Great things ahead!`,
-          `Dear customer, we're thrilled you chose ${p}.`,
-          `Hello! ${p} is fully active. Enjoy everything it brings.`,
-          `Greetings, dear customer. ${p} is ready for you!`,
-          `Hi, and welcome! ${p} is your plan starting today.`,
-          `Dear customer, enjoy every bit of ${p}. We're here for you.`,
-          `Hello! Welcome to the ${p} family. We're glad you're here!`,
-          `Dear customer, ${p} is on. Sit back and enjoy the benefits.`,
-          `Dear customer, welcome to ${p}. Let the adventure begin!`,
-          `Hello! Thank you for trusting ${p} with your connectivity.`,
-          `Dear valued customer, ${p} is now at your fingertips.`,
-          `Greetings! Your ${p} package is ready to change your day.`,
-          `Dear customer, we're honored to have you on ${p}.`,
-          `Hello! ${p} is here to make your life easier and better.`,
-          `Dear subscriber, welcome to the world of ${p}. Enjoy!`,
-          `Hi! ${p} is officially yours. We're excited for you!`,
-          `Dear customer, your journey with ${p} starts today. Enjoy!`,
-          `Welcome aboard! ${p} will take you further than ever before.`,
+          `Dear customer thank you for subscribing to ${p}`,
+          `Hello We are glad you have chosen ${p} Welcome aboard`,
+          `Dear valued customer your ${p} subscription is confirmed`,
+          `Hi there ${p} is now ready for your use Enjoy`,
+          `Welcome We are excited to have you on ${p}`,
+          `Dear customer your ${p} plan is now active Enjoy`,
+          `Hello and welcome to ${p} We are happy you are here`,
+          `Greetings Thank you for activating ${p} with us`,
+          `Dear subscriber ${p} is live on your account Enjoy`,
+          `Hi We are delighted to welcome you to ${p}`,
+          `Dear customer it is great to have you on ${p}`,
+          `Hello Your ${p} journey starts now We are with you`,
+          `Welcome to ${p} dear customer Great things ahead`,
+          `Dear customer we are thrilled you chose ${p}`,
+          `Hello ${p} is fully active Enjoy everything it brings`,
+          `Greetings dear customer ${p} is ready for you`,
+          `Hi and welcome ${p} is your plan starting today`,
+          `Dear customer enjoy every bit of ${p} We are here for you`,
+          `Hello Welcome to the ${p} family We are glad you are here`,
+          `Dear customer ${p} is on Sit back and enjoy the benefits`,
+          `Dear customer welcome to ${p} Let the adventure begin`,
+          `Hello Thank you for trusting ${p} with your connectivity`,
+          `Dear valued customer ${p} is now at your fingertips`,
+          `Greetings Your ${p} package is ready to change your day`,
+          `Dear customer we are honored to have you on ${p}`,
+          `Hello ${p} is here to make your life easier and better`,
+          `Dear subscriber welcome to the world of ${p} Enjoy`,
+          `Hi ${p} is officially yours We are excited for you`,
+          `Dear customer your journey with ${p} starts today Enjoy`,
+          `Welcome aboard ${p} will take you further than ever before`,
         ],
         TH: [
           `เรียนลูกค้า ขอบคุณที่สมัครใช้บริการ ${p}`,
-          `สวัสดี! ดีใจที่คุณเลือก ${p} ยินดีต้อนรับ`,
+          `สวัสดี ดีใจที่คุณเลือก ${p} ยินดีต้อนรับ`,
           `เรียนลูกค้าที่มีคุณค่า การสมัคร ${p} ของคุณได้รับการยืนยันแล้ว`,
-          `สวัสดี! ${p} พร้อมใช้งานสำหรับคุณแล้ว ขอให้สนุก`,
-          `ยินดีต้อนรับ! เรายินดีที่คุณเป็นส่วนหนึ่งของ ${p}`,
-          `เรียนลูกค้า แผน ${p} ของคุณเปิดใช้งานแล้ว ขอให้สนุก!`,
-          `สวัสดีและยินดีต้อนรับสู่ ${p}! เรายินดีที่คุณมาอยู่ที่นี่`,
-          `ขอทักทาย! ขอบคุณที่เปิดใช้งาน ${p} กับเรา`,
-          `เรียนสมาชิก ${p} มีผลบนบัญชีของคุณแล้ว ขอให้สนุก!`,
-          `สวัสดี! เรายินดีที่ได้ต้อนรับคุณสู่ ${p}`,
-          `เรียนลูกค้า ดีใจที่คุณอยู่บน ${p}!`,
-          `สวัสดี! การเดินทางกับ ${p} ของคุณเริ่มแล้ว เราอยู่เคียงข้างคุณ`,
-          `ยินดีต้อนรับสู่ ${p} เรียนลูกค้า สิ่งดีๆ กำลังรออยู่ข้างหน้า!`,
+          `สวัสดี ${p} พร้อมใช้งานสำหรับคุณแล้ว ขอให้สนุก`,
+          `ยินดีต้อนรับ เรายินดีที่คุณเป็นส่วนหนึ่งของ ${p}`,
+          `เรียนลูกค้า แผน ${p} ของคุณเปิดใช้งานแล้ว ขอให้สนุก`,
+          `สวัสดีและยินดีต้อนรับสู่ ${p} เรายินดีที่คุณมาอยู่ที่นี่`,
+          `ขอทักทาย ขอบคุณที่เปิดใช้งาน ${p} กับเรา`,
+          `เรียนสมาชิก ${p} มีผลบนบัญชีของคุณแล้ว ขอให้สนุก`,
+          `สวัสดี เรายินดีที่ได้ต้อนรับคุณสู่ ${p}`,
+          `เรียนลูกค้า ดีใจที่คุณอยู่บน ${p}`,
+          `สวัสดี การเดินทางกับ ${p} ของคุณเริ่มแล้ว เราอยู่เคียงข้างคุณ`,
+          `ยินดีต้อนรับสู่ ${p} เรียนลูกค้า สิ่งดีๆ กำลังรออยู่ข้างหน้า`,
           `เรียนลูกค้า เรารู้สึกตื่นเต้นที่คุณเลือก ${p}`,
-          `สวัสดี! ${p} เปิดใช้งานเต็มที่แล้ว เพลิดเพลินกับทุกสิ่งที่มี`,
-          `ขอทักทาย เรียนลูกค้า ${p} พร้อมสำหรับคุณแล้ว!`,
-          `สวัสดีและยินดีต้อนรับ! ${p} คือแผนของคุณตั้งแต่วันนี้เป็นต้นไป`,
+          `สวัสดี ${p} เปิดใช้งานเต็มที่แล้ว เพลิดเพลินกับทุกสิ่งที่มี`,
+          `ขอทักทาย เรียนลูกค้า ${p} พร้อมสำหรับคุณแล้ว`,
+          `สวัสดีและยินดีต้อนรับ ${p} คือแผนของคุณตั้งแต่วันนี้เป็นต้นไป`,
           `เรียนลูกค้า ขอให้เพลิดเพลินกับทุกส่วนของ ${p} เราอยู่เคียงข้างคุณ`,
-          `สวัสดี! ยินดีต้อนรับสู่ครอบครัว ${p} เรายินดีที่คุณมาอยู่ที่นี่!`,
+          `สวัสดี ยินดีต้อนรับสู่ครอบครัว ${p} เรายินดีที่คุณมาอยู่ที่นี่`,
           `เรียนลูกค้า ${p} เปิดแล้ว นั่งสบายๆ และเพลิดเพลินกับสิทธิพิเศษ`,
-          `เรียนลูกค้า ยินดีต้อนรับสู่ ${p} ให้การผจญภัยเริ่มต้นขึ้น!`,
-          `สวัสดี! ขอบคุณที่ไว้วางใจ ${p} ในการเชื่อมต่อของคุณ`,
+          `เรียนลูกค้า ยินดีต้อนรับสู่ ${p} ให้การผจญภัยเริ่มต้นขึ้น`,
+          `สวัสดี ขอบคุณที่ไว้วางใจ ${p} ในการเชื่อมต่อของคุณ`,
           `เรียนลูกค้าที่มีคุณค่า ${p} อยู่แค่ปลายนิ้วคุณแล้ว`,
-          `ขอทักทาย! แพ็กเกจ ${p} ของคุณพร้อมที่จะเปลี่ยนวันของคุณ`,
-          `เรียนลูกค้า เรารู้สึกเป็นเกียรติที่ได้有你 บน ${p}`,
-          `สวัสดี! ${p} อยู่ที่นี่เพื่อทำให้ชีวิตคุณง่ายขึ้นและดีขึ้น`,
-          `เรียนสมาชิก ยินดีต้อนรับสู่โลกของ ${p} ขอให้สนุก!`,
-          `สวัสดี! ${p} เป็นของคุณอย่างเป็นทางการแล้ว เราตื่นเต้นไปกับคุณ!`,
-          `เรียนลูกค้า การเดินทางกับ ${p} ของคุณเริ่มวันนี้ ขอให้สนุก!`,
-          `ยินดีต้อนรับ! ${p} จะพาคุณไปได้ไกลกว่าที่เคย`,
+          `ขอทักทาย แพ็กเกจ ${p} ของคุณพร้อมที่จะเปลี่ยนวันของคุณ`,
+          `เรียนลูกค้า เรารู้สึกเป็นเกียรติที่ได้มีคุณบน ${p}`,
+          `สวัสดี ${p} อยู่ที่นี่เพื่อทำให้ชีวิตคุณง่ายขึ้นและดีขึ้น`,
+          `เรียนสมาชิก ยินดีต้อนรับสู่โลกของ ${p} ขอให้สนุก`,
+          `สวัสดี ${p} เป็นของคุณอย่างเป็นทางการแล้ว เราตื่นเต้นไปกับคุณ`,
+          `เรียนลูกค้า การเดินทางกับ ${p} ของคุณเริ่มวันนี้ ขอให้สนุก`,
+          `ยินดีต้อนรับ ${p} จะพาคุณไปได้ไกลกว่าที่เคย`,
         ],
       },
     };
@@ -2637,9 +2758,9 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       if ($body.find('textarea[formcontrolname="shortPromotionName"]').length > 0) {
         scrollToElement('textarea[formcontrolname="shortPromotionName"]', 'Short Promotion Name');
         cy.get('textarea[formcontrolname="shortPromotionName"]').then(($els: any) => {
-          cy.wrap($els[0]).clear({ force: true }).type(limit(pickRandom(wordingPools.shortPromotionName.EN), 50), { delay: 0, force: true });
+          cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.shortPromotionName.EN), 50), { delay: 0, force: true });
           if ($els.length > 1) {
-            cy.wrap($els[1]).clear({ force: true }).type(limit(pickRandom(wordingPools.shortPromotionName.TH), 50), { delay: 0, force: true });
+            cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.shortPromotionName.TH), 50), { delay: 0, force: true });
           }
         });
         cy.wait(WAIT_TIME);
@@ -2651,9 +2772,9 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       if ($body.find('textarea[formcontrolname="cmsDisplay"]').length > 0) {
         scrollToElement('textarea[formcontrolname="cmsDisplay"]', 'CMS Display');
         cy.get('textarea[formcontrolname="cmsDisplay"]').then(($els: any) => {
-          cy.wrap($els[0]).clear({ force: true }).type(limit(pickRandom(wordingPools.cmsDisplay.EN), 250), { delay: 0, force: true });
+          cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.cmsDisplay.EN), 250), { delay: 0, force: true });
           if ($els.length > 1) {
-            cy.wrap($els[1]).clear({ force: true }).type(limit(pickRandom(wordingPools.cmsDisplay.TH), 250), { delay: 0, force: true });
+            cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.cmsDisplay.TH), 250), { delay: 0, force: true });
           }
         });
         cy.wait(WAIT_TIME);
@@ -2665,9 +2786,9 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       if ($body.find('textarea[formcontrolname="promotionDescription"]').length > 0) {
         scrollToElement('textarea[formcontrolname="promotionDescription"]', 'Promotion Description');
         cy.get('textarea[formcontrolname="promotionDescription"]').then(($els: any) => {
-          cy.wrap($els[0]).clear({ force: true }).type(limit(pickRandom(wordingPools.promotionDescription.EN), 250), { delay: 0, force: true });
+          cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.promotionDescription.EN), 250), { delay: 0, force: true });
           if ($els.length > 1) {
-            cy.wrap($els[1]).clear({ force: true }).type(limit(pickRandom(wordingPools.promotionDescription.TH), 250), { delay: 0, force: true });
+            cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.promotionDescription.TH), 250), { delay: 0, force: true });
           }
         });
         cy.wait(WAIT_TIME);
@@ -2678,8 +2799,8 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     cy.get('body').then(($body: any) => {
       if ($body.find('textarea[formcontrolname="smsCheckCurrent"]').length > 0) {
         scrollToElement('textarea[formcontrolname="smsCheckCurrent"]', 'SMS Check Current');
-        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(0).clear({ force: true }).type(limit(pickRandom(wordingPools.smsCheckCurrent.EN), 50), { delay: 0, force: true });
-        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(1).clear({ force: true }).type(limit(pickRandom(wordingPools.smsCheckCurrent.TH), 50), { delay: 0, force: true });
+        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(0).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.smsCheckCurrent.EN), 50), { delay: 0, force: true });
+        cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(1).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.smsCheckCurrent.TH), 50), { delay: 0, force: true });
         cy.wait(WAIT_TIME);
       }
     });
@@ -2692,8 +2813,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
         if (smsGreetingFlag === 'Send') {
           cy.get('textarea[formcontrolname="smsGreeting"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? pickRandom(wordingPools.smsGreeting.EN) : pickRandom(wordingPools.smsGreeting.TH);
-            cy.wrap($el).clear({ force: true }).type(limit(text, 400), { delay: 0, force: true });
+            const text = idx === 0
+              ? pickRandom(wordingPools.smsGreeting.EN)
+              : pickRandom(wordingPools.smsGreeting.TH);
+            const cleaned = idx === 0
+              ? limitAndCleanEN(text, 400)
+              : limitAndCleanTH(text, 400);
+            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
           });
         }
         cy.wait(WAIT_TIME);
@@ -2725,9 +2851,12 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
                 if (randomDefaultVal === 'No') {
                   cy.get('textarea[formcontrolname="smsDelete"]').then(($els: any) => {
-                    cy.wrap($els[0]).clear({ force: true }).type(limit(pickRandom(wordingPools.smsDeletePRE.EN), 250), { delay: 0, force: true });
+                    // ENG - ต้อง clean พิเศษ (ไม่มีไทย, ไม่มี special chars)
+                    const enText = pickRandom(wordingPools.smsDeletePRE.EN);
+                    cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(enText, 250), { delay: 0, force: true });
                     if ($els.length > 1) {
-                      cy.wrap($els[1]).clear({ force: true }).type(limit(pickRandom(wordingPools.smsDeletePRE.TH), 250), { delay: 0, force: true });
+                      const thText = pickRandom(wordingPools.smsDeletePRE.TH);
+                      cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(thText, 250), { delay: 0, force: true });
                     }
                   });
                 }
@@ -2735,8 +2864,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
             });
           } else {
             cy.get('textarea[formcontrolname="smsDelete"]').each(($el: any, idx: number) => {
-              const text = idx === 0 ? pickRandom(wordingPools.smsDeletePOST.EN) : pickRandom(wordingPools.smsDeletePOST.TH);
-              cy.wrap($el).clear({ force: true }).type(limit(text, 250), { delay: 0, force: true });
+              const text = idx === 0
+                ? pickRandom(wordingPools.smsDeletePOST.EN)
+                : pickRandom(wordingPools.smsDeletePOST.TH);
+              const cleaned = idx === 0
+                ? limitAndCleanEN(text, 250)
+                : limitAndCleanTH(text, 250);
+              cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
             });
           }
         }
@@ -2789,8 +2923,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
         if (smsPromotePackVal === 'Send') {
           cy.get('textarea[formcontrolname="smsPromotePack"]').each(($el: any, idx: number) => {
-            const prefix = idx === 0 ? `Special offer! ${p} - ` : `ข้อเสนอพิเศษ! ${p} - `;
-            cy.wrap($el).clear({ force: true }).type(limit(`${prefix}Get it now`, 250), { delay: 0, force: true });
+            if (idx === 0) {
+              const enText = `Special offer! ${p} - Get it now`;
+              cy.wrap($el).clear({ force: true }).type(limitAndCleanEN(enText, 250), { delay: 0, force: true });
+            } else {
+              const thText = `ข้อเสนอพิเศษ! ${p} - รับเลยตอนนี้`;
+              cy.wrap($el).clear({ force: true }).type(limitAndCleanTH(thText, 250), { delay: 0, force: true });
+            }
           });
         }
         cy.wait(WAIT_TIME);
@@ -2825,7 +2964,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     cy.get('body').then(($body: any) => {
       if ($body.find('select[formcontrolname="promotionExpAlertSendFlag"]').length > 0) {
         scrollToElement('select[formcontrolname="promotionExpAlertSendFlag"]', 'Promotion Expired');
-        cy.log(`🎯 Promotion Expired Alert Flag = ${promoExpVal} (mutually exclusive with Before Promotion)`);
+        cy.log(`Promotion Expired Alert Flag = ${promoExpVal} (mutually exclusive with Before Promotion)`);
         cy.get('select[formcontrolname="promotionExpAlertSendFlag"]').select(promoExpVal, { force: true });
         cy.wait(WAIT_TIME);
       }
@@ -2833,11 +2972,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
     // ==================== SECTION 15: POST Only Fields ====================
     if (type === 'POST') {
-      // Marketing Name
+      // Marketing Name (ต้องไม่เกิน 40 ตัว และ clean)
       cy.get('body').then(($body: any) => {
         if ($body.find('textarea[formcontrolname="marketingName"]').length > 0) {
           scrollToElement('textarea[formcontrolname="marketingName"]', 'Marketing Name');
-          cy.get('textarea[formcontrolname="marketingName"]').clear({ force: true }).type(limit(pickRandom(wordingPools.marketingName), 40), { delay: 0, force: true });
+          const rawText = pickRandom(wordingPools.marketingName);
+          cy.get('textarea[formcontrolname="marketingName"]').clear({ force: true })
+            .type(limitAndCleanEN(rawText, 40), { delay: 0, force: true });
           cy.wait(WAIT_TIME);
         }
       });
@@ -2847,8 +2988,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         if ($body.find('textarea[formcontrolname="yourPackage"]').length > 0) {
           scrollToElement('textarea[formcontrolname="yourPackage"]', 'Your Package');
           cy.get('textarea[formcontrolname="yourPackage"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? pickRandom(wordingPools.yourPackage.EN) : pickRandom(wordingPools.yourPackage.TH);
-            cy.wrap($el).clear({ force: true }).type(limit(text, 100), { delay: 0, force: true });
+            const text = idx === 0
+              ? pickRandom(wordingPools.yourPackage.EN)
+              : pickRandom(wordingPools.yourPackage.TH);
+            const cleaned = idx === 0
+              ? limitAndCleanEN(text, 100)
+              : limitAndCleanTH(text, 100);
+            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
           });
           cy.wait(WAIT_TIME);
         }
@@ -2859,8 +3005,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         if ($body.find('textarea[formcontrolname="greetingLetter"]').length > 0) {
           scrollToElement('textarea[formcontrolname="greetingLetter"]', 'Greeting Letter');
           cy.get('textarea[formcontrolname="greetingLetter"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? pickRandom(wordingPools.greetingLetter.EN) : pickRandom(wordingPools.greetingLetter.TH);
-            cy.wrap($el).clear({ force: true }).type(limit(text, 250), { delay: 0, force: true });
+            const text = idx === 0
+              ? pickRandom(wordingPools.greetingLetter.EN)
+              : pickRandom(wordingPools.greetingLetter.TH);
+            const cleaned = idx === 0
+              ? limitAndCleanEN(text, 250)
+              : limitAndCleanTH(text, 250);
+            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
           });
           cy.wait(WAIT_TIME);
         }
@@ -2914,59 +3065,845 @@ export const smsCKSPOST = (): void => {
 
     const p = finalProjectName;
 
-    // สุ่ม messageCode
     const randomMessageCode = (): string => {
       return `PRO${Math.floor(Math.random() * 10000)}`;
     };
 
-    // เลื่อนไปที่ SMS Promote Package
     cy.get('select[formcontrolname="smsPromotePackSendFlag"]').first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
     cy.wait(1000);
 
-    // เช็คค่าที่เลือกอยู่ก่อนว่าเป็น Send หรือไม่
     cy.get('select[formcontrolname="smsPromotePackSendFlag"]').then(($select) => {
       const currentValue = $select.val() as string;
 
       if (currentValue === 'Send') {
         cy.log('✅ SMS Promote Package = Send, filling messageCode');
-        // กรอก Message Code Expired (สุ่ม)
-        cy.get('input[formcontrolname="messageCode"]').clear({ force: true }).type(randomMessageCode(), { force: true });
+        cy.get('input[formcontrolname="messageCode"]').type(randomMessageCode(), { force: true });
         cy.wait(1000);
       } else {
         cy.log('⚠️ SMS Promote Package is not "Send", skipping messageCode');
       }
     });
 
-    // save
+    // Save - ใช้ selector ที่ถูกต้อง
     cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-    cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
+    cy.contains('button', 'Save').should('be.visible').click(); // ✅ แก้ตรงนี้
     cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 
     closeSuccessModal();
   });
 };
+// ========================
+// RANDOM REMARK
+// ========================
+export const RandomRemark = (
+  projectName: string,
+  poName: string,
+  priceType?: string,
+  productClass?: string,
+  subModule?: string,
+  module?: string
+): void => {
+  // ===== HELPER FUNCTIONS =====
+  const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const pickMultiple = <T>(arr: T[], count: number): T[] => {
+    const shuffled = [...arr].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, count);
+  };
+  const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+  const WAIT_TIME = 2000;
+  
+  const scrollToElement = (selector: string, sectionName: string) => {
+    cy.log(`📌 Scrolling to: ${sectionName}`);
+    cy.get(selector).first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
+    cy.wait(300);
+  };
 
+  // ==================== REMARK LOGIC ====================
+  cy.get('body').then(($body: any) => {
+    if ($body.find('textarea[formcontrolname="remark"]').length > 0) {
+      scrollToElement('textarea[formcontrolname="remark"]', 'Remark');
+
+      const shouldFillRemark = Math.random() < 0.8;
+
+      if (shouldFillRemark) {
+        const currentDate = new Date();
+        const thaiDate = currentDate.toLocaleDateString('th-TH', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+        const engDate = currentDate.toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric'
+        });
+        const currentTime = currentDate.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        const isoDate = currentDate.toISOString().split('T')[0];
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2, 10).toUpperCase();
+
+        // ใช้ค่าที่ส่งเข้ามา หรือค่า default
+        const pName = projectName || 'New Package';
+        const pOName = poName || 'Product Offering';
+        const pType = priceType || 'recurring';
+        const pClass = productClass || 'main';
+        const sModule = subModule || 'POST';
+        const mod = module || 'MOB';
+
+        // ===== PRICE MAPPING =====
+        const priceTypeDisplay: Record<string, { EN: string; TH: string }> = {
+          'onetime': { EN: 'One-Time', TH: 'ครั้งเดียว' },
+          'recurring': { EN: 'Recurring', TH: 'รายเดือน' },
+          'usage': { EN: 'Usage-Based', TH: 'ตามการใช้งาน' }
+        };
+        const ptDisplay = priceTypeDisplay[pType] || { EN: pType, TH: pType };
+
+        const productClassDisplay: Record<string, { EN: string; TH: string }> = {
+          'main': { EN: 'Main Package', TH: 'แพ็กเกจหลัก' },
+          'ontop': { EN: 'On-Top Package', TH: 'แพ็กเกจเสริม' },
+          'ontopextra': { EN: 'On-Top Extra', TH: 'แพ็กเกจเสริมพิเศษ' }
+        };
+        const pcDisplay = productClassDisplay[pClass] || { EN: pClass, TH: pClass };
+
+        const moduleDisplay: Record<string, { EN: string; TH: string }> = {
+          'MOB': { EN: 'Mobile', TH: 'มือถือ' },
+          'ENTER': { EN: 'Entertainment', TH: 'บันเทิง' },
+          'MUSIC': { EN: 'Music', TH: 'เพลง' }
+        };
+        const modDisplay = moduleDisplay[mod] || { EN: mod, TH: mod };
+
+        const subModuleDisplay: Record<string, { EN: string; TH: string }> = {
+          'PRE': { EN: 'Prepaid', TH: 'เติมเงิน' },
+          'POST': { EN: 'Postpaid', TH: 'รายเดือน' }
+        };
+        const smDisplay = subModuleDisplay[sModule] || { EN: sModule, TH: sModule };
+
+        // ===== RANDOM VALUES FOR DIVERSITY =====
+        const dataAllowance = pickRandom(['10GB', '30GB', '50GB', '100GB', '200GB', '500GB', 'Unlimited']);
+        const speedTier = pickRandom(['10 Mbps', '100 Mbps', '300 Mbps', '500 Mbps', '1 Gbps', '2 Gbps']);
+        const priceAmount = randomInt(199, 1999);
+        const contractMonths = pickRandom([1, 3, 6, 12, 24, 36]);
+        const discountPercent = pickRandom([10, 15, 20, 25, 30, 40, 50]);
+        const targetAgeMin = randomInt(18, 35);
+        const targetAgeMax = randomInt(targetAgeMin + 10, 65);
+        const launchQuarter = pickRandom(['Q1', 'Q2', 'Q3', 'Q4']) + ' ' + (currentDate.getFullYear() + pickRandom([0, 1]));
+        const validityDays = pickRandom([1, 3, 7, 30, 90, 180, 365]);
+        const subscriberTarget = pickRandom(['10K', '25K', '50K', '100K', '250K', '500K', '1M']);
+
+        // ===== ENHANCED REMARK POOLS =====
+        const remarkPools = {
+          // ข้อความสั้น (1-2 บรรทัด)
+          short: {
+            EN: [
+              `Initial setup for ${pName}.`,
+              `Base configuration for ${pName} completed.`,
+              `Price type set to ${ptDisplay.EN} for ${pName}.`,
+              `Product class configured: ${pcDisplay.EN} - ${pName}.`,
+              `PO created: ${pOName} for ${pName}.`,
+              `${pName} ready for pricing configuration.`,
+              `Bundle rules pending for ${pName}.`,
+              `${pName} - awaiting commercial approval.`,
+              `${pName} configured with standard parameters.`,
+              `Market launch target for ${pName}: ${launchQuarter}.`,
+              `${pName} added to ${smDisplay.EN} portfolio.`,
+              `Auto-renewal enabled for ${pName}.`,
+              `${pName} - data allowance: ${dataAllowance}.`,
+              `${pName} - speed tier: ${speedTier}.`,
+              `${pName} - monthly fee: ${priceAmount} THB.`,
+              `${pName} - contract term: ${contractMonths} months.`,
+              `${pName} - ${modDisplay.EN} ${smDisplay.EN} ${pcDisplay.EN}.`,
+              `Created by: System Auto-Generation. Ref: ${randomId}.`,
+              `${pName} - validity: ${validityDays} days.`,
+              `${pName} - target: ${targetAgeMin}-${targetAgeMax} years.`,
+              `Status: Draft - ${pName}.`,
+              `Priority: High - ${pName} launch.`,
+              `${pName} - channel readiness: In Progress.`,
+              `${pName} - legal review: Pending.`,
+              `${pName} - pricing approved: Tier ${pickRandom(['A', 'B', 'C', 'S'])}.`,
+              `${pName} - network provisioning: Ready.`,
+              `${pName} - billing integration: Complete.`,
+              `${pName} - CRM sync: Scheduled.`,
+              `${pName} - marketing assets: In Development.`,
+              `${pName} - training materials: Pending.`,
+            ],
+            TH: [
+              `ตั้งค่าเริ่มต้นสำหรับ ${pName}`,
+              `กำหนดค่าพื้นฐาน ${pName} เรียบร้อย`,
+              `กำหนดประเภทราคาเป็น ${ptDisplay.TH} สำหรับ ${pName}`,
+              `กำหนดประเภทผลิตภัณฑ์: ${pcDisplay.TH} - ${pName}`,
+              `สร้าง PO: ${pOName} สำหรับ ${pName}`,
+              `${pName} พร้อมสำหรับการกำหนดราคา`,
+              `รอกำหนดกฎบันเดิลสำหรับ ${pName}`,
+              `${pName} - รออนุมัติเชิงพาณิชย์`,
+              `${pName} กำหนดค่าด้วยพารามิเตอร์มาตรฐาน`,
+              `เป้าหมายเปิดตัว ${pName}: ${launchQuarter}`,
+              `${pName} เพิ่มในพอร์ตโฟลิโอ${smDisplay.TH}`,
+              `เปิดใช้งานต่ออายุอัตโนมัติสำหรับ ${pName}`,
+              `${pName} - ปริมาณเน็ต: ${dataAllowance}`,
+              `${pName} - ความเร็ว: ${speedTier}`,
+              `${pName} - ค่าบริการ: ${priceAmount} บาท`,
+              `${pName} - ระยะสัญญา: ${contractMonths} เดือน`,
+              `${pName} - ${modDisplay.TH} ${smDisplay.TH} ${pcDisplay.TH}`,
+              `สร้างโดย: ระบบอัตโนมัติ อ้างอิง: ${randomId}`,
+              `${pName} - อายุแพ็กเกจ: ${validityDays} วัน`,
+              `${pName} - กลุ่มเป้าหมาย: ${targetAgeMin}-${targetAgeMax} ปี`,
+              `สถานะ: ฉบับร่าง - ${pName}`,
+              `ความสำคัญ: สูง - เปิดตัว ${pName}`,
+              `${pName} - ความพร้อมช่องทาง: ระหว่างดำเนินการ`,
+              `${pName} - ตรวจสอบกฎหมาย: รอดำเนินการ`,
+              `${pName} - อนุมัติราคา: ระดับ ${pickRandom(['A', 'B', 'C', 'S'])}`,
+              `${pName} - การตั้งค่าเครือข่าย: พร้อม`,
+              `${pName} - เชื่อมต่อระบบบิล: เสร็จสิ้น`,
+              `${pName} - เชื่อม CRM: ตามกำหนด`,
+              `${pName} - สื่อการตลาด: ระหว่างพัฒนา`,
+              `${pName} - เอกสารอบรม: รอดำเนินการ`,
+            ],
+          },
+
+          // ข้อความกลาง (3-5 บรรทัด)
+          medium: {
+            EN: [
+              `${pName} configuration in progress. Type: ${modDisplay.EN} ${smDisplay.EN} ${pcDisplay.EN}. Price: ${ptDisplay.EN} at ${priceAmount} THB/month. Data: ${dataAllowance} at ${speedTier}. PO: ${pOName}.`,
+              `${pName} setup details: ${contractMonths}-month contract. Auto-renewal: Enabled. Credit check: Required for new customers. Deposit: ${pickRandom(['None', '1,000 THB', '3,000 THB'])} based on credit score.`,
+              `${pName} pricing: Monthly ${priceAmount} THB (VAT incl). Activation: ${pickRandom(['Free', '100 THB'])}. Overage: Data ${randomInt(1, 5)} THB/MB, Voice ${randomInt(1, 3)} THB/min, SMS ${randomInt(2, 5)} THB/msg.`,
+              `${pName} bundle eligibility: Compatible with ${pickRandom(['Video Streaming', 'Music Streaming', 'Cloud Storage', 'Security Suite'])} add-ons. Max ${randomInt(3, 10)} add-ons. Not compatible with other promos. PO: ${pOName}.`,
+              `${pName} market positioning: ${smDisplay.EN} ${pcDisplay.EN} for ${modDisplay.EN}. Target: Age ${targetAgeMin}-${targetAgeMax}. USP: ${dataAllowance} data, ${speedTier} speed, 5G included. Launch: ${launchQuarter}.`,
+              `${pName} technical specs: Supports 5G NSA/SA, VoLTE, VoWiFi, eSIM. Speed: Up to ${speedTier}. Video streaming: ${pickRandom(['1080p', '4K', '720p'])}. Fair usage: After ${dataAllowance}, speed reduced.`,
+              `${pName} channel strategy: Available via ${pickRandom(['All Digital', 'Retail + Digital', 'Online Exclusive', 'All Channels'])}. Promotion: ${discountPercent}% off first ${randomInt(1, 6)} months.`,
+              `${pName} lifecycle: ${pickRandom(['In Development', 'Pending Approval', 'Ready for UAT', 'Pre-Launch'])}. Expected launch: ${launchQuarter}. Post-launch review: ${randomInt(30, 90)} days. PO: ${pOName}.`,
+              `${pName} provisioning: Activation within ${pickRandom(['2 hours', '24 hours', '1-3 days'])}. Port-in: Supported. eSIM: ${pickRandom(['Available', 'Coming Soon'])}. Temp number during port: Yes.`,
+              `${pName} eligibility: Thai nationals & foreign residents with valid permit. Min age: 18. Credit threshold: ${randomInt(500, 700)}+. Alternative: ${randomInt(1000, 5000)} THB deposit.`,
+              `${pName} bundle with ${pickRandom(['Entertainment Pack', 'Family Plan', 'Business Suite', 'Student Package'])}. Additional ${discountPercent}% discount on add-ons.`,
+              `${pName} migration path: Existing customers on legacy plans can migrate with ${pickRandom(['fee waiver', 'bonus data', 'discount'])}.`,
+            ],
+            TH: [
+              `กำลังกำหนดค่า ${pName} ประเภท: ${modDisplay.TH} ${smDisplay.TH} ${pcDisplay.TH}. ราคา: ${ptDisplay.TH} ${priceAmount} บาท/เดือน. เน็ต: ${dataAllowance} ความเร็ว ${speedTier}. PO: ${pOName}.`,
+              `รายละเอียด ${pName}: สัญญา ${contractMonths} เดือน ต่ออายุอัตโนมัติ ตรวจสอบเครดิตสำหรับลูกค้าใหม่ เงินประกัน: ${pickRandom(['ไม่มี', '1,000 บาท', '3,000 บาท'])} ตามคะแนนเครดิต`,
+              `ราคา ${pName}: ค่าบริการ ${priceAmount} บาท/เดือน (รวม VAT) ค่าเปิดใช้: ${pickRandom(['ฟรี', '100 บาท'])} ส่วนเกิน: เน็ต ${randomInt(1, 5)} บาท/MB โทร ${randomInt(1, 3)} บาท/นาที SMS ${randomInt(2, 5)} บาท/ข้อความ`,
+              `สิทธิ์บันเดิล ${pName}: ใช้ร่วมกับ ${pickRandom(['สตรีมมิ่งวิดีโอ', 'สตรีมมิ่งเพลง', 'คลาวด์', 'ความปลอดภัย'])} ได้ สูงสุด ${randomInt(3, 10)} บริการเสริม PO: ${pOName}`,
+              `ตำแหน่งตลาด ${pName}: ${smDisplay.TH} ${pcDisplay.TH} สำหรับ${modDisplay.TH} กลุ่มเป้าหมาย: ${targetAgeMin}-${targetAgeMax} ปี จุดขาย: เน็ต ${dataAllowance} ความเร็ว ${speedTier} รองรับ 5G เปิดตัว: ${launchQuarter}`,
+              `สเปคเทคนิค ${pName}: รองรับ 5G NSA/SA, VoLTE, VoWiFi, eSIM ความเร็วสูงสุด ${speedTier} สตรีมมิ่ง: ${pickRandom(['1080p', '4K', '720p'])} FUP: หลัง ${dataAllowance} ลดความเร็ว`,
+              `กลยุทธ์ช่องทาง ${pName}: จำหน่ายผ่าน ${pickRandom(['ดิจิทัล', 'ร้านค้า+ดิจิทัล', 'ออนไลน์เท่านั้น', 'ทุกช่องทาง'])} โปรโมชัน: ลด ${discountPercent}% ${randomInt(1, 6)} เดือนแรก`,
+              `วงจรชีวิต ${pName}: ${pickRandom(['กำลังพัฒนา', 'รออนุมัติ', 'พร้อมทดสอบ', 'ก่อนเปิดตัว'])} คาดเปิดตัว: ${launchQuarter} ทบทวนหลังเปิด: ${randomInt(30, 90)} วัน PO: ${pOName}`,
+              `การให้บริการ ${pName}: เปิดใช้ภายใน ${pickRandom(['2 ชม.', '24 ชม.', '1-3 วัน'])} รองรับย้ายค่าย eSIM: ${pickRandom(['พร้อม', 'เร็วๆ นี้'])} เบอร์ชั่วคราวระหว่างย้าย: มี`,
+              `คุณสมบัติ ${pName}: สัญชาติไทย/ต่างด้าวมีใบอนุญาต อายุ 18+ เครดิต ${randomInt(500, 700)}+ ทางเลือก: วางประกัน ${randomInt(1000, 5000)} บาท`,
+              `${pName} บันเดิลกับ ${pickRandom(['แพ็กบันเทิง', 'แพ็กครอบครัว', 'แพ็กธุรกิจ', 'แพ็กนักเรียน'])} ลดเพิ่ม ${discountPercent}% สำหรับบริการเสริม`,
+              `${pName} เส้นทางย้าย: ลูกค้าเดิมสามารถย้ายจากแพ็กเกจเก่าโดย${pickRandom(['ยกเว้นค่าธรรมเนียม', 'รับเน็ตเพิ่ม', 'รับส่วนลด'])}`,
+            ],
+          },
+
+          // ข้อความยาว (5+ บรรทัด รายละเอียดเยอะ)
+          long: {
+            EN: [
+              `[${pName}] Comprehensive Configuration Summary\n` +
+              `Package Type: ${modDisplay.EN} | ${smDisplay.EN} | ${pcDisplay.EN}\n` +
+              `Price Model: ${ptDisplay.EN} - ${priceAmount} THB/month (VAT inclusive)\n` +
+              `Data Allowance: ${dataAllowance} at ${speedTier} (5G where available)\n` +
+              `Contract: ${contractMonths} months | Auto-Renewal: Yes | Early Termination: ${discountPercent}% of remaining\n` +
+              `Credit Requirements: Score ${randomInt(500, 700)}+ or ${randomInt(1000, 5000)} THB deposit\n` +
+              `Target Market: Age ${targetAgeMin}-${targetAgeMax} | ${pickRandom(['Urban', 'Suburban', 'Nationwide'])} | ${pickRandom(['Mass', 'Premium', 'Youth', 'Family'])} Segment\n` +
+              `Launch Timeline: ${launchQuarter} | Subscriber Target: ${subscriberTarget} in first 3 months\n` +
+              `PO Reference: ${pOName} | Product Code: PKG-${mod}-${sModule}-${timestamp.toString().slice(-6)}\n` +
+              `Created: ${isoDate} | Status: ${pickRandom(['Draft', 'In Review', 'Pending Approval', 'Ready'])}`,
+
+              `╔══════════════════════════════════════════════════════════════╗\n` +
+              `║ ${pName} - Product Offering Documentation                     ║\n` +
+              `╠══════════════════════════════════════════════════════════════╣\n` +
+              `║ Category: ${modDisplay.EN.padEnd(20)} | Sub-Type: ${smDisplay.EN.padEnd(15)} | Class: ${pcDisplay.EN.padEnd(15)} ║\n` +
+              `║ Price: ${(priceAmount + ' THB').padEnd(20)} | Billing: ${ptDisplay.EN.padEnd(15)} | Term: ${contractMonths} months`.padEnd(62) + `║\n` +
+              `║ Data: ${dataAllowance.padEnd(20)} | Speed: ${speedTier.padEnd(15)} | 5G: Included`.padEnd(62) + `║\n` +
+              `║ Voice: Unlimited (FUP: 10,000 mins) | SMS: 100 msgs | MMS: Extra`.padEnd(62) + `║\n` +
+              `║ Add-ons: Up to 5 | Bundle Discount: ${discountPercent}% | Compatible: Streaming, Cloud`.padEnd(62) + `║\n` +
+              `║ Target: Age ${targetAgeMin}-${targetAgeMax} | ARPU Target: ${priceAmount + randomInt(50, 200)} THB`.padEnd(62) + `║\n` +
+              `║ Launch: ${launchQuarter.padEnd(20)} | Subscriber Goal: ${subscriberTarget}`.padEnd(62) + `║\n` +
+              `║ PO: ${pOName}`.padEnd(62) + `║\n` +
+              `║ Created: ${engDate} ${currentTime} | Ref: ${randomId}`.padEnd(62) + `║\n` +
+              `╚══════════════════════════════════════════════════════════════╝`,
+
+              `${pName} - Complete Product Specification\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Product ID: PKG-${mod}-${sModule}-${pClass}-${timestamp.toString().slice(-8)}\n` +
+              `Product Name: ${pName}\n` +
+              `PO Name: ${pOName}\n` +
+              `Module: ${mod} | Sub-Module: ${sModule} | Class: ${pClass}\n` +
+              `Price Type: ${pType} | Monthly Fee: ${priceAmount} THB\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Allowances:\n` +
+              `  • Data: ${dataAllowance} @ ${speedTier}\n` +
+              `  • Voice: Unlimited (FUP: 10,000 mins/month)\n` +
+              `  • SMS: 100 messages/month\n` +
+              `  • 5G Access: Included\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Business Rules:\n` +
+              `  • Auto-Renewal: Enabled\n` +
+              `  • Grace Period: ${randomInt(3, 7)} days\n` +
+              `  • Credit Limit: ${randomInt(2000, 10000)} THB\n` +
+              `  • Barring Threshold: ${discountPercent}% of credit limit\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Commercial Info:\n` +
+              `  • Target Segment: Age ${targetAgeMin}-${targetAgeMax}\n` +
+              `  • Launch Quarter: ${launchQuarter}\n` +
+              `  • Subscriber Target: ${subscriberTarget}\n` +
+              `  • Expected ARPU: ${priceAmount + randomInt(50, 200)} THB\n` +
+              `─────────────────────────────────────────────────\n` +
+              `System Integration:\n` +
+              `  • CBS Product Code: ${pClass.toUpperCase()}_${sModule}_${randomInt(100, 999)}\n` +
+              `  • CRM Eligibility: Credit Score >= ${randomInt(500, 700)}\n` +
+              `  • Provisioning SLA: ${pickRandom(['2 hours', '24 hours', '1-3 days'])}\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Created: ${thaiDate} | Updated: ${currentTime}\n` +
+              `Document Ref: DOC-${randomId}-${timestamp.toString().slice(-4)}`,
+            ],
+            TH: [
+              `[${pName}] สรุปการกำหนดค่าแบบครอบคลุม\n` +
+              `ประเภทแพ็กเกจ: ${modDisplay.TH} | ${smDisplay.TH} | ${pcDisplay.TH}\n` +
+              `รูปแบบราคา: ${ptDisplay.TH} - ${priceAmount} บาท/เดือน (รวมภาษีมูลค่าเพิ่ม)\n` +
+              `ปริมาณเน็ต: ${dataAllowance} ความเร็ว ${speedTier} (รองรับ 5G)\n` +
+              `สัญญา: ${contractMonths} เดือน | ต่ออายุอัตโนมัติ: ใช่ | ค่าธรรมเนียมยกเลิกก่อนกำหนด: ${discountPercent}% ของส่วนที่เหลือ\n` +
+              `ข้อกำหนดเครดิต: คะแนน ${randomInt(500, 700)}+ หรือวางประกัน ${randomInt(1000, 5000)} บาท\n` +
+              `กลุ่มเป้าหมาย: อายุ ${targetAgeMin}-${targetAgeMax} ปี | ${pickRandom(['ในเมือง', 'ชานเมือง', 'ทั่วประเทศ'])} | กลุ่ม${pickRandom(['ทั่วไป', 'พรีเมียม', 'วัยรุ่น', 'ครอบครัว'])}\n` +
+              `แผนเปิดตัว: ${launchQuarter} | เป้าหมายสมาชิก: ${subscriberTarget} ใน 3 เดือนแรก\n` +
+              `PO อ้างอิง: ${pOName} | รหัสผลิตภัณฑ์: PKG-${mod}-${sModule}-${timestamp.toString().slice(-6)}\n` +
+              `สร้างเมื่อ: ${thaiDate} | สถานะ: ${pickRandom(['ฉบับร่าง', 'อยู่ระหว่างตรวจสอบ', 'รออนุมัติ', 'พร้อม'])}`,
+
+              `╔══════════════════════════════════════════════════════════════╗\n` +
+              `║ ${pName} - เอกสารผลิตภัณฑ์                                   ║\n` +
+              `╠══════════════════════════════════════════════════════════════╣\n` +
+              `║ ประเภท: ${modDisplay.TH.padEnd(15)} | รูปแบบ: ${smDisplay.TH.padEnd(10)} | ระดับ: ${pcDisplay.TH.padEnd(10)} ║\n` +
+              `║ ราคา: ${(priceAmount + ' บาท').padEnd(15)} | การเรียกเก็บ: ${ptDisplay.TH.padEnd(12)} | สัญญา: ${contractMonths} ด.`.padEnd(62) + `║\n` +
+              `║ เน็ต: ${dataAllowance.padEnd(15)} | ความเร็ว: ${speedTier.padEnd(12)} | 5G: รวม`.padEnd(62) + `║\n` +
+              `║ โทร: ไม่จำกัด (FUP: 10,000 นาที) | SMS: 100 ข้อความ | MMS: เพิ่มเติม`.padEnd(62) + `║\n` +
+              `║ บริการเสริม: สูงสุด 5 รายการ | ส่วนลดบันเดิล: ${discountPercent}% | ใช้ร่วมกับ: สตรีมมิ่ง, คลาวด์`.padEnd(62) + `║\n` +
+              `║ กลุ่มเป้าหมาย: ${targetAgeMin}-${targetAgeMax} ปี | เป้าหมาย ARPU: ${priceAmount + randomInt(50, 200)} บาท`.padEnd(62) + `║\n` +
+              `║ เปิดตัว: ${launchQuarter.padEnd(15)} | เป้าหมายสมาชิก: ${subscriberTarget}`.padEnd(62) + `║\n` +
+              `║ PO: ${pOName}`.padEnd(62) + `║\n` +
+              `║ สร้าง: ${thaiDate} | อ้างอิง: ${randomId}`.padEnd(62) + `║\n` +
+              `╚══════════════════════════════════════════════════════════════╝`,
+
+              `${pName} - ข้อมูลจำเพาะผลิตภัณฑ์ฉบับสมบูรณ์\n` +
+              `─────────────────────────────────────────────────\n` +
+              `รหัสผลิตภัณฑ์: PKG-${mod}-${sModule}-${pClass}-${timestamp.toString().slice(-8)}\n` +
+              `ชื่อผลิตภัณฑ์: ${pName}\n` +
+              `ชื่อ PO: ${pOName}\n` +
+              `โมดูล: ${mod} | โมดูลย่อย: ${sModule} | ประเภท: ${pClass}\n` +
+              `ประเภทราคา: ${pType} | ค่าบริการรายเดือน: ${priceAmount} บาท\n` +
+              `─────────────────────────────────────────────────\n` +
+              `สิทธิ์การใช้งาน:\n` +
+              `  • เน็ต: ${dataAllowance} @ ${speedTier}\n` +
+              `  • โทร: ไม่จำกัด (FUP: 10,000 นาที/เดือน)\n` +
+              `  • SMS: 100 ข้อความ/เดือน\n` +
+              `  • 5G: รวมในแพ็กเกจ\n` +
+              `─────────────────────────────────────────────────\n` +
+              `กฎทางธุรกิจ:\n` +
+              `  • ต่ออายุอัตโนมัติ: เปิดใช้งาน\n` +
+              `  • ระยะผ่อนผัน: ${randomInt(3, 7)} วัน\n` +
+              `  • วงเงินเครดิต: ${randomInt(2000, 10000)} บาท\n` +
+              `  • เกณฑ์ระงับบริการ: ${discountPercent}% ของวงเงินเครดิต\n` +
+              `─────────────────────────────────────────────────\n` +
+              `ข้อมูลเชิงพาณิชย์:\n` +
+              `  • กลุ่มเป้าหมาย: อายุ ${targetAgeMin}-${targetAgeMax} ปี\n` +
+              `  • ไตรมาสเปิดตัว: ${launchQuarter}\n` +
+              `  • เป้าหมายสมาชิก: ${subscriberTarget}\n` +
+              `  • ARPU คาดการณ์: ${priceAmount + randomInt(50, 200)} บาท\n` +
+              `─────────────────────────────────────────────────\n` +
+              `การเชื่อมต่อระบบ:\n` +
+              `  • รหัส CBS: ${pClass.toUpperCase()}_${sModule}_${randomInt(100, 999)}\n` +
+              `  • เงื่อนไข CRM: คะแนนเครดิต >= ${randomInt(500, 700)}\n` +
+              `  • SLA การเปิดบริการ: ${pickRandom(['2 ชั่วโมง', '24 ชั่วโมง', '1-3 วัน'])}\n` +
+              `─────────────────────────────────────────────────\n` +
+              `สร้างเมื่อ: ${thaiDate} | อัปเดตล่าสุด: ${currentTime} น.\n` +
+              `เอกสารอ้างอิง: DOC-${randomId}-${timestamp.toString().slice(-4)}`,
+            ],
+          },
+        };
+
+        const packageMetadata = {
+          devStatus: {
+            EN: ['Draft', 'In Development', 'Pending Approval', 'Ready for UAT', 'Production Ready', 'Launched', 'Grandfathered', 'Deprecated'],
+            TH: ['ฉบับร่าง', 'กำลังพัฒนา', 'รออนุมัติ', 'พร้อมทดสอบ', 'พร้อมใช้งานจริง', 'เปิดตัวแล้ว', 'สำหรับลูกค้าเดิม', 'ยกเลิกแล้ว'],
+          },
+          billingType: {
+            EN: ['Recurring - Monthly', 'Recurring - Prepaid', 'One-Time', 'Usage-Based', 'Hybrid', 'Tiered', 'Volume-Based'],
+            TH: ['รายเดือน', 'เติมเงิน', 'ครั้งเดียว', 'ตามการใช้งาน', 'แบบผสม', 'ตามระดับ', 'ตามปริมาณ'],
+          },
+          targetSegment: {
+            EN: ['Mass Market', 'Youth', 'Family', 'Business', 'Premium', 'Entry-Level', 'Senior', 'Student', 'SME', 'Enterprise', 'Tourist'],
+            TH: ['ตลาดทั่วไป', 'วัยรุ่น', 'ครอบครัว', 'ธุรกิจ', 'พรีเมียม', 'ระดับเริ่มต้น', 'ผู้สูงอายุ', 'นักศึกษา', 'SME', 'องค์กร', 'นักท่องเที่ยว'],
+          },
+          contractTerm: {
+            EN: ['No Contract', '3 Months', '6 Months', '12 Months', '24 Months', '36 Months', 'Month-to-Month'],
+            TH: ['ไม่มีสัญญา', '3 เดือน', '6 เดือน', '12 เดือน', '24 เดือน', '36 เดือน', 'รายเดือน'],
+          },
+          approvalStatus: {
+            EN: ['Product Committee: Approved', 'Product Committee: Pending', 'Pricing Committee: Approved', 'Pricing Committee: Pending', 'Legal: Approved', 'Legal: Under Review', 'Compliance: Approved', 'Risk: Approved', 'Risk: Pending', 'Finance: Approved'],
+            TH: ['คณะกรรมการผลิตภัณฑ์: อนุมัติ', 'คณะกรรมการผลิตภัณฑ์: รอดำเนินการ', 'คณะกรรมการราคา: อนุมัติ', 'คณะกรรมการราคา: รอดำเนินการ', 'ฝ่ายกฎหมาย: อนุมัติ', 'ฝ่ายกฎหมาย: ระหว่างตรวจสอบ', 'ฝ่ายกำกับดูแล: อนุมัติ', 'ฝ่ายความเสี่ยง: อนุมัติ', 'ฝ่ายความเสี่ยง: รอดำเนินการ', 'ฝ่ายการเงิน: อนุมัติ'],
+          },
+          salesChannel: {
+            EN: ['Digital Only', 'All Channels', 'Retail Exclusive', 'Online Exclusive', 'Telesales', 'Partner Network', 'Direct Sales', 'App Exclusive'],
+            TH: ['ดิจิทัลเท่านั้น', 'ทุกช่องทาง', 'เฉพาะร้านค้า', 'เฉพาะออนไลน์', 'การขายทางโทรศัพท์', 'เครือข่ายพันธมิตร', 'การขายตรง', 'เฉพาะแอป'],
+          },
+          creditTier: {
+            EN: ['Tier 1: No Deposit', 'Tier 2: 1,000 THB', 'Tier 3: 3,000 THB', 'Tier 4: 5,000 THB', 'Tier 5: 10,000 THB', 'Prepaid Only'],
+            TH: ['ระดับ 1: ไม่มีเงินประกัน', 'ระดับ 2: 1,000 บาท', 'ระดับ 3: 3,000 บาท', 'ระดับ 4: 5,000 บาท', 'ระดับ 5: 10,000 บาท', 'เฉพาะเติมเงิน'],
+          },
+          priority: {
+            EN: ['Critical', 'High', 'Medium', 'Low', 'Standard'],
+            TH: ['วิกฤต', 'สูง', 'ปานกลาง', 'ต่ำ', 'มาตรฐาน'],
+          },
+          networkType: {
+            EN: ['5G NSA/SA', '4G LTE', '5G Only', '4G/5G Hybrid', 'WiFi Calling Ready'],
+            TH: ['5G NSA/SA', '4G LTE', '5G เท่านั้น', '4G/5G ผสม', 'พร้อม WiFi Calling'],
+          },
+        };
+
+        // สุ่มประเภทความยาว (ปรับสัดส่วนให้หลากหลาย)
+        const lengthType = (() => {
+          const rand = Math.random();
+          if (rand < 0.25) return 'short';      // 25% สั้น
+          if (rand < 0.60) return 'medium';     // 35% กลาง
+          return 'long';                         // 40% ยาว
+        })();
+
+        // สุ่มภาษา
+        const useThai = Math.random() < 0.5;
+
+        // เลือกข้อความหลัก (บางครั้งสุ่มเลือกหลายข้อความมา combine)
+        let remarkText: string;
+        const shouldCombine = lengthType === 'long' && Math.random() < 0.3;
+        
+        if (shouldCombine && !useThai) {
+          // Combine multiple medium texts for extra long variety
+          const texts = pickMultiple(remarkPools.medium.EN, randomInt(2, 3));
+          remarkText = texts.join('\n\n---\n\n');
+        } else if (shouldCombine && useThai) {
+          const texts = pickMultiple(remarkPools.medium.TH, randomInt(2, 3));
+          remarkText = texts.join('\n\n---\n\n');
+        } else {
+          if (useThai) {
+            remarkText = pickRandom(remarkPools[lengthType].TH);
+          } else {
+            remarkText = pickRandom(remarkPools[lengthType].EN);
+          }
+        }
+
+        // เพิ่ม Metadata (ปรับความน่าจะเป็นตามความยาว)
+        const addMetadataProb = lengthType === 'short' ? 0.6 : (lengthType === 'medium' ? 0.8 : 0.9);
+        const addMetadata = Math.random() < addMetadataProb;
+        
+        if (addMetadata) {
+          const metadataLines: string[] = [];
+          const metaCount = lengthType === 'short' ? randomInt(1, 2) : (lengthType === 'medium' ? randomInt(2, 4) : randomInt(3, 6));
+          const usedTypes = new Set<string>();
+
+          const availableMetaTypes = ['devStatus', 'billingType', 'targetSegment', 'contractTerm',
+            'approvalStatus', 'salesChannel', 'creditTier', 'priority', 'networkType', 'po', 'ref', 'version'];
+
+          for (let i = 0; i < metaCount; i++) {
+            const availableTypes = availableMetaTypes.filter(t => !usedTypes.has(t));
+            if (availableTypes.length === 0) break;
+
+            const metaType = pickRandom(availableTypes);
+            usedTypes.add(metaType);
+
+            if (useThai) {
+              switch (metaType) {
+                case 'devStatus':
+                  metadataLines.push(`สถานะการพัฒนา: ${pickRandom(packageMetadata.devStatus.TH)}`);
+                  break;
+                case 'billingType':
+                  metadataLines.push(`ประเภทการเรียกเก็บ: ${pickRandom(packageMetadata.billingType.TH)}`);
+                  break;
+                case 'targetSegment':
+                  metadataLines.push(`กลุ่มเป้าหมาย: ${pickRandom(packageMetadata.targetSegment.TH)}`);
+                  break;
+                case 'contractTerm':
+                  metadataLines.push(`ระยะสัญญา: ${pickRandom(packageMetadata.contractTerm.TH)}`);
+                  break;
+                case 'approvalStatus':
+                  metadataLines.push(`${pickRandom(packageMetadata.approvalStatus.TH)}`);
+                  break;
+                case 'salesChannel':
+                  metadataLines.push(`ช่องทางการขาย: ${pickRandom(packageMetadata.salesChannel.TH)}`);
+                  break;
+                case 'creditTier':
+                  metadataLines.push(`เกณฑ์เครดิต: ${pickRandom(packageMetadata.creditTier.TH)}`);
+                  break;
+                case 'priority':
+                  metadataLines.push(`ระดับความสำคัญ: ${pickRandom(packageMetadata.priority.TH)}`);
+                  break;
+                case 'networkType':
+                  metadataLines.push(`ประเภทรองรับเครือข่าย: ${pickRandom(packageMetadata.networkType.TH)}`);
+                  break;
+                case 'po':
+                  metadataLines.push(`PO: ${pOName}`);
+                  break;
+                case 'ref':
+                  metadataLines.push(`รหัสผลิตภัณฑ์: PKG-${mod}-${sModule}-${randomInt(1000, 9999)}-${String.fromCharCode(65 + randomInt(0, 25))}`);
+                  break;
+                case 'version':
+                  metadataLines.push(`เวอร์ชัน: ${randomInt(1, 5)}.${randomInt(0, 9)}.${randomInt(0, 9)}`);
+                  break;
+              }
+            } else {
+              switch (metaType) {
+                case 'devStatus':
+                  metadataLines.push(`Development Status: ${pickRandom(packageMetadata.devStatus.EN)}`);
+                  break;
+                case 'billingType':
+                  metadataLines.push(`Billing Type: ${pickRandom(packageMetadata.billingType.EN)}`);
+                  break;
+                case 'targetSegment':
+                  metadataLines.push(`Target Segment: ${pickRandom(packageMetadata.targetSegment.EN)}`);
+                  break;
+                case 'contractTerm':
+                  metadataLines.push(`Contract Term: ${pickRandom(packageMetadata.contractTerm.EN)}`);
+                  break;
+                case 'approvalStatus':
+                  metadataLines.push(`${pickRandom(packageMetadata.approvalStatus.EN)}`);
+                  break;
+                case 'salesChannel':
+                  metadataLines.push(`Sales Channel: ${pickRandom(packageMetadata.salesChannel.EN)}`);
+                  break;
+                case 'creditTier':
+                  metadataLines.push(`Credit Tier: ${pickRandom(packageMetadata.creditTier.EN)}`);
+                  break;
+                case 'priority':
+                  metadataLines.push(`Priority: ${pickRandom(packageMetadata.priority.EN)}`);
+                  break;
+                case 'networkType':
+                  metadataLines.push(`Network Support: ${pickRandom(packageMetadata.networkType.EN)}`);
+                  break;
+                case 'po':
+                  metadataLines.push(`PO: ${pOName}`);
+                  break;
+                case 'ref':
+                  metadataLines.push(`Product Code: PKG-${mod}-${sModule}-${randomInt(1000, 9999)}-${String.fromCharCode(65 + randomInt(0, 25))}`);
+                  break;
+                case 'version':
+                  metadataLines.push(`Version: ${randomInt(1, 5)}.${randomInt(0, 9)}.${randomInt(0, 9)}`);
+                  break;
+              }
+            }
+          }
+
+          if (metadataLines.length > 0) {
+            const separator = lengthType === 'short' ? ' | ' : '\n';
+            const prefix = lengthType === 'short' ? ' | ' : (useThai ? '\n\nข้อมูลเพิ่มเติม:\n' : '\n\nAdditional Information:\n');
+            
+            if (lengthType === 'short') {
+              remarkText += prefix + metadataLines.join(separator);
+            } else {
+              remarkText += prefix + metadataLines.map(l => `  • ${l}`).join('\n');
+            }
+          }
+        }
+
+        // เพิ่ม Timestamp (ปรับตามความยาว)
+        const addTimestampProb = lengthType === 'short' ? 0.3 : 0.6;
+        if (Math.random() < addTimestampProb) {
+          const separator = lengthType === 'short' ? ' ' : '\n\n';
+          if (useThai) {
+            remarkText += `${separator}[บันทึก: ${thaiDate}]`;
+          } else {
+            remarkText += `${separator}[Recorded: ${engDate} ${currentTime}]`;
+          }
+        }
+
+        // ตรวจสอบความยาวไม่เกิน 4000 ตัวอักษร
+        if (remarkText.length > 4000) {
+          remarkText = remarkText.substring(0, 3997) + '...';
+        }
+
+        // กรอกข้อความ
+        cy.get('textarea[formcontrolname="remark"]')
+          .clear({ force: true })
+          .type(remarkText, { delay: 0, force: true });
+
+        cy.log(`✅ Remark: ${remarkText.length} chars, ${useThai ? 'TH' : 'EN'}, ${lengthType}${shouldCombine ? ' (combined)' : ''}`);
+      } else {
+        cy.get('textarea[formcontrolname="remark"]').clear({ force: true });
+        cy.log('⏭️ Remark skipped (20%)');
+      }
+
+      cy.wait(WAIT_TIME);
+    }
+  });
+};
+
+export const RandomProjectDescription = (
+  projectName: string,
+  poName?: string,
+  priceType?: string,
+  productClass?: string,
+  subModule?: string,
+  module?: string
+): void => {
+  // ===== HELPER FUNCTIONS =====
+  const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+  const WAIT_TIME = 2000;
+  
+  const scrollToElement = (selector: string, sectionName: string) => {
+    cy.log(`📌 Scrolling to: ${sectionName}`);
+    cy.get(selector).first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
+    cy.wait(300);
+  };
+
+  // ==================== PROJECT DESCRIPTION LOGIC ====================
+  cy.get('body').then(($body: any) => {
+    if ($body.find('textarea[formcontrolname="projectDescription"]').length > 0) {
+      scrollToElement('textarea[formcontrolname="projectDescription"]', 'Project Description');
+
+      // สุ่มว่าจะกรอกหรือไม่ (85% กรอก, 15% ไม่กรอก)
+      const shouldFill = Math.random() < 0.85;
+
+      if (shouldFill) {
+        // ใช้ค่าที่ส่งเข้ามา หรือค่า default
+        const pName = projectName || 'New Package';
+        const pOName = poName || 'Product Offering';
+        const pType = priceType || 'recurring';
+        const pClass = productClass || 'main';
+        const sModule = subModule || 'POST';
+        const mod = module || 'MOB';
+
+        // ===== DISPLAY MAPPINGS =====
+        const priceTypeDisplay: Record<string, { EN: string; TH: string }> = {
+          'onetime': { EN: 'One-Time Charge', TH: 'ค่าบริการแบบครั้งเดียว' },
+          'recurring': { EN: 'Monthly Recurring', TH: 'ค่าบริการรายเดือน' },
+          'usage': { EN: 'Usage-Based', TH: 'คิดตามการใช้งานจริง' }
+        };
+        const ptDisplay = priceTypeDisplay[pType] || { EN: pType, TH: pType };
+
+        const productClassDisplay: Record<string, { EN: string; TH: string }> = {
+          'main': { EN: 'Main Package', TH: 'แพ็กเกจหลัก' },
+          'ontop': { EN: 'On-Top Add-on', TH: 'แพ็กเกจเสริม' },
+          'ontopextra': { EN: 'On-Top Extra', TH: 'แพ็กเกจเสริมพิเศษ' }
+        };
+        const pcDisplay = productClassDisplay[pClass] || { EN: pClass, TH: pClass };
+
+        const moduleDisplay: Record<string, { EN: string; TH: string }> = {
+          'MOB': { EN: 'Mobile Service', TH: 'บริการมือถือ' },
+          'ENTER': { EN: 'Entertainment Service', TH: 'บริการความบันเทิง' },
+          'MUSIC': { EN: 'Music Streaming', TH: 'บริการสตรีมมิ่งเพลง' }
+        };
+        const modDisplay = moduleDisplay[mod] || { EN: mod, TH: mod };
+
+        const subModuleDisplay: Record<string, { EN: string; TH: string }> = {
+          'PRE': { EN: 'Prepaid', TH: 'ระบบเติมเงิน' },
+          'POST': { EN: 'Postpaid', TH: 'ระบบรายเดือน' }
+        };
+        const smDisplay = subModuleDisplay[sModule] || { EN: sModule, TH: sModule };
+
+        // ===== RANDOM VALUES =====
+        const dataVolume = pickRandom(['10GB', '30GB', '50GB', '100GB', '200GB', '300GB', '500GB', 'Unlimited']);
+        const maxSpeed = pickRandom(['100 Mbps', '300 Mbps', '500 Mbps', '1 Gbps', '2 Gbps', '5G Max Speed']);
+        const priceAmount = randomInt(199, 2999);
+        const validityPeriod = pickRandom(['1 Day', '7 Days', '30 Days', '90 Days', '180 Days', '365 Days']);
+        const targetCustomers = pickRandom([
+          'General Consumers', 'Young Professionals', 'Families', 'Students', 
+          'Business Users', 'Heavy Data Users', 'Budget-Conscious', 'Premium Segment',
+          'Digital Natives', 'Urban Residents', 'Suburban Families', 'SME Owners'
+        ]);
+        const targetCustomersTH = pickRandom([
+          'ลูกค้าทั่วไป', 'คนรุ่นใหม่วัยทำงาน', 'ครอบครัว', 'นักศึกษา',
+          'กลุ่มธุรกิจ', 'ผู้ใช้งานเน็ตปริมาณมาก', 'กลุ่มประหยัด', 'กลุ่มพรีเมียม',
+          'ชาวดิจิทัล', 'คนเมือง', 'ครอบครัวชานเมือง', 'เจ้าของธุรกิจขนาดย่อม'
+        ]);
+        const launchTiming = pickRandom(['Q1 2025', 'Q2 2025', 'Q3 2025', 'Q4 2025', 'Early Next Year', 'This Quarter', 'Next Month']);
+        const launchTimingTH = pickRandom(['ไตรมาส 1 ปี 2568', 'ไตรมาส 2 ปี 2568', 'ไตรมาส 3 ปี 2568', 'ไตรมาส 4 ปี 2568', 'ต้นปีหน้า', 'ไตรมาสนี้', 'เดือนหน้า']);
+        const keyBenefit1 = pickRandom(['High-speed 5G', 'Unlimited Calls', 'Free Streaming', 'Rollover Data', 'Family Sharing', 'International Roaming']);
+        const keyBenefit1TH = pickRandom(['5G ความเร็วสูง', 'โทรฟรีไม่อั้น', 'สตรีมมิ่งฟรี', 'ยกยอดเน็ตได้', 'แชร์ให้ครอบครัว', 'โรมมิ่งต่างประเทศ']);
+        const keyBenefit2 = pickRandom(['No Contract', 'Free SIM', 'eSIM Support', 'Priority Support', 'Device Discount', 'Cashback']);
+        const keyBenefit2TH = pickRandom(['ไม่มีสัญญา', 'ซิมฟรี', 'รองรับ eSIM', 'บริการพิเศษ', 'ส่วนลดเครื่อง', 'เงินคืน']);
+
+        // ===== PROJECT DESCRIPTION POOLS =====
+        const descriptionPools = {
+          // แบบสั้น (1-2 ประโยค)
+          short: {
+            EN: [
+              `${pName} is a ${smDisplay.EN} ${pcDisplay.EN.toLowerCase()} for ${modDisplay.EN.toLowerCase()} offering ${dataVolume} of high-speed data.`,
+              `${pName}: ${modDisplay.EN} ${smDisplay.EN} ${pcDisplay.EN} featuring ${dataVolume} data and ${maxSpeed} speeds.`,
+              `${pName} provides ${dataVolume} mobile data with ${maxSpeed} download speeds on ${smDisplay.EN.toLowerCase()} ${modDisplay.EN.toLowerCase()} service.`,
+              `${pName} - ${modDisplay.EN} ${pcDisplay.EN} with ${priceTypeDisplay[pType]?.EN || pType} billing at ${priceAmount} THB.`,
+              `${pName} delivers premium ${modDisplay.EN.toLowerCase()} experience with ${dataVolume} data allowance.`,
+              `${pName}: Value-packed ${smDisplay.EN} package with ${keyBenefit1} and ${keyBenefit2}.`,
+              `${pName} offers seamless connectivity with ${dataVolume} data and nationwide coverage.`,
+              `${pName} is designed for ${targetCustomers} seeking reliable ${modDisplay.EN.toLowerCase()} service.`,
+              `${pName} combines ${dataVolume} data, unlimited calls, and 5G access in one ${pcDisplay.EN.toLowerCase()}.`,
+              `${pName} - The ultimate ${smDisplay.EN.toLowerCase()} solution for ${modDisplay.EN.toLowerCase()} users.`,
+            ],
+            TH: [
+              `${pName} เป็น${pcDisplay.TH}${smDisplay.TH}สำหรับ${modDisplay.TH} มอบเน็ตความเร็วสูง ${dataVolume}`,
+              `${pName}: ${modDisplay.TH} ${smDisplay.TH} ${pcDisplay.TH} พร้อมเน็ต ${dataVolume} ความเร็ว ${maxSpeed}`,
+              `${pName} ให้บริการเน็ตมือถือ ${dataVolume} ความเร็วดาวน์โหลดสูงสุด ${maxSpeed} บน${modDisplay.TH}${smDisplay.TH}`,
+              `${pName} - ${modDisplay.TH} ${pcDisplay.TH} คิดค่าบริการ${ptDisplay.TH} ${priceAmount} บาท`,
+              `${pName} มอบประสบการณ์${modDisplay.TH}ระดับพรีเมียมด้วยปริมาณเน็ต ${dataVolume}`,
+              `${pName}: แพ็กเกจ${smDisplay.TH}คุ้มค่า พร้อม${keyBenefit1TH}และ${keyBenefit2TH}`,
+              `${pName} มอบการเชื่อมต่อที่ราบรื่นด้วยเน็ต ${dataVolume} และครอบคลุมทั่วประเทศ`,
+              `${pName} ออกแบบมาสำหรับ${targetCustomersTH}ที่ต้องการ${modDisplay.TH}ที่เชื่อถือได้`,
+              `${pName} รวมเน็ต ${dataVolume} โทรฟรี และการเข้าถึง 5G ใน${pcDisplay.TH}เดียว`,
+              `${pName} - โซลูชัน${smDisplay.TH}ขั้นสุดสำหรับผู้ใช้${modDisplay.TH}`,
+            ],
+          },
+
+          // แบบกลาง (3-4 ประโยค)
+          medium: {
+            EN: [
+              `${pName} is a ${smDisplay.EN} ${pcDisplay.EN} for ${modDisplay.EN} customers. This package includes ${dataVolume} of high-speed data at up to ${maxSpeed}, unlimited on-net calls, and 5G network access at no additional cost. Priced at ${priceAmount} THB/month with ${ptDisplay.EN.toLowerCase()} billing.`,
+              
+              `${pName} offers exceptional value for ${targetCustomers}. The package features ${dataVolume} data allowance, ${keyBenefit1}, and ${keyBenefit2}. Available on ${smDisplay.EN} ${modDisplay.EN} with flexible ${validityPeriod} validity options. Monthly fee: ${priceAmount} THB.`,
+              
+              `${pName} is designed to meet the needs of modern ${modDisplay.EN.toLowerCase()} users. Subscribers enjoy ${dataVolume} of 5G data, unlimited voice calls, and access to exclusive promotions. This ${pcDisplay.EN.toLowerCase()} operates on ${smDisplay.EN.toLowerCase()} billing with auto-renewal capability.`,
+              
+              `${pName} - A comprehensive ${modDisplay.EN.toLowerCase()} solution featuring ${dataVolume} data (${maxSpeed}), unlimited calls, and premium support. Ideal for ${targetCustomers} seeking reliable connectivity. ${ptDisplay.EN} at ${priceAmount} THB per billing cycle.`,
+              
+              `${pName} brings together speed, value, and flexibility. With ${dataVolume} of data at ${maxSpeed}, subscribers can stream, browse, and connect without limits. This ${smDisplay.EN.toLowerCase()} ${pcDisplay.EN.toLowerCase()} includes ${keyBenefit1} and ${keyBenefit2} as standard features.`,
+            ],
+            TH: [
+              `${pName} เป็น${pcDisplay.TH}${smDisplay.TH}สำหรับลูกค้า${modDisplay.TH} แพ็กเกจนี้รวมเน็ตความเร็วสูง ${dataVolume} ที่ความเร็วสูงสุด ${maxSpeed} โทรฟรีในเครือข่ายไม่จำกัด และการเข้าถึงเครือข่าย 5G โดยไม่มีค่าใช้จ่ายเพิ่มเติม ราคา ${priceAmount} บาท/เดือน คิดค่าบริการ${ptDisplay.TH}`,
+              
+              `${pName} มอบความคุ้มค่าที่ยอดเยี่ยมสำหรับ${targetCustomersTH} แพ็กเกจประกอบด้วยเน็ต ${dataVolume} ${keyBenefit1TH} และ${keyBenefit2TH} มีให้บริการบน${modDisplay.TH}${smDisplay.TH} พร้อมตัวเลือกระยะเวลา ${validityPeriod} ค่าบริการ ${priceAmount} บาท/เดือน`,
+              
+              `${pName} ออกแบบมาเพื่อตอบสนองความต้องการของผู้ใช้${modDisplay.TH}ยุคใหม่ สมาชิกจะได้เพลิดเพลินกับเน็ต 5G ${dataVolume} โทรฟรีไม่จำกัด และการเข้าถึงโปรโมชันพิเศษ ${pcDisplay.TH}นี้ทำงานบนระบบ${smDisplay.TH}พร้อมความสามารถต่ออายุอัตโนมัติ`,
+              
+              `${pName} - โซลูชัน${modDisplay.TH}ที่ครอบคลุม นำเสนอเน็ต ${dataVolume} (ความเร็ว ${maxSpeed}) โทรฟรีไม่จำกัด และการสนับสนุนระดับพรีเมียม เหมาะสำหรับ${targetCustomersTH}ที่ต้องการการเชื่อมต่อที่เชื่อถือได้ ${ptDisplay.TH} ${priceAmount} บาทต่อรอบบิล`,
+              
+              `${pName} ผสานความเร็ว ความคุ้มค่า และความยืดหยุ่นเข้าด้วยกัน ด้วยเน็ต ${dataVolume} ที่ความเร็ว ${maxSpeed} สมาชิกสามารถสตรีม ท่องเว็บ และเชื่อมต่อได้อย่างไร้ขีดจำกัด ${pcDisplay.TH}${smDisplay.TH}นี้รวม${keyBenefit1TH}และ${keyBenefit2TH}เป็นคุณสมบัติมาตรฐาน`,
+            ],
+          },
+
+          // แบบยาว (5+ ประโยค)
+          long: {
+            EN: [
+              `${pName} is a premium ${smDisplay.EN} ${pcDisplay.EN} offered under the ${modDisplay.EN} portfolio. This comprehensive package delivers ${dataVolume} of high-speed mobile data with maximum download speeds of ${maxSpeed} on our advanced 5G network. Subscribers benefit from unlimited voice calls to all domestic networks, SMS allowance, and seamless 5G connectivity at no extra charge.\n\n` +
+              `Priced competitively at ${priceAmount} THB per month (${ptDisplay.EN.toLowerCase()}), ${pName} represents exceptional value for ${targetCustomers}. The package includes ${keyBenefit1} and ${keyBenefit2} as standard features, with optional add-ons available for further customization. Billing is processed on a ${smDisplay.EN.toLowerCase()} basis with automatic renewal for uninterrupted service.\n\n` +
+              `Target launch: ${launchTiming}. This offering is positioned to capture the growing demand for high-speed, reliable ${modDisplay.EN.toLowerCase()} services among ${targetCustomers}.`,
+
+              `${pName} - Product Offering Overview\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Service Type: ${modDisplay.EN} | ${smDisplay.EN} | ${pcDisplay.EN}\n` +
+              `Data Allowance: ${dataVolume} @ ${maxSpeed} (5G Ready)\n` +
+              `Voice: Unlimited domestic calls\n` +
+              `SMS: Standard allowance included\n` +
+              `Price: ${priceAmount} THB/month (${ptDisplay.EN})\n` +
+              `Validity: ${validityPeriod} with auto-renewal\n` +
+              `─────────────────────────────────────────────────\n` +
+              `Key Benefits:\n` +
+              `  • ${keyBenefit1}\n` +
+              `  • ${keyBenefit2}\n` +
+              `  • 5G network access included\n` +
+              `  • No hidden fees or charges\n` +
+              `─────────────────────────────────────────────────\n` +
+              `${pName} is ideal for ${targetCustomers} seeking a reliable, high-performance ${modDisplay.EN.toLowerCase()} solution.`,
+
+              `${pName} represents the next evolution in ${modDisplay.EN} ${pcDisplay.EN}s. Building on our commitment to delivering superior connectivity, this ${smDisplay.EN.toLowerCase()} package combines generous data allowances (${dataVolume} at ${maxSpeed}) with unlimited domestic calling and 5G network access.\n\n` +
+              `Designed specifically for ${targetCustomers}, ${pName} addresses the growing demand for high-bandwidth applications including video streaming, online gaming, and remote work. The ${ptDisplay.EN.toLowerCase()} pricing model at ${priceAmount} THB/month ensures predictable billing with no surprise charges.\n\n` +
+              `Key features include ${keyBenefit1}, ${keyBenefit2}, and comprehensive network coverage nationwide. ${pName} is scheduled for commercial launch in ${launchTiming}, with pre-registration available for interested customers.`,
+            ],
+            TH: [
+              `${pName} เป็น${pcDisplay.TH}${smDisplay.TH}ระดับพรีเมียมภายใต้พอร์ตโฟลิโอ${modDisplay.TH} แพ็กเกจที่ครอบคลุมนี้มอบเน็ตมือถือความเร็วสูง ${dataVolume} ด้วยความเร็วดาวน์โหลดสูงสุด ${maxSpeed} บนเครือข่าย 5G ขั้นสูงของเรา สมาชิกจะได้รับสิทธิประโยชน์โทรฟรีทุกเครือข่ายไม่จำกัด SMS และการเชื่อมต่อ 5G ที่ราบรื่นโดยไม่มีค่าใช้จ่ายเพิ่มเติม\n\n` +
+              `ด้วยราคาที่แข่งขันได้ที่ ${priceAmount} บาทต่อเดือน (${ptDisplay.TH}) ${pName} แสดงถึงความคุ้มค่าที่ยอดเยี่ยมสำหรับ${targetCustomersTH} แพ็กเกจรวม${keyBenefit1TH}และ${keyBenefit2TH}เป็นคุณสมบัติมาตรฐาน พร้อมบริการเสริมที่สามารถเลือกเพิ่มได้เพื่อปรับแต่งเพิ่มเติม การเรียกเก็บเงินดำเนินการแบบ${smDisplay.TH}พร้อมการต่ออายุอัตโนมัติเพื่อบริการที่ไม่หยุดชะงัก\n\n` +
+              `เป้าหมายการเปิดตัว: ${launchTimingTH} ข้อเสนอนี้ถูกวางตำแหน่งเพื่อตอบสนองความต้องการที่เพิ่มขึ้นสำหรับบริการ${modDisplay.TH}ความเร็วสูงและเชื่อถือได้ในกลุ่ม${targetCustomersTH}`,
+
+              `${pName} - ภาพรวมผลิตภัณฑ์\n` +
+              `─────────────────────────────────────────────────\n` +
+              `ประเภทบริการ: ${modDisplay.TH} | ${smDisplay.TH} | ${pcDisplay.TH}\n` +
+              `ปริมาณเน็ต: ${dataVolume} @ ${maxSpeed} (รองรับ 5G)\n` +
+              `โทร: ไม่จำกัดในประเทศ\n` +
+              `SMS: รวมสิทธิ์มาตรฐาน\n` +
+              `ราคา: ${priceAmount} บาท/เดือน (${ptDisplay.TH})\n` +
+              `อายุแพ็กเกจ: ${validityPeriod} พร้อมต่ออายุอัตโนมัติ\n` +
+              `─────────────────────────────────────────────────\n` +
+              `สิทธิประโยชน์หลัก:\n` +
+              `  • ${keyBenefit1TH}\n` +
+              `  • ${keyBenefit2TH}\n` +
+              `  • การเข้าถึงเครือข่าย 5G รวมอยู่แล้ว\n` +
+              `  • ไม่มีค่าธรรมเนียมแอบแฝง\n` +
+              `─────────────────────────────────────────────────\n` +
+              `${pName} เหมาะสำหรับ${targetCustomersTH}ที่ต้องการโซลูชัน${modDisplay.TH}ประสิทธิภาพสูงและเชื่อถือได้`,
+
+              `${pName} แสดงถึงวิวัฒนาการขั้นต่อไปของ${pcDisplay.TH}${modDisplay.TH} ด้วยความมุ่งมั่นในการส่งมอบการเชื่อมต่อที่เหนือกว่า แพ็กเกจ${smDisplay.TH}นี้ผสานปริมาณเน็ตที่มากพอ (${dataVolume} ที่ ${maxSpeed}) กับการโทรในประเทศไม่จำกัดและการเข้าถึงเครือข่าย 5G\n\n` +
+              `ออกแบบมาโดยเฉพาะสำหรับ${targetCustomersTH} ${pName} ตอบสนองความต้องการที่เพิ่มขึ้นสำหรับแอปพลิเคชันที่ใช้แบนด์วิธสูง รวมถึงการสตรีมมิ่งวิดีโอ เกมออนไลน์ และการทำงานระยะไกล รูปแบบการคิดราคา${ptDisplay.TH}ที่ ${priceAmount} บาท/เดือน ช่วยให้การเรียกเก็บเงินคาดการณ์ได้โดยไม่มีค่าใช้จ่ายที่ไม่คาดคิด\n\n` +
+              `คุณสมบัติหลักรวมถึง ${keyBenefit1TH} ${keyBenefit2TH} และการครอบคลุมเครือข่ายทั่วประเทศ ${pName} มีกำหนดเปิดตัวเชิงพาณิชย์ใน${launchTimingTH} โดยเปิดให้ลงทะเบียนล่วงหน้าสำหรับลูกค้าที่สนใจ`,
+            ],
+          },
+        };
+
+        // สุ่มประเภทความยาว
+        const lengthType = (() => {
+          const rand = Math.random();
+          if (rand < 0.3) return 'short';      // 30% สั้น
+          if (rand < 0.65) return 'medium';    // 35% กลาง
+          return 'long';                        // 35% ยาว
+        })();
+
+        // สุ่มภาษา (60% อังกฤษ, 40% ไทย)
+        const useThai = Math.random() < 0.4;
+
+        // เลือกข้อความ
+        let descriptionText: string;
+        if (useThai) {
+          descriptionText = pickRandom(descriptionPools[lengthType].TH);
+        } else {
+          descriptionText = pickRandom(descriptionPools[lengthType].EN);
+        }
+
+        // บางครั้งเพิ่มข้อมูล PO
+        if (Math.random() < 0.4 && pOName) {
+          if (useThai) {
+            descriptionText += `\n\nPO อ้างอิง: ${pOName}`;
+          } else {
+            descriptionText += `\n\nPO Reference: ${pOName}`;
+          }
+        }
+
+        // ตรวจสอบความยาวไม่เกิน 4000 ตัวอักษร
+        if (descriptionText.length > 4000) {
+          descriptionText = descriptionText.substring(0, 3997) + '...';
+        }
+
+        // กรอกข้อความ
+        cy.get('textarea[formcontrolname="projectDescription"]')
+          .clear({ force: true })
+          .type(descriptionText, { delay: 0, force: true });
+
+        cy.log(`✅ Project Description: ${descriptionText.length} chars, ${useThai ? 'TH' : 'EN'}, ${lengthType}`);
+      } else {
+        cy.get('textarea[formcontrolname="projectDescription"]').clear({ force: true });
+        cy.log('⏭️ Project Description skipped (15%)');
+      }
+
+      cy.wait(WAIT_TIME);
+    }
+  });
+};
 // ========================
 // RANDOM PRODUCT SPECIFICATION
 // ========================
 
 export const RandomProductSpecification = (productClass: string, subModule?: string, Module?: string): void => {
   const generalList = [
-    // 'AIS Secure Net',
-    // 'Apple Care',
-    // 'Cloud PC',
-    // 'Flowaccount',
-    // 'MS365 Copilot',
-    // 'Mobile Care',
-    // 'Ubisoft Plus',
-    // 'Voice',
-    // 'SMS', 'MMS',
-    // 'Internet',
-    // 'Calling Melody',
+    'AIS Secure Net',
+    'Apple Care',
+    'Cloud PC',
+    'Flowaccount',
+    'MS365 Copilot',
+    'Mobile Care',
+    'Ubisoft Plus',
+    'Voice',
+    'SMS', 'MMS',
+    'Internet',
+    'Calling Melody',
     // 'Vertical App',
-    // 'Cloud Game',
-    // 'AI IP Camera',
-    'WiFi',
+    'Cloud Game',
+    'AI IP Camera',
+    // 'WiFi',
     // 'Karaoke',
     // 'VRBT',
     // 'Music Streaming',
@@ -2995,7 +3932,9 @@ export const RandomProductSpecification = (productClass: string, subModule?: str
         .then($options => {
           const allOptions = [...$options].map(el => el.textContent?.trim() || '');
           const availableGeneral = allOptions.filter(text => generalList.includes(text));
-          const pickedItems = availableGeneral.filter(() => Cypress._.random(0, 1) === 1);
+          // const pickedItems = availableGeneral.filter(() => Cypress._.random(0, 1) === 1);
+
+          const pickedItems = availableGeneral;  // เลือกทั้งหมดที่อยู่ใน generalList
           cy.wrap(pickedItems).as('pickedItems');
         });
     });
@@ -3208,119 +4147,62 @@ export const Mms = (): void => {
 
 const getRandomNumberOfEntries = (): number => {
   const random = Math.random();
-  if (random < 0.01) return 1;
-  else if (random < 0.99) return 2;
+  if (random < 0.95) return 1;
+  else if (random < 0.98) return 2;
   else return 3;
 };
-export const VerticalApp = (): void => {
-  openTab(/^Vertical App$/);
-
-  cy.get('app-mass-mkt-vertical-app')
-    .should('be.visible')
-    .within(() => {
-      cy.get('.collapse-panel').then(($panel) => {
-        if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
-          cy.get('.panel-heading').click({ force: true });
-        }
-      });
-    });
-
-  repeatEntries('VerticalApp', () => {
-
-    // =====================
-    // STEP 1: กด +
-    // =====================
-    cy.get('app-mass-mkt-vertical-app')
-      .find('button:has(.glyphicon-plus)')
-      .click({ force: true });
-    cy.wait(5000)
-    // =====================
-    // STEP 2: random form
-    // =====================
-
-    // Usage Type
-    randomSelect('select[formcontrolname="VerticalAppUsageType"]');
-
-    // Quota Type
-    cy.get('select[formcontrolname="VerticalAppQuotaType"]')
-      .find('option:not([disabled])')
-      .then(($options) => {
-        const index = Cypress._.random(0, $options.length - 1);
-        const val = $options.eq(index).val() as string;
-
-        cy.wrap(val).as('quotaVal');
-        cy.get('select[formcontrolname="VerticalAppQuotaType"]')
-          .select(val, { force: true });
-
-        cy.log(`🎯 QuotaType: ${val}`);
-      });
-
-    // Vertical App (mat-select)
-    cy.contains('*Vertical App :')
-      .closest('.form-group')
-      .find('mat-select')
-      .click({ force: true });
-
-    cy.get('.mat-select-panel').should('be.visible');
-    randomMatSelect();
-
-    // =====================
-    // Network Coverage
-    // =====================
-    const pick5G = Cypress._.random(0, 1) === 1;
-
-    cy.get('[formarrayname="vaNetworkCoverageCheckBox"] input[type="checkbox"]')
-      .each(($el, index) => {
-        const shouldCheck = (index === 0 && pick5G) || (index === 1 && !pick5G);
-
-        if (shouldCheck) {
-          cy.wrap($el).check({ force: true });
-        } else {
-          cy.wrap($el).uncheck({ force: true });
-        }
-      });
-
-    // =====================
-    // Speed
-    // =====================
-    randomSelect('select[formcontrolname="commuSpeed"]');
-
-    // =====================
-    // Conditional: Throttling
-    // =====================
-    cy.get('@quotaVal').then((val) => {
-      if (String(val).includes('Throttling')) {
-        cy.log('⚡ Throttling case');
-
-        cy.get('select[formcontrolname="commuThrottlingSpeed"]')
-          .should('be.visible')
-          .then(() => {
-            randomSelect('select[formcontrolname="commuThrottlingSpeed"]');
+const randomMatSelect = () => {
+  // รอให้ panel ปรากฏ (ใช้ document.querySelector เพราะมันอยู่บอก component)
+  cy.document().then((doc) => {
+    // รอจนกว่าจะมี mat-select-panel ใน DOM
+    const waitForPanel = () => {
+      const panel = doc.querySelector('.mat-select-panel');
+      if (!panel) {
+        cy.wait(100);
+        cy.document().then((newDoc) => {
+          const newPanel = newDoc.querySelector('.mat-select-panel');
+          if (newPanel) {
+            cy.wrap(newPanel).should('be.visible');
+            // สุ่มเลือก option
+            cy.wrap(newPanel)
+              .find('mat-option')
+              .should('have.length.gt', 0)
+              .then(($options) => {
+                const index = Cypress._.random(0, $options.length - 1);
+                cy.wrap($options).eq(index).click({ force: true });
+                cy.log(`✅ Selected mat-option index: ${index}`);
+              });
+          }
+        });
+      } else {
+        cy.wrap(panel).should('be.visible');
+        cy.wrap(panel)
+          .find('mat-option')
+          .should('have.length.gt', 0)
+          .then(($options) => {
+            const index = Cypress._.random(0, $options.length - 1);
+            cy.wrap($options).eq(index).click({ force: true });
+            cy.log(`✅ Selected mat-option index: ${index}`);
           });
       }
-    });
+    };
 
-    // =====================
-    // STEP 3: Add
-    // =====================
-    cy.contains('button', /^Add$/)
-      .filter(':visible')
-      .should('be.enabled')
-      .click({ force: true });
-
-    // =====================
-    // กัน Angular render lag
-    // =====================
-    cy.wait(800);
+    waitForPanel();
   });
 };
+const clickAddButton = () => {
+  cy.contains('button', /^Add$/)
+    .filter(':visible')
+    .should('be.enabled')
+    .click({ force: true });
+};
+
 const repeatEntries = (label: string, fn: (index: number) => void): void => {
   const count = getRandomNumberOfEntries();
   cy.log(`🔥 ${label}: ${count} entries`);
 
   const runNext = (i: number): void => {
     if (i >= count) return;
-
     cy.log(`➡️ ${label} รอบที่ ${i + 1}`);
     fn(i);
     cy.then(() => runNext(i + 1));
@@ -3336,13 +4218,6 @@ const openTab = (name: RegExp) => {
     .click({ force: true });
 };
 
-const clickAddButton = () => {
-  cy.contains('button', /^Add$/)
-    .filter(':visible')
-    .should('be.enabled')
-    .click({ force: true });
-};
-
 const randomSelect = (selector: string) => {
   cy.get(selector)
     .should('be.visible')
@@ -3353,95 +4228,6 @@ const randomSelect = (selector: string) => {
       cy.get(selector).select(val, { force: true });
       cy.log(`🎯 ${selector}: ${val}`);
     });
-};
-
-const randomMatSelect = () => {
-  cy.get('.mat-select-panel mat-option')
-    .should('have.length.gt', 0)
-    .then(($options) => {
-      const index = Cypress._.random(0, $options.length - 1);
-      cy.wrap($options).eq(index).click({ force: true });
-    });
-};
-export const CloudGame = (): void => {
-  openTab(/^Cloud Game$/);
-  cy.wait(3000);
-
-  repeatEntries('CloudGame', () => {
-    cy.get('app-mass-mkt-vr')
-      .first()
-      .should('be.visible')
-      .within(() => {
-        cy.get('button .glyphicon-plus').first().parent().click();
-
-        cy.contains('*Content :')
-          .closest('.col-md-12')
-          .find('.mat-select-trigger')
-          .click({ force: true });
-      });
-
-    cy.get('.mat-select-panel').should('be.visible');
-    randomMatSelect();
-
-    cy.get('app-mass-mkt-vr').first().within(() => {
-      clickAddButton();
-    });
-
-    cy.wait(800);
-  });
-};
-export const EntertainmentPartnership = (
-  platforms: Array<'Arcade' | 'TV Plus' | 'Youtube Premium'>
-): void => {
-  openTab(/^Entertainment Partnership$/);
-
-  repeatEntries('Entertainment', () => {
-    platforms.forEach((platform) => {
-      const targetPlatform = platform === 'Youtube Premium' ? 'Google' : platform;
-
-      cy.get('app-mass-mkt-content-music-streaming')
-        .should('be.visible')
-        .within(() => {
-
-          cy.get('button .glyphicon-plus').first().parent().click();
-
-          // CP
-          const cpOptions = ['Apple', 'GOOGLE IRELAND LIMITED'];
-          const randomCp = Cypress._.sample(cpOptions)!;
-
-          cy.get('select[formcontrolname="cpName"]').select(randomCp);
-
-          cy.wait(500);
-
-          cy.get('select[formcontrolname="platform"]').select(targetPlatform);
-
-          cy.wait(500);
-
-          // Partner App ID
-          cy.contains('Partner App ID')
-            .closest('.panel')
-            .within(() => {
-              cy.get('.glyphicon-plus').first().parent().click();
-
-              cy.contains('Partner App ID Detail')
-                .closest('.panel')
-                .within(() => {
-                  cy.get('input[formcontrolname="partnerPackageName"]')
-                    .clear()
-                    .type('test');
-
-                  randomSelect('select[formcontrolname="customerType"]');
-
-                  clickAddButton();
-                });
-            });
-
-          clickAddButton();
-        });
-
-      cy.wait(800);
-    });
-  });
 };
 
 const openMatSelectWithRetry = (
@@ -3595,109 +4381,655 @@ export const WiFi = (): void => {
   });
 };
 
-export const AIIPCamera = (): void => {
-  openTab(/^AI IP Camera$/);
-  cy.wait(5000)
-  repeatEntries('AI IP Camera', () => {
-    cy.get('.glyphicon-plus').first().parent().click();
+export const VerticalApp = (): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Vertical App$/)
+    .click({ force: true });
+  cy.wait(5000);
 
-    randomSelect('select[formcontrolname="cpName"]');
+  cy.get('app-mass-mkt-vertical-app').within(() => {
+    cy.get('.collapse-panel').then(($panel) => {
+      if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
+        cy.get('.panel-heading').click({ force: true });
+      }
+    });
 
-    cy.contains('Partner App ID')
-      .closest('.panel')
-      .within(() => {
-        cy.get('.glyphicon-plus').last().parent().click();
+    cy.get('button:has(.glyphicon-plus)').click({ force: true });
+  });
 
-        cy.contains('Partner App ID Detail')
-          .closest('.panel')
-          .within(() => {
-            randomSelect('select[formcontrolname="customerType"]');
-            clickAddButton();
-          });
+  cy.get('select[formcontrolname="VerticalAppUsageType"]')
+    .find('option:not([disabled])')
+    .then(($options) => {
+      const randomIndex = Cypress._.random(0, $options.length - 1);
+      const val = $options.eq(randomIndex).val() as string;
+      cy.get('select[formcontrolname="VerticalAppUsageType"]').select(val, { force: true });
+    });
+
+  cy.get('select[formcontrolname="VerticalAppQuotaType"]')
+    .find('option:not([disabled])')
+    .then(($options) => {
+      const randomIndex = Cypress._.random(0, $options.length - 1);
+      const val = $options.eq(randomIndex).val() as string;
+      cy.wrap(val).as('selectedQuotaValue');
+      cy.get('select[formcontrolname="VerticalAppQuotaType"]').select(val, { force: true });
+    });
+
+  cy.contains('label', '*Vertical App :')
+    .closest('.form-group')
+    .find('mat-select .mat-select-trigger')
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('body')
+    .find('mat-option')
+    .not('.mat-option-disabled')
+    .then(($options) => {
+      const randomIndex = Cypress._.random(0, $options.length - 1);
+      cy.wrap($options).eq(randomIndex).scrollIntoView().click({ force: true });
+    });
+
+  cy.get('app-mass-mkt-vertical-app').within(() => {
+    const pick5G = Cypress._.random(0, 1) === 1;
+
+    cy.get('[formarrayname="vaNetworkCoverageCheckBox"] input[type="checkbox"]')
+      .each(($checkbox, index) => {
+        const should5GBeChecked = index === 0 && pick5G;
+        const shouldNo4GBeChecked = index === 1 && !pick5G;
+
+        if (should5GBeChecked || shouldNo4GBeChecked) {
+          cy.wrap($checkbox).check({ force: true });
+        } else {
+          cy.wrap($checkbox).uncheck({ force: true });
+        }
       });
 
-    clickAddButton();
-    cy.wait(800);
-  });
-};
-export const Karaoke = (): void => {
-  openTab(/^Karaoke$/);
-  cy.wait(5000)
-  repeatEntries('Karaoke', () => {
-    cy.get('.glyphicon-plus').first().parent().click();
-
-    cy.get('select[formcontrolname="cpName"]')
-      .select('Karaoke_Bundle_PLAYPremium');
-
-    randomSelect('select[formcontrolname="platform"]');
-
-    cy.contains('Partner App ID')
-      .closest('.panel')
-      .within(() => {
-        cy.get('.glyphicon-plus').first().parent().click();
-
-        cy.contains('Partner App ID Detail')
-          .closest('.panel')
-          .within(() => {
-            cy.get('input').type('test');
-            randomSelect('select[formcontrolname="customerType"]');
-            clickAddButton();
-          });
-      });
-
-    clickAddButton();
-    cy.wait(800);
-  });
-};
-export const MusicStreaming = (): void => {
-  openTab(/^Music Streaming$/);
-  cy.wait(5000)
-  repeatEntries('MusicStreaming', () => {
-    cy.get('.glyphicon-plus').first().parent().click();
-
-    randomSelect('select[formcontrolname="cpName"]');
-    randomSelect('select[formcontrolname="platform"]');
-
-    cy.contains('Partner App ID')
-      .closest('.panel')
-      .within(() => {
-        cy.get('.glyphicon-plus').first().parent().click();
-
-        cy.contains('Partner App ID Detail')
-          .closest('.panel')
-          .within(() => {
-            cy.get('input').type('test');
-            randomSelect('select[formcontrolname="customerType"]');
-            clickAddButton();
-          });
-      });
-
-    clickAddButton();
-    cy.wait(800);
-  });
-};
-export const VRBT = (): void => {
-  openTab(/^VRBT$/);
-  cy.wait(5000)
-  repeatEntries('VRBT', () => {
-    cy.get('.glyphicon-plus').first().parent().click();
-
-    cy.get('select[formcontrolname="productName"]')
-      .select('Platform Calling VDO');
-
-    cy.get('select[formcontrolname="availableListBox"] option')
+    cy.get('select[formcontrolname="commuSpeed"]')
+      .find('option:not([disabled])')
       .then(($options) => {
-        const index = Cypress._.random(0, $options.length - 1);
-        cy.get('select[formcontrolname="availableListBox"]')
-          .select($options.eq(index).val() as string);
-
-        cy.get('button.str').click();
+        const randomIndex = Cypress._.random(0, $options.length - 1);
+        const val = $options.eq(randomIndex).val() as string;
+        cy.get('select[formcontrolname="commuSpeed"]').select(val, { force: true });
       });
 
-    clickAddButton();
-    cy.wait(800);
+    cy.get('@selectedQuotaValue').then((quotaValue) => {
+      if (String(quotaValue).includes('Throttling')) {
+        cy.get('select[formcontrolname="commuThrottlingSpeed"]')
+          .should('exist')
+          .find('option:not([disabled])')
+          .then(($options) => {
+            const randomIndex = Cypress._.random(0, $options.length - 1);
+            const val = $options.eq(randomIndex).val() as string;
+            cy.get('select[formcontrolname="commuThrottlingSpeed"]').select(val, { force: true });
+          });
+      }
+    });
+
+    cy.contains('button', /^Add$/).click({ force: true });
   });
 };
+
+// ========================
+// CLOUD GAME
+// ========================
+
+export const CloudGame = (): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Cloud Game$/)
+    .click({ force: true });
+
+  cy.wait(5000);
+
+  cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+    .first()
+    .should('be.visible')
+    .within(() => {
+      cy.get('button .glyphicon-plus').first().parent().click();
+
+      cy.contains('label', '*Content :')
+        .closest('.col-md-12')
+        .find('.mat-select-trigger')
+        .click({ force: true });
+    });
+
+  cy.get('.cdk-overlay-container .mat-select-panel', { timeout: 10000 })
+    .should('be.visible');
+
+  cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
+    .should('have.length.greaterThan', 0)
+    .then(($options) => {
+      const count = $options.length;
+      const randomIndex = Math.floor(Math.random() * count);
+      cy.wrap($options).eq(randomIndex).click({ force: true });
+    });
+
+  cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+    .first()
+    .should('be.visible')
+    .within(() => {
+      cy.get('button.btn-primary').contains('Add').click({ force: true });
+    });
+};
+
+// ========================
+// ENTERTAINMENT PARTNERSHIP
+// ========================
+
+export const EntertainmentPartnership = (platforms: Array<'Arcade' | 'TV Plus' | 'Youtube Premium'>): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Entertainment Partnership$/)
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+        .should('be.visible')
+        .within(() => {
+          platforms.forEach((platform) => {
+            const targetPlatform = platform === 'Youtube Premium' ? 'Google' : platform;
+
+            cy.get('button .glyphicon-plus').first().parent().click();
+
+            const cpOptions = ['Apple', 'GOOGLE IRELAND LIMITED'];
+            const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
+
+            cy.contains('label', 'CP Name')
+              .closest('.form-group')
+              .find('select[formcontrolname="cpName"]')
+              .select(randomCp);
+
+            cy.wait(2000);
+
+            cy.contains('label', 'Platform')
+              .closest('.form-group')
+              .find('select[formcontrolname="platform"]')
+              .select(targetPlatform);
+
+            cy.wait(2000);
+
+            cy.contains('h3', 'Partner App ID')
+              .closest('.panel')
+              .within(() => {
+                cy.get('button .glyphicon-plus').first().parent().click();
+
+                cy.contains('h3', 'Partner App ID Detail')
+                  .closest('.panel')
+                  .should('be.visible')
+                  .within(() => {
+                    cy.get('input[formcontrolname="partnerPackageName"]').clear().type('test');
+
+                    cy.get('select[formcontrolname="customerType"]')
+                      .should('be.visible')
+                      .find('option:not([disabled])')
+                      .then(($options) => {
+                        const options = $options.toArray() as HTMLOptionElement[];
+                        const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
+                        if (!matched) {
+                          throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
+                        }
+                        cy.get('select[formcontrolname="customerType"]')
+                          .select(matched.value.trim())
+                          .should('have.value', matched.value.trim());
+                        cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+                      });
+
+                    cy.contains('button', /^Add$/).should('be.visible').click();
+                  });
+
+                cy.contains('h3', 'Partner App ID Detail')
+                  .closest('.panel')
+                  .should(($panel) => {
+                    const isHidden = $panel.attr('hidden') !== undefined ||
+                      $panel.css('display') === 'none' ||
+                      $panel.css('visibility') === 'hidden' ||
+                      !$panel.is(':visible');
+                    expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                  });
+              });
+
+            cy.wait(2000);
+
+            cy.get('button')
+              .filter(':visible')
+              .contains(/^Add$/)
+              .should('be.enabled')
+              .click({ force: true });
+          });
+        });
+    });
+};
+// ========================
+// AI IP CAMERA
+// ========================
+
+export const AIIPCamera = (): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^AI IP Camera$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-ai-ip-camera .panel-body .btn-primary .glyphicon-plus')
+    .first()
+    .parent()
+    .should('be.enabled')
+    .click();
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('select[formcontrolname="cpName"]')
+        .should('be.visible')
+        .find('option')
+        .then(($options) => {
+          const validOptions = ($options.toArray() as HTMLOptionElement[]).filter(
+            (opt) => !opt.disabled && opt.value && opt.value !== 'null' && opt.value !== ''
+          );
+
+          if (validOptions.length === 0) {
+            throw new Error('No valid options found in CP Name dropdown');
+          }
+
+          const randomIndex = Math.floor(Math.random() * validOptions.length);
+          const randomValue = validOptions[randomIndex].value;
+
+          cy.get('select[formcontrolname="cpName"]').select(randomValue).should('have.value', randomValue);
+          cy.log(`Selected CP Name: ${randomValue}`);
+        });
+
+      cy.contains('.panel-heading', 'Partner App ID')
+        .closest('.panel')
+        .within(() => {
+          cy.get('.btn-xs .glyphicon-plus').last().should('be.visible').click();
+        });
+
+      cy.contains('.panel-heading', 'Partner App ID Detail')
+        .closest('.panel')
+        .should('be.visible')
+        .within(() => {
+          cy.get('select[formcontrolname="customerType"]')
+            .should('be.visible')
+            .find('option:not([disabled])')
+            .then(($options) => {
+              const options = $options.toArray() as HTMLOptionElement[];
+              const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
+              if (!matched) {
+                throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
+              }
+              cy.get('select[formcontrolname="customerType"]')
+                .select(matched.value.trim())
+                .should('have.value', matched.value.trim());
+              cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+            });
+
+          cy.contains('button', /^Add$/).should('be.enabled').click();
+        });
+
+      cy.contains('.panel-heading', 'Partner App ID Detail')
+        .closest('.panel')
+        .should(($panel) => {
+          const isHidden = $panel.attr('hidden') !== undefined ||
+            $panel.css('display') === 'none' ||
+            $panel.css('visibility') === 'hidden' ||
+            !$panel.is(':visible');
+          expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+        });
+
+      cy.get('app-mass-mkt-ai-ip-camera')
+        .within(() => {
+          cy.get('.row.ng-star-inserted')
+            .last()
+            .within(() => {
+              cy.contains('button', /^Add$/).should('be.enabled').click();
+            });
+        });
+    });
+};
+
+// ========================
+// KARAOKE
+// ========================
+
+export const Karaoke = (): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Karaoke$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
+    .first()
+    .parent()
+    .should('be.enabled')
+    .click();
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+        .should('be.visible')
+        .within(() => {
+          cy.get('select[formcontrolname="cpName"]')
+            .should('be.visible')
+            .select('Karaoke_Bundle_PLAYPremium')
+            .should('have.value', 'Karaoke_Bundle_PLAYPremium');
+
+          cy.log('Selected CP Name: Karaoke_Bundle_PLAYPremium');
+
+          const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
+          const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+          const isAISPlayBox = randomPlatform === '3: AIS Play Box';
+
+          cy.get('select[formcontrolname="platform"]')
+            .should('be.visible')
+            .select(randomPlatform)
+            .should('have.value', randomPlatform);
+
+          cy.log(`Selected Platform: ${randomPlatform}`);
+
+          cy.wait(2000);
+
+          cy.contains('h3', 'Partner App ID')
+            .closest('.panel')
+            .within(() => {
+              cy.get('button .glyphicon-plus').first().parent().click();
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should('be.visible')
+                .within(() => {
+                  cy.get('input[formcontrolname="partnerPackageName"]').should('be.visible').clear().type('test');
+
+                  cy.get('select[formcontrolname="customerType"]')
+                    .should('be.visible')
+                    .find('option:not([disabled])')
+                    .then(($options) => {
+                      const options = $options.toArray() as HTMLOptionElement[];
+                      const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
+                      if (!matched) {
+                        throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
+                      }
+                      cy.get('select[formcontrolname="customerType"]')
+                        .select(matched.value.trim())
+                        .should('have.value', matched.value.trim());
+                      cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+                    });
+
+                  cy.contains('button', /^Add$/).should('be.visible').click();
+                });
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should(($panel) => {
+                  const isHidden = $panel.attr('hidden') !== undefined ||
+                    $panel.css('display') === 'none' ||
+                    $panel.css('visibility') === 'hidden' ||
+                    !$panel.is(':visible');
+                  expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                });
+            });
+
+          cy.wait(2000);
+
+          if (isAISPlayBox) {
+            cy.contains('h3', 'Vimmi Product')
+              .closest('.panel')
+              .within(() => {
+                cy.get('button .glyphicon-plus').first().parent().click();
+
+                cy.contains('h4', 'Vimmi Product Detail')
+                  .closest('.panel')
+                  .should('be.visible')
+                  .within(() => {
+                    cy.get('input[formcontrolname="vimmiProductNameText"]').should('be.visible').clear().type('test');
+
+                    const random19Digits = Array.from({ length: 19 }, () => Math.floor(Math.random() * 10)).join('');
+                    cy.log(`Random Vimmi Product ID: ${random19Digits}`);
+
+                    cy.get('input[formcontrolname="vimmiProductId"]').should('be.visible').clear().type(random19Digits);
+
+                    cy.contains('button', /^Add$/).should('be.visible').click();
+                  });
+              });
+
+            cy.wait(2000);
+          }
+
+          cy.get('button')
+            .filter(':visible')
+            .contains(/^Add$/)
+            .should('be.enabled')
+            .click();
+        });
+    });
+};
+
+// ========================
+// MUSIC STREAMING
+// ========================
+
+export const MusicStreaming = (): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^Music Streaming$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-content-music-streaming .panel-body .btn-primary .glyphicon-plus')
+    .first()
+    .parent()
+    .should('be.enabled')
+    .click();
+
+  cy.get('app-mass-mkt-product-offering select[formcontrolname="customerType"]')
+    .find('option:selected')
+    .invoke('val')
+    .then((selectedVal) => {
+      const rawVal = String(selectedVal);
+      const label = rawVal.includes(':') ? rawVal.split(':')[1].trim() : rawVal.trim();
+
+      let partnerCustomerType: string;
+      if (label === 'Post-paid' || label === 'Hybrid-Post') {
+        partnerCustomerType = 'Post-paid';
+      } else if (label === 'Pre-paid') {
+        partnerCustomerType = 'Pre-paid';
+      } else {
+        partnerCustomerType = Math.random() < 0.5 ? 'Post-paid' : 'Pre-paid';
+      }
+
+      cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
+
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+        .should('be.visible')
+        .within(() => {
+          const cpOptions = ['GMM Plern', 'jooxvip', 'Apple'];
+          const randomCp = cpOptions[Math.floor(Math.random() * cpOptions.length)];
+
+          cy.get('select[formcontrolname="cpName"]')
+            .should('be.visible')
+            .find('option:not([disabled])')
+            .then(($options) => {
+              const options = $options.toArray() as HTMLOptionElement[];
+              const matched = options.find((opt) => opt.text.trim().includes(randomCp));
+              if (!matched) {
+                throw new Error(`No option matched "${randomCp}" in CP Name dropdown`);
+              }
+              cy.get('select[formcontrolname="cpName"]').select(matched.value.trim()).should('have.value', matched.value.trim());
+              cy.log(`Selected CP Name: ${matched.value.trim()}`);
+            });
+
+          cy.wait(2000);
+
+          const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
+          const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
+
+          cy.get('select[formcontrolname="platform"]')
+            .should('be.visible')
+            .select(randomPlatform)
+            .should('have.value', randomPlatform);
+
+          cy.log(`Selected Platform: ${randomPlatform}`);
+
+          cy.wait(2000);
+
+          cy.contains('h3', 'Partner App ID')
+            .closest('.panel')
+            .within(() => {
+              cy.get('button .glyphicon-plus').first().parent().click();
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should('be.visible')
+                .within(() => {
+                  cy.get('input[formcontrolname="partnerPackageName"]').should('be.visible').clear().type('test');
+
+                  cy.get('select[formcontrolname="customerType"]')
+                    .should('be.visible')
+                    .find('option:not([disabled])')
+                    .then(($options) => {
+                      const options = $options.toArray() as HTMLOptionElement[];
+                      const matched = options.find((opt) => opt.text.trim() === partnerCustomerType);
+                      if (!matched) {
+                        throw new Error(`No option matched "${partnerCustomerType}" in customerType dropdown`);
+                      }
+                      cy.get('select[formcontrolname="customerType"]')
+                        .select(matched.value.trim())
+                        .should('have.value', matched.value.trim());
+                      cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
+                    });
+
+                  cy.contains('button', /^Add$/).should('be.visible').click();
+                });
+
+              cy.contains('h3', 'Partner App ID Detail')
+                .closest('.panel')
+                .should(($panel) => {
+                  const isHidden = $panel.attr('hidden') !== undefined ||
+                    $panel.css('display') === 'none' ||
+                    $panel.css('visibility') === 'hidden' ||
+                    !$panel.is(':visible');
+                  expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
+                });
+            });
+
+          cy.wait(2000);
+
+          cy.get('button')
+            .filter(':visible')
+            .contains(/^Add$/)
+            .should('be.enabled')
+            .click();
+        });
+    });
+};
+
+// ========================
+// VRBT
+// ========================
+
+export const VRBT = (): void => {
+  cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
+    .contains(/^VRBT$/)
+    .should('be.visible')
+    .click({ force: true });
+
+  cy.get('app-mass-mkt-vrbt')
+    .find('button.btn-primary')
+    .find('.glyphicon-plus')
+    .parent('button')
+    .should('be.enabled')
+    .click({ force: true });
+
+  cy.wait(2000);
+
+  cy.get('app-mass-mkt-vrbt', { timeout: 15000 })
+    .should('be.visible')
+    .within(() => {
+      cy.get('.panel')
+        .contains('h3', 'VRBT Detail')
+        .closest('.panel')
+        .should('not.have.attr', 'hidden')
+        .within(() => {
+          cy.get('select[formcontrolname="productName"]')
+            .should('be.visible')
+            .find('option:not([disabled])')
+            .then(($options) => {
+              const options = $options.toArray() as HTMLOptionElement[];
+              const matched = options.find((opt) => opt.text.trim() === 'Platform Calling VDO');
+              if (!matched) {
+                throw new Error('No option matched "Platform Calling VDO" in Product Name dropdown');
+              }
+              cy.get('select[formcontrolname="productName"]').select(matched.value.trim()).should('have.value', matched.value.trim());
+              cy.log(`Selected Product Name: ${matched.value.trim()}`);
+            });
+          cy.wait(2000);
+
+          cy.get('ng2-dual-list-box[formcontrolname="partnerSku"]')
+            .within(() => {
+              cy.get('select[formcontrolname="availableListBox"]')
+                .find('option')
+                .then(($options) => {
+                  const options = $options.toArray() as HTMLOptionElement[];
+                  if (options.length === 0) {
+                    throw new Error('No available options in Partner SKU list');
+                  }
+                  const randomIndex = Math.floor(Math.random() * options.length);
+                  const randomValue = options[randomIndex].value;
+                  cy.log(`Selected Partner SKU: ${options[randomIndex].text.trim()}`);
+                  cy.get('select[formcontrolname="availableListBox"]').select(randomValue);
+                  cy.wait(300);
+                  cy.get('button.str').click();
+                });
+            });
+          cy.wait(300);
+
+          cy.contains('button', /^Add$/).should('be.visible').should('be.enabled').click();
+        });
+    });
+};
+
 
 const INTERNET_SPEEDS = [
   '4Gbps/4Gbps', '3Gbps/3Gbps', 'Max Speed (5G 2Gbps/2Gbps)',
@@ -4434,6 +5766,7 @@ const createProjectBase = (
   }
 
   cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
+  RandomProjectDescription(projectName,subModule, Module);
 
   cy.get('button[type="button"]').contains('Save').click();
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
@@ -4463,94 +5796,55 @@ const createPOBase = (
   cy.wait(8000);
 };
 
-/**
- * Fill Service PO specific fields
- */
-const fillServicePOFields = (Module: Module, PriceType: string): void => {
-  const promotionLevels = ['Mobile', 'Account', 'Non-Mobile'] as const;
-  const randomPromotion = promotionLevels[Math.floor(Math.random() * promotionLevels.length)];
+// ===== HELPER: Pick random from array =====
+const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
 
-  cy.get('select[formcontrolname="promotionLevel"]')
-    .select(randomPromotion)
-    .should('have.value', randomPromotion);
-
-  cy.get('textarea[formcontrolname="wordingInStatementEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Greeting Letter Eng`);
-  cy.get('textarea[formcontrolname="wordingInStatementTh"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Greeting Letter Thai`);
-
-  cy.get('select[formcontrolname="smsGreetingSendFlag"]').select('Send');
-  cy.get('textarea[formcontrolname="smsGreetingEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} SMS Greeting Eng`);
-  cy.get('textarea[formcontrolname="smsGreetingTh"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} SMS Greeting Thai`);
-
-  cy.get('select[formcontrolname="smsDeleteSendFlag"]').select('Send');
-  cy.get('textarea[formcontrolname="smsDeleteEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} SMS Delete Eng`);
-  cy.get('textarea[formcontrolname="smsDeleteTh"]')
-    .type(`MOB ${Module} ${PriceType} ${day}${month} ${hours}${minutes} SMS Delete Thai`);
-
-  cy.get('textarea[formcontrolname="descriptionEn"]')
-    .type(`MOB ${Module} ${PriceType} ${day}${month} ${hours}${minutes} description Eng`);
-  cy.get('textarea[formcontrolname="descriptionTh"]')
-    .type(`MOB ${Module} ${PriceType} ${day}${month} ${hours}${minutes} description Thai`);
-
-  cy.get('input[formcontrolname="discountRevenueCode"]').type('APCP-009');
-
-  selectMultipleFromDualList('availableListBox', 3);
-  cy.get('textarea[formcontrolname="otherCondition"]').type('Other Condition '.repeat(6));
-  cy.get('textarea[formcontrolname="memoDescription"]').type('Memo Description '.repeat(6));
+// ===== HELPER: Pick multiple random items =====
+const pickMultiple = <T>(arr: T[], count: number): T[] => {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
 };
 
-/**
- * Fill CashBack PO specific fields
- */
-const fillCashBackPOFields = (Module: Module, PriceType: string): void => {
-  cy.get('textarea[formcontrolname="shortPromotionNameEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Short Promotion Name Eng`);
-  cy.get('textarea[formcontrolname="shortPromotionNameTh"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Short Promotion Name Thai`);
-  cy.get('textarea[formcontrolname="promotionDescriptionEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Promotion Description Eng`);
-  cy.get('textarea[formcontrolname="promotionDescriptionTh"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Promotion Description Thai`);
-  cy.get('textarea[formcontrolname="greetingLetterEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Greeting Letter Eng`);
-  cy.get('textarea[formcontrolname="greetingLetterTh"]')
-    .type(`MOB ${Module} ${PriceType} ${day}${month} ${hours}${minutes} Greeting Letter Thai`);
-  cy.get('textarea[formcontrolname="yourPackageNameEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Your PackageName Eng`);
-  cy.get('textarea[formcontrolname="yourPackageNameTh"]').type('ทดสอบ'.repeat(5));
-  selectMultipleFromDualList('availableListBox', 3);
+// ===== HELPER: Random integer =====
+const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// ===== HELPER: Random float with decimals =====
+const randomFloat = (min: number, max: number, decimals: number = 2): string => {
+  return (Math.random() * (max - min) + min).toFixed(decimals);
 };
 
-/**
- * Fill standard PO fields (for other types)
- */
-const fillStandardPOFields = (Module: Module, PriceType: string): void => {
-  const productTypes = ['FBB', 'Fixline', 'Mobile', 'Non Mobile'] as const;
-  const randomValue = productTypes[Math.floor(Math.random() * productTypes.length)];
-  cy.get('select[formcontrolname="productType"]').select(randomValue).should('have.value', randomValue);
-
-  cy.get('textarea[formcontrolname="wordingInStatementEn"]')
-    .type(`MOB ${Module} ${PriceType} ${day}${month} ${hours}${minutes} Greeting Letter Eng`);
-  cy.get('textarea[formcontrolname="wordingInStatementTh"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} Greeting Letter Thai`);
-  cy.get('textarea[formcontrolname="descriptionEn"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} description Eng`);
-  cy.get('textarea[formcontrolname="descriptionTh"]')
-    .type(`MOB ${Module} ${PriceType}${day}${month} ${hours}${minutes} description Thai`);
-
-  cy.get('input[formcontrolname="discountRevenueCode"]').type('APCP-009');
-  selectMultipleFromDualList('availableListBox', 3);
-  cy.get('textarea[formcontrolname="otherCondition"]').type('Other Condition '.repeat(6));
-  cy.get('textarea[formcontrolname="memoDescription"]').type('Memo Description '.repeat(6));
+// ===== HELPER: Clean text for English fields =====
+const cleanEnglishText = (str: string): string => {
+  if (!str) return '';
+  return str
+    .replace(/[^\x00-\x7F\s]/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 };
 
-/**
- * Helper: Select multiple random options from dual list
- */
+// ===== HELPER: Clean text for Thai fields =====
+const cleanThaiText = (str: string): string => {
+  if (!str) return '';
+  return str
+    .replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+// ===== HELPER: Limit string length =====
+const limit = (str: string, maxLen: number): string => {
+  if (!str) return '';
+  let result = str.length > maxLen ? str.substring(0, maxLen) : str;
+  result = result.trimEnd();
+  if (result.length === maxLen && !result.endsWith(' ') && result.includes(' ')) {
+    const lastSpace = result.lastIndexOf(' ');
+    if (lastSpace > maxLen * 0.7) {
+      result = result.substring(0, lastSpace);
+    }
+  }
+  return result;
+};
 const selectMultipleFromDualList = (controlName: string, maxSelections: number): void => {
   cy.get(`select[formcontrolname="${controlName}"]`).then(($select) => {
     const optionCount = $select.find('option').length;
@@ -4570,45 +5864,532 @@ const selectMultipleFromDualList = (controlName: string, maxSelections: number):
   });
 };
 
-/**
- * Fill CashBack discount configuration
- */
-const fillCashBackDiscountConfig = (Module: Module, PriceType: string): void => {
-  const randomDuration = Math.floor(Math.random() * 999) + 1;
-  cy.get('input[formcontrolname="duration"]').clear().type(randomDuration.toString());
-  cy.get('button[class*="btn-primary"][type="button"]').click();
-  cy.get('input[formcontrolname="durationFrom"]').type('1');
+// ===== HELPER: Limit and clean EN =====
+const limitAndCleanEN = (str: string, maxLen: number): string => {
+  return limit(cleanEnglishText(str), maxLen);
+};
 
+// ===== HELPER: Limit and clean TH =====
+const limitAndCleanTH = (str: string, maxLen: number): string => {
+  return limit(cleanThaiText(str), maxLen);
+};
+
+// ====================================================================
+// WORDING POOLS สำหรับ PO Fields
+// ====================================================================
+
+/**
+ * สร้าง Wording Pools สำหรับ PO Fields
+ */
+const createPOWordingPools = (
+  projectName: string,
+  poName: string,
+  Module: string,
+  PriceType: string,
+  subModule?: string
+) => {
+  const p = projectName || `${Module} ${PriceType}`;
+  const po = poName || 'Product Offering';
+  const mod = Module || 'MOB';
+  const sm = subModule || 'POST';
+
+  // ===== DISPLAY NAMES =====
+  const moduleNames: Record<string, { EN: string; TH: string }> = {
+    'MOB': { EN: 'Mobile', TH: 'มือถือ' },
+    'ENTER': { EN: 'Entertainment', TH: 'บันเทิง' },
+    'MUSIC': { EN: 'Music', TH: 'เพลง' },
+    'FBB': { EN: 'Fiber Broadband', TH: 'ไฟเบอร์บรอดแบนด์' },
+    'Fixline': { EN: 'Fixed Line', TH: 'โทรศัพท์บ้าน' },
+  };
+  const modName = moduleNames[mod] || { EN: mod, TH: mod };
+
+  const priceTypeNames: Record<string, { EN: string; TH: string }> = {
+    'onetime': { EN: 'One-Time', TH: 'ครั้งเดียว' },
+    'recurring': { EN: 'Recurring', TH: 'รายเดือน' },
+    'usage': { EN: 'Usage', TH: 'ตามการใช้งาน' },
+  };
+  const ptName = priceTypeNames[PriceType] || { EN: PriceType, TH: PriceType };
+
+  // ===== RANDOM VALUES =====
+  const dataAmount = pickRandom(['10GB', '30GB', '50GB', '100GB', '200GB', '300GB', '500GB', 'Unlimited']);
+  const speed = pickRandom(['100 Mbps', '300 Mbps', '500 Mbps', '1 Gbps', '2 Gbps', '5G Max']);
+  const price = randomInt(199, 2999);
+  const discount = pickRandom([10, 15, 20, 25, 30, 40, 50]);
+  const validity = pickRandom([1, 3, 7, 30, 90, 180, 365]);
+  const contractMonths = pickRandom([1, 3, 6, 12, 24, 36]);
+  const benefit1 = pickRandom(['5G Access', 'Unlimited Calls', 'Free Streaming', 'Rollover Data', 'Family Sharing', 'International Roaming']);
+  const benefit1TH = pickRandom(['เข้าใช้ 5G', 'โทรฟรีไม่อั้น', 'สตรีมมิ่งฟรี', 'ยกยอดเน็ต', 'แชร์ครอบครัว', 'โรมมิ่ง']);
+  const benefit2 = pickRandom(['No Contract', 'Free SIM', 'eSIM Ready', 'Priority Support', 'Device Discount', 'Cashback']);
+  const benefit2TH = pickRandom(['ไม่มีสัญญา', 'ซิมฟรี', 'พร้อม eSIM', 'บริการพิเศษ', 'ส่วนลดเครื่อง', 'เงินคืน']);
+
+  return {
+    // ===== SHORT PROMOTION NAME =====
+    shortPromotionName: {
+      EN: [
+        `${p} Special Offer`,
+        `${p} Best Value`,
+        `${p} Limited Deal`,
+        `${p} Top Pick`,
+        `${p} Exclusive`,
+        `${p} Premium Choice`,
+        `Promo: ${p}`,
+        `Deal: ${p}`,
+        `Offer – ${p}`,
+        `Package: ${p}`,
+        `Special: ${p}`,
+        `Bundle: ${p}`,
+        `${p} Flash Sale`,
+        `${p} Hot Deal`,
+        `${p} Mega Saver`,
+        `${p} Pro`,
+        `${p} Max`,
+        `${p} Unlimited`,
+        `${p} ${dataAmount}`,
+        `${p} ${speed}`,
+        `${p} ${discount}% Off`,
+      ],
+      TH: [
+        `${p} ข้อเสนอพิเศษ`,
+        `${p} คุ้มที่สุด`,
+        `${p} ดีลพิเศษ`,
+        `${p} แนะนำ`,
+        `${p} เอ็กซ์คลูซีฟ`,
+        `${p} พรีเมียม`,
+        `โปรฯ: ${p}`,
+        `ดีล: ${p}`,
+        `ข้อเสนอ – ${p}`,
+        `แพ็กเกจ: ${p}`,
+        `พิเศษ: ${p}`,
+        `บันเดิล: ${p}`,
+        `${p} แฟลชเซล`,
+        `${p} ดีลด่วน`,
+        `${p} เมกะเซฟเวอร์`,
+        `${p} โปร`,
+        `${p} แม็กซ์`,
+        `${p} ไม่จำกัด`,
+        `${p} ${dataAmount}`,
+        `${p} ${speed}`,
+        `${p} ลด ${discount}%`,
+      ],
+    },
+
+    // ===== PROMOTION DESCRIPTION =====
+    promotionDescription: {
+      EN: [
+        `Subscribe to ${p} and enjoy ${dataAmount} of high-speed data at ${speed}. This ${modName.EN} package includes unlimited calls, ${benefit1}, and ${benefit2}. Only ${price} THB/month!`,
+        `${p} gives you the best value with ${dataAmount} data, ${speed} speeds, and premium features. ${benefit1} included. Sign up today!`,
+        `Experience seamless ${modName.EN} with ${p}. ${dataAmount} data allowance, unlimited domestic calls, and 5G ready. Special launch price: ${price} THB.`,
+        `${p}: More data, better experience. ${dataAmount} @ ${speed}, ${benefit1}, ${benefit2}. ${price} THB/month. Limited time offer!`,
+        `Get ${dataAmount} of high-speed ${modName.EN} data for just ${price} THB with ${p}. Includes ${benefit1} and ${benefit2}.`,
+      ],
+      TH: [
+        `สมัคร ${p} และรับเน็ตความเร็วสูง ${dataAmount} ที่ความเร็ว ${speed} แพ็กเกจ${modName.TH}นี้รวมโทรฟรีไม่จำกัด ${benefit1TH} และ${benefit2TH} เพียง ${price} บาท/เดือน!`,
+        `${p} ให้ความคุ้มค่าสูงสุดด้วยเน็ต ${dataAmount} ความเร็ว ${speed} และฟีเจอร์พรีเมียม ${benefit1TH} รวมอยู่แล้ว สมัครวันนี้!`,
+        `สัมผัสประสบการณ์${modName.TH}ที่ราบรื่นกับ ${p} เน็ต ${dataAmount} โทรฟรีทุกเครือข่ายไม่จำกัด รองรับ 5G ราคาเปิดตัวพิเศษ ${price} บาท`,
+        `${p}: เน็ตเยอะกว่า ประสบการณ์ดีกว่า ${dataAmount} @ ${speed} ${benefit1TH} ${benefit2TH} ${price} บาท/เดือน ข้อเสนอจำนวนจำกัด!`,
+        `รับเน็ต${modName.TH}ความเร็วสูง ${dataAmount} ในราคาเพียง ${price} บาท กับ ${p} รวม ${benefit1TH} และ ${benefit2TH}`,
+      ],
+    },
+
+    // ===== GREETING LETTER =====
+    greetingLetter: {
+      EN: [
+        `Dear customer, thank you for subscribing to ${p}. Your ${modName.EN} package is now active with ${dataAmount} of high-speed data. Enjoy seamless connectivity and exclusive benefits!`,
+        `Hello! Welcome to ${p}. We're thrilled to have you on board. Your ${modName.EN} service includes ${dataAmount} data, unlimited calls, and more. Enjoy!`,
+        `Congratulations on choosing ${p}! Your subscription is confirmed. ${dataAmount} data, ${speed} speeds, and premium features are ready for you.`,
+        `Welcome to the ${p} family! Your ${modName.EN} package is now live. Enjoy ${dataAmount} of data, ${benefit1}, and ${benefit2}.`,
+        `Thank you for joining ${p}. Your account is active and ready to use. ${dataAmount} data allowance, unlimited calls, and 5G access included.`,
+      ],
+      TH: [
+        `เรียนลูกค้า ขอบคุณที่สมัครใช้บริการ ${p} แพ็กเกจ${modName.TH}ของคุณพร้อมใช้งานแล้วด้วยเน็ตความเร็วสูง ${dataAmount} ขอให้เพลิดเพลินกับการเชื่อมต่อที่ราบรื่นและสิทธิพิเศษ!`,
+        `สวัสดี! ยินดีต้อนรับสู่ ${p} เรายินดีที่คุณมาร่วมกับเรา บริการ${modName.TH}ของคุณรวมเน็ต ${dataAmount} โทรฟรีไม่จำกัด และอื่นๆ อีกมากมาย ขอให้สนุก!`,
+        `ยินดีด้วยที่คุณเลือก ${p}! การสมัครของคุณได้รับการยืนยันแล้ว เน็ต ${dataAmount} ความเร็ว ${speed} และฟีเจอร์พรีเมียมพร้อมสำหรับคุณแล้ว`,
+        `ยินดีต้อนรับสู่ครอบครัว ${p}! แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ${benefit1TH} และ ${benefit2TH}`,
+        `ขอบคุณที่ร่วมใช้ ${p} บัญชีของคุณพร้อมใช้งานแล้ว เน็ต ${dataAmount} โทรฟรีไม่จำกัด และการเข้าถึง 5G รวมอยู่แล้ว`,
+      ],
+    },
+
+    // ===== YOUR PACKAGE NAME =====
+    yourPackageName: {
+      EN: [
+        `You are subscribed to ${p}`,
+        `Your package: ${p}`,
+        `Active plan: ${p}`,
+        `Current package: ${p}`,
+        `${p} (Active)`,
+        `${p} - ${dataAmount}`,
+        `${p} ${modName.EN} ${ptName.EN}`,
+      ],
+      TH: [
+        `คุณกำลังใช้งาน ${p}`,
+        `แพ็กเกจของคุณ: ${p}`,
+        `แผนปัจจุบัน: ${p}`,
+        `แพ็กเกจที่ใช้งาน: ${p}`,
+        `${p} (ใช้งานอยู่)`,
+        `${p} - ${dataAmount}`,
+        `${p} ${modName.TH} ${ptName.TH}`,
+      ],
+    },
+
+    // ===== SMS GREETING =====
+    smsGreeting: {
+      EN: [
+        `Welcome to ${p}! Your subscription is now active. Enjoy ${dataAmount} data!`,
+        `Hi! You've successfully joined ${p}. ${dataAmount} data ready to use.`,
+        `${p} activated! Enjoy ${dataAmount} of high-speed data.`,
+        `Welcome! ${p} is live on your number. ${benefit1} included.`,
+        `Thanks for choosing ${p}! Your ${dataAmount} data package is ready.`,
+        `You're on ${p}! Enjoy ${speed} speeds and unlimited calls.`,
+        `${p}: Your ${modName.EN} package is active. Start exploring!`,
+      ],
+      TH: [
+        `ยินดีต้อนรับสู่ ${p}! แพ็กเกจของคุณพร้อมใช้งานแล้ว รับเน็ต ${dataAmount}!`,
+        `สวัสดี! คุณสมัคร ${p} สำเร็จแล้ว เน็ต ${dataAmount} พร้อมใช้งาน`,
+        `เปิดใช้งาน ${p} แล้ว! เพลิดเพลินกับเน็ตความเร็วสูง ${dataAmount}`,
+        `ยินดีต้อนรับ! ${p} พร้อมใช้งานบนเบอร์ของคุณแล้ว ${benefit1TH} รวมอยู่ด้วย`,
+        `ขอบคุณที่เลือก ${p}! แพ็กเกจเน็ต ${dataAmount} ของคุณพร้อมแล้ว`,
+        `คุณใช้ ${p} อยู่! เพลิดเพลินกับความเร็ว ${speed} และโทรฟรีไม่จำกัด`,
+        `${p}: แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เริ่มสำรวจได้เลย!`,
+      ],
+    },
+
+    // ===== SMS DELETE =====
+    smsDelete: {
+      EN: [
+        `Your ${p} package has been removed. Thank you for using our service.`,
+        `${p} has been unsubscribed. Hope to see you again!`,
+        `You have cancelled ${p}. We appreciate your loyalty.`,
+        `${p} is now deactivated. Thank you for being with us.`,
+        `Your ${p} subscription has ended. Come back anytime!`,
+        `${p} service stopped. Thanks for choosing us.`,
+      ],
+      TH: [
+        `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการ`,
+        `${p} ถูกยกเลิกแล้ว หวังว่าจะพบกันใหม่!`,
+        `คุณยกเลิก ${p} แล้ว ขอบคุณที่ไว้วางใจเรา`,
+        `${p} ถูกปิดใช้งานแล้ว ขอบคุณที่อยู่กับเรา`,
+        `การสมัคร ${p} สิ้นสุดแล้ว กลับมาได้ทุกเมื่อ!`,
+        `บริการ ${p} หยุดแล้ว ขอบคุณที่เลือกเรา`,
+      ],
+    },
+
+    // ===== WORDING IN STATEMENT =====
+    wordingInStatement: {
+      EN: [
+        `${p} - ${modName.EN} ${ptName.EN} Package`,
+        `${p} | ${dataAmount} | ${speed}`,
+        `${p} (${price} THB/month)`,
+        `${p} - Thank you for your payment`,
+        `${p} Subscription Fee`,
+        `${p} Monthly Charge`,
+        `Service: ${p}`,
+      ],
+      TH: [
+        `${p} - แพ็กเกจ${modName.TH} ${ptName.TH}`,
+        `${p} | ${dataAmount} | ${speed}`,
+        `${p} (${price} บาท/เดือน)`,
+        `${p} - ขอบคุณสำหรับการชำระเงิน`,
+        `ค่าบริการ ${p}`,
+        `ค่าบริการรายเดือน ${p}`,
+        `บริการ: ${p}`,
+      ],
+    },
+
+    // ===== DESCRIPTION =====
+    description: {
+      EN: [
+        `${p} is a ${ptName.EN} ${modName.EN} package offering ${dataAmount} of high-speed data, unlimited domestic calls, and 5G network access.`,
+        `${p}: Comprehensive ${modName.EN} solution with ${dataAmount} data allowance at ${speed}. Includes ${benefit1} and ${benefit2}.`,
+        `${p} provides exceptional value with ${dataAmount} data, unlimited calls, and premium features for just ${price} THB/month.`,
+        `${p} - The ultimate ${modName.EN} experience. ${dataAmount} data, ${speed} speeds, 5G ready.`,
+      ],
+      TH: [
+        `${p} เป็นแพ็กเกจ${modName.TH}แบบ${ptName.TH} มอบเน็ตความเร็วสูง ${dataAmount} โทรฟรีทุกเครือข่ายไม่จำกัด และการเข้าถึงเครือข่าย 5G`,
+        `${p}: โซลูชัน${modName.TH}ที่ครอบคลุมด้วยปริมาณเน็ต ${dataAmount} ความเร็ว ${speed} รวม ${benefit1TH} และ ${benefit2TH}`,
+        `${p} มอบความคุ้มค่าที่ยอดเยี่ยมด้วยเน็ต ${dataAmount} โทรฟรีไม่จำกัด และฟีเจอร์พรีเมียมในราคาเพียง ${price} บาท/เดือน`,
+        `${p} - ประสบการณ์${modName.TH}ขั้นสุด เน็ต ${dataAmount} ความเร็ว ${speed} พร้อม 5G`,
+      ],
+    },
+
+    // ===== OTHER CONDITION =====
+    otherCondition: {
+      EN: [
+        `Offer valid for new ${modName.EN} subscribers only.`,
+        `Promotion valid for ${validity} days from activation.`,
+        `Fair usage policy applies after ${dataAmount}.`,
+        `Cannot be combined with other promotions.`,
+        `Subject to credit approval.`,
+        `Auto-renewal applies unless cancelled.`,
+        `Terms and conditions apply.`,
+        `Limited time offer while supplies last.`,
+        `Valid for Thai nationals and residents only.`,
+        `Minimum contract term: ${contractMonths} months.`,
+      ],
+      TH: [
+        `ข้อเสนอสำหรับลูกค้าใหม่${modName.TH}เท่านั้น`,
+        `โปรโมชันมีอายุ ${validity} วันนับจากวันเปิดใช้งาน`,
+        `ใช้นโยบายการใช้งานที่เหมาะสมหลังใช้ครบ ${dataAmount}`,
+        `ไม่สามารถใช้ร่วมกับโปรโมชันอื่นได้`,
+        `ขึ้นอยู่กับการอนุมัติเครดิต`,
+        `ต่ออายุอัตโนมัติหากไม่ยกเลิก`,
+        `เป็นไปตามข้อกำหนดและเงื่อนไข`,
+        `ข้อเสนอจำนวนจำกัด`,
+        `สำหรับบุคคลสัญชาติไทยและผู้มีถิ่นพำนักในไทยเท่านั้น`,
+        `ระยะสัญญาขั้นต่ำ ${contractMonths} เดือน`,
+      ],
+    },
+
+    // ===== MEMO DESCRIPTION =====
+    memoDescription: {
+      EN: [
+        `${p} - Internal notes for configuration reference.`,
+        `${p}: ${modName.EN} ${ptName.EN}. PO: ${po}.`,
+        `Product config: ${dataAmount}, ${speed}, ${price} THB.`,
+        `${p} - Created for testing and validation purposes.`,
+        `Memo: ${p} setup completed with standard parameters.`,
+      ],
+      TH: [
+        `${p} - บันทึกภายในสำหรับอ้างอิงการกำหนดค่า`,
+        `${p}: ${modName.TH} ${ptName.TH}. PO: ${po}`,
+        `การกำหนดค่าผลิตภัณฑ์: ${dataAmount}, ${speed}, ${price} บาท`,
+        `${p} - สร้างเพื่อวัตถุประสงค์ในการทดสอบและตรวจสอบ`,
+        `บันทึก: การตั้งค่า ${p} เสร็จสมบูรณ์ด้วยพารามิเตอร์มาตรฐาน`,
+      ],
+    },
+
+    // ===== DISCOUNT NAME =====
+    discountName: {
+      EN: [
+        `${p} Launch Discount`,
+        `${p} Welcome Offer`,
+        `${p} ${discount}% Off`,
+        `${p} First Month Free`,
+        `${p} Cashback`,
+        `${p} Rebate`,
+        `${p} Promo`,
+        `${p} Special`,
+      ],
+      TH: [
+        `ส่วนลดเปิดตัว ${p}`,
+        `ข้อเสนอต้อนรับ ${p}`,
+        `${p} ลด ${discount}%`,
+        `${p} ฟรีเดือนแรก`,
+        `${p} เงินคืน`,
+        `${p} ส่วนลด`,
+        `${p} โปรโมชัน`,
+        `${p} พิเศษ`,
+      ],
+    },
+  };
+};
+
+/**
+ * Fill Service PO specific fields (ปรับปรุงใช้ Pool)
+ */
+const fillServicePOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
+  const promotionLevels = ['Mobile', 'Account', 'Non-Mobile'] as const;
+  const randomPromotion = promotionLevels[Math.floor(Math.random() * promotionLevels.length)];
+
+  cy.get('select[formcontrolname="promotionLevel"]')
+    .select(randomPromotion)
+    .should('have.value', randomPromotion);
+
+  const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
+  const pOName = poName || 'ServicePO';
+  
+  const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
+
+  // Wording In Statement
+  cy.get('textarea[formcontrolname="wordingInStatementEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
+  cy.get('textarea[formcontrolname="wordingInStatementTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
+
+  // SMS Greeting
+  const smsFlags = ['Send', "Don't Send"];
+  const randomSmsFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
+  cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(randomSmsFlag);
+  
+  if (randomSmsFlag === 'Send') {
+    cy.get('textarea[formcontrolname="smsGreetingEn"]')
+      .clear().type(limitAndCleanEN(pickRandom(pools.smsGreeting.EN), 400));
+    cy.get('textarea[formcontrolname="smsGreetingTh"]')
+      .clear().type(limitAndCleanTH(pickRandom(pools.smsGreeting.TH), 400));
+  }
+
+  // SMS Delete
+  const randomDeleteFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
+  cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(randomDeleteFlag);
+  
+  if (randomDeleteFlag === 'Send') {
+    cy.get('textarea[formcontrolname="smsDeleteEn"]')
+      .clear().type(limitAndCleanEN(pickRandom(pools.smsDelete.EN), 250));
+    cy.get('textarea[formcontrolname="smsDeleteTh"]')
+      .clear().type(limitAndCleanTH(pickRandom(pools.smsDelete.TH), 250));
+  }
+
+  // Description
+  cy.get('textarea[formcontrolname="descriptionEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
+  cy.get('textarea[formcontrolname="descriptionTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
+
+  cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
+
+  selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+  
+  // Other Condition
+  const conditionCount = Math.floor(Math.random() * 5) + 2;
+  const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
+  cy.get('textarea[formcontrolname="otherCondition"]')
+    .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
+  
+  // Memo Description
+  cy.get('textarea[formcontrolname="memoDescription"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
+};
+
+/**
+ * Fill CashBack PO specific fields (ปรับปรุงใช้ Pool)
+ */
+const fillCashBackPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
+  const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
+  const pOName = poName || 'CashBackPO';
+  
+  const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
+
+  // Short Promotion Name
+  cy.get('textarea[formcontrolname="shortPromotionNameEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.shortPromotionName.EN), 100));
+  cy.get('textarea[formcontrolname="shortPromotionNameTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.shortPromotionName.TH), 100));
+  
+  // Promotion Description
+  cy.get('textarea[formcontrolname="promotionDescriptionEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.promotionDescription.EN), 500));
+  cy.get('textarea[formcontrolname="promotionDescriptionTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.promotionDescription.TH), 500));
+  
+  // Greeting Letter
+  cy.get('textarea[formcontrolname="greetingLetterEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.greetingLetter.EN), 500));
+  cy.get('textarea[formcontrolname="greetingLetterTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.greetingLetter.TH), 500));
+  
+  // Your Package Name
+  cy.get('textarea[formcontrolname="yourPackageNameEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.yourPackageName.EN), 100));
+  cy.get('textarea[formcontrolname="yourPackageNameTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.yourPackageName.TH), 100));
+  
+  selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+};
+
+/**
+ * Fill standard PO fields (ปรับปรุงใช้ Pool)
+ */
+const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
+  const productTypes = ['FBB', 'Fixline', 'Mobile', 'Non Mobile'] as const;
+  const randomValue = productTypes[Math.floor(Math.random() * productTypes.length)];
+  cy.get('select[formcontrolname="productType"]').select(randomValue).should('have.value', randomValue);
+
+  const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
+  const pOName = poName || 'StandardPO';
+  
+  const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
+
+  // Wording In Statement
+  cy.get('textarea[formcontrolname="wordingInStatementEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
+  cy.get('textarea[formcontrolname="wordingInStatementTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
+  
+  // Description
+  cy.get('textarea[formcontrolname="descriptionEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
+  cy.get('textarea[formcontrolname="descriptionTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
+
+  cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
+  selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+  
+  // Other Condition
+  const conditionCount = Math.floor(Math.random() * 5) + 2;
+  const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
+  cy.get('textarea[formcontrolname="otherCondition"]')
+    .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
+  
+  // Memo Description
+  cy.get('textarea[formcontrolname="memoDescription"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
+};
+
+/**
+ * Fill CashBack discount configuration (ปรับปรุงใช้ Pool)
+ */
+const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectName?: string, poName?: string): void => {
+  const pName = projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`;
+  const pOName = poName || 'CashBackDiscount';
+  
+  const pools = createPOWordingPools(pName, pOName, Module, PriceType);
+  
+  // Duration
+  const durationOptions = [1, 3, 6, 12, 24, 36];
+  const randomDuration = durationOptions[Math.floor(Math.random() * durationOptions.length)];
+  cy.get('input[formcontrolname="duration"]').clear().type(randomDuration.toString());
+  cy.get('button[class*="btn-primary"][type="button"]').first().click();
+  
+  // Duration From
+  const durationFromOptions = [0, 1, 2, 3];
+  const randomDurationFrom = durationFromOptions[Math.floor(Math.random() * durationFromOptions.length)];
+  cy.get('input[formcontrolname="durationFrom"]').clear().type(randomDurationFrom.toString());
+
+  // Discount Type
   cy.get('select[formcontrolname="discountType"]')
     .find('option:not([disabled])')
     .then(($options) => {
-      const randomIndex = Math.floor(Math.random() * $options.length);
-      cy.get('select[formcontrolname="discountType"]').select(($options[randomIndex] as HTMLOptionElement).value);
+      if ($options.length > 0) {
+        const randomIndex = Math.floor(Math.random() * $options.length);
+        cy.get('select[formcontrolname="discountType"]').select(($options[randomIndex] as HTMLOptionElement).value);
+      }
     });
 
-  cy.get('textarea[formcontrolname="discountNameEn"]').type(`MOB ${Module} ${PriceType}${day}${month}${hours}${minutes} Discount NameEn`);
-  cy.get('textarea[formcontrolname="discountNameTh"]').type(`MOB ${Module} ${PriceType}${day}${month}${hours}${minutes} Discount Name Th`);
+  // Discount Name
+  cy.get('textarea[formcontrolname="discountNameEn"]')
+    .clear().type(limitAndCleanEN(pickRandom(pools.discountName.EN), 100));
+  cy.get('textarea[formcontrolname="discountNameTh"]')
+    .clear().type(limitAndCleanTH(pickRandom(pools.discountName.TH), 100));
 
   const randomIndex = Math.floor(Math.random() * 2);
-  cy.get('input[formcontrolname="marginalDiscount"]').eq(randomIndex).check();
+  cy.get('input[formcontrolname="marginalDiscount"]').eq(randomIndex).check({ force: true });
   cy.get('button[class*="btn-primary"][type="button"]').eq(1).click();
-  cy.get('input[formcontrolname="prorate"]').eq(randomIndex).check();
+  cy.get('input[formcontrolname="prorate"]').eq(randomIndex).check({ force: true });
 
   const getRandomNumber = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
 
   if (randomIndex === 0) {
-    cy.get('input[formcontrolname="cashBackType"]').first().check();
-    const totalUsage = getRandomNumber(1000, 5000);
-    const cashBackExc = getRandomNumber(50, 500);
-    cy.get('input[formcontrolname="totalUsageFromExcVat"]').type(totalUsage.toString());
-    cy.get('input[formcontrolname="cashBackExcVat"]').type(cashBackExc.toString());
-    cy.get('input[formcontrolname="cashBackIncVat"]').type(Math.round(cashBackExc * 1.07).toString());
+    const cashbackTypes = Math.floor(Math.random() * 2);
+    
+    if (cashbackTypes === 0) {
+      cy.get('input[formcontrolname="cashBackType"]').first().check({ force: true });
+      const totalUsage = getRandomNumber(1000, 5000);
+      const cashBackExc = getRandomNumber(50, 500);
+      cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(totalUsage.toString());
+      cy.get('input[formcontrolname="cashBackExcVat"]').clear().type(cashBackExc.toString());
+      cy.get('input[formcontrolname="cashBackIncVat"]').clear().type(Math.round(cashBackExc * 1.07).toString());
+    } else {
+      cy.get('input[formcontrolname="cashBackType"]').last().check({ force: true });
+      cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
+      cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
+    }
   } else {
-    cy.get('input[formcontrolname="cashBackType"]').last().check();
-    cy.get('input[formcontrolname="totalUsageFromExcVat"]').type(getRandomNumber(1000, 5000).toString());
-    cy.get('input[formcontrolname="cashBackPercent"]').type(getRandomNumber(1, 20).toString());
+    cy.get('input[formcontrolname="cashBackType"]').last().check({ force: true });
+    cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
+    cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
   }
+  
   cy.get('button.btn.btn-primary').contains('Add').click();
+  cy.wait(1000);
   cy.get('button.btn.btn-primary').contains('Add').click();
 };
 
@@ -4685,12 +6466,7 @@ export const ProjectBasicInformationComplete = (
   PriceExcluding();
   selectTargetGroup('random');
   dropdownPromotionGroup();
-
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.'.repeat(5));
-
-  cy.log(`🟡 Before RandomProductSpecification | ProductClass: ${ProductClass} | subModule: ${subModule} | Module: ${Module}`);
   RandomProductSpecification(ProductClass, subModule, Module);
-
   if (Module === 'PRE' && (ProductClass === 'ontop' || ProductClass === 'ontopextra')) {
     cy.get('body').then(($body) => {
       const mvpnRadios = $body.find('input[formcontrolname="allowMvpn"]');
@@ -4699,16 +6475,14 @@ export const ProjectBasicInformationComplete = (
       }
     });
   }
-
   targetgroup();
-
+  RandomRemark(projectName, poName, PriceType, ProductClass, subModule);
   if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {
     RetryPattern();
   }
   if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
     CopyDeductFail();
   }
-
   smsWording();
   backBacicInfo();
   addFile();

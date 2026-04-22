@@ -10,18 +10,9 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { 
-      ProductClass1: 'Main', 
-      Module: 'POST',
-      subModule: 'POST',
-      autoSetDuration: true 
-    });
-    Master.InternetRandom('main', 'post', 'post');
-    Master.backBacicInfo();
-    Master.addFile();
-    
-    // เรียกหลังจากทุกอย่างใน test นี้เสร็จ
-    Master.afterMKTMAINPOST();
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module: 'PRE', subModule:'PRE',autoSetDuration: true });
   });
+  Master.afterMKTMainPRE_FullSpadFlow();
 });
+
