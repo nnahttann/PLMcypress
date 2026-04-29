@@ -15,5 +15,5 @@
   },
   "include": [
     "**/*.ts"
-  ]
+, "e2e/support/commands.js"  ]
 }
