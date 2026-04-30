@@ -820,6 +820,7 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
     addauto5gCKS();
     checkAndFillContentType();
     checkAndUpdatePriority();
+    checkAndUpdateVerticalAppPriority();
     CopyDeductFail();
     smsCKSPOST();
     beforeapproveCKS();
@@ -842,6 +843,7 @@ export const afterMKTMainPRE_NotComplex = (): void => {
     addauto5gCKS();
     checkAndFillContentType();
     checkAndUpdatePriority();
+    checkAndUpdateVerticalAppPriority();
     smsCKSPOST();
     beforeapproveCKS();
   });
@@ -1022,6 +1024,7 @@ const _afterMKTontopCommon = (module: string): void => {
   executeCKSRole('standard', 'ontop', () => {
     checkAndFillContentType();
     checkAndUpdatePriority();
+    checkAndUpdateVerticalAppPriority();
     smsCKSPOST();
   });
   afterCKSCommon(module);
@@ -1054,6 +1057,7 @@ const stepsOntopPRE = (): void => {
   dropdownRecurringCKS();
   diyflagCKS();
   checkAndFillContentType();
+  checkAndUpdateVerticalAppPriority();
   cy.scrollTo('bottom');
   smsCKSPRE();
 };
@@ -1111,6 +1115,7 @@ const stepsOntopPREUsage = (): void => {
   diyflagCKS();
   checkAndFillContentType();
   checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
   cy.scrollTo('bottom');
   smsCKSPRE();
 };
@@ -1619,6 +1624,7 @@ export const afterMKTMAINPOST = (): void => {
   executeCKSRole('standard', 'main', () => {
     checkAndFillContentType();
     checkAndUpdatePriority();
+    checkAndUpdateVerticalAppPriority();
     smsCKSPOST();
     Tariff();
   });
@@ -1638,7 +1644,7 @@ const executeCKSRole = (
 ): void => {
   it('CKS role', () => {
     // ===== HARDCODE สำหรับทดสอบ =====
-    // const HARDCODE_PROJECT_NAME = 'Enter POST 020426';
+    // const HARDCODE_PROJECT_NAME = 'MOB POST onetime ontop 3004 1018';
     // const getProjectName: GetProjectNameFn = () => HARDCODE_PROJECT_NAME;
     // ================================
 
@@ -4008,9 +4014,9 @@ export const RandomProductSpecification = (productClass: string, subModule?: str
         .then($options => {
           const allOptions = [...$options].map(el => el.textContent?.trim() || '');
           const availableGeneral = allOptions.filter(text => generalList.includes(text));
-          // const pickedItems = availableGeneral.filter(() => Cypress._.random(0, 1) === 1);
+          const pickedItems = availableGeneral.filter(() => Cypress._.random(0, 1) === 1);
 
-          const pickedItems = availableGeneral;  // เลือกทั้งหมดที่อยู่ใน generalList
+          // const pickedItems = availableGeneral;  // เลือกทั้งหมดที่อยู่ใน generalList
           cy.wrap(pickedItems).as('pickedItems');
         });
     });
@@ -4861,6 +4867,7 @@ export const Voice = (): void => {
 // ========================
 export const Mms = (): void => {
   const processFreeResource = () => {
+    // Step 1: Open panel + click plus button
     cy.get('app-mass-mkt-mms-free-resource').within(() => {
       cy.get('.collapse-panel').first().then(($panel) => {
         if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
@@ -4869,9 +4876,14 @@ export const Mms = (): void => {
         }
       });
       cy.get('button:has(.glyphicon-plus)').click({ force: true });
-      cy.get('mat-select .mat-select-trigger').click({ force: true });
     });
 
+    // Step 2: Click mat-select OUTSIDE .within() so CDK overlay opens correctly
+    cy.get('app-mass-mkt-mms-free-resource mat-select .mat-select-trigger')
+      .should('be.visible')
+      .click({ force: true });
+
+    // Step 3: Options are in CDK overlay (body-level), query normally
     cy.get('mat-option:not(.mat-option-disabled)', { timeout: 10000 })
       .should('have.length.gt', 0)
       .then(($options) => {
@@ -4879,6 +4891,7 @@ export const Mms = (): void => {
         cy.wrap($options.eq(randomIndex)).scrollIntoView().click({ force: true });
       });
 
+    // Step 4: Click Add button
     cy.get('app-mass-mkt-mms-free-resource').within(() => {
       cy.contains('button', 'Add').should('be.visible').click({ force: true });
     });
@@ -4900,7 +4913,6 @@ export const Mms = (): void => {
 
       processFreeResource();
 
-      // 🔑 แก้จุดที่พัง: เพิ่ม .first() ยืนยันว่าคลิกแค่ element เดียว
       cy.get('app-mass-mkt-mms-rating').within(() => {
         cy.get('.panel-heading').first().click({ force: true });
       });
@@ -4913,11 +4925,13 @@ export const Mms = (): void => {
     }
   });
 };
+
 // ========================
 // SMS
 // ========================
 export const Sms = (): void => {
   const processFreeResource = () => {
+    // Step 1: Open panel + click plus button
     cy.get('app-mass-mkt-sms-free-resource').within(() => {
       cy.get('.collapse-panel').first().then(($panel) => {
         if ($panel.outerHeight() === 0 || $panel.css('display') === 'none') {
@@ -4926,9 +4940,14 @@ export const Sms = (): void => {
         }
       });
       cy.get('button:has(.glyphicon-plus)').click({ force: true });
-      cy.get('mat-select .mat-select-trigger').click({ force: true });
     });
 
+    // Step 2: Click mat-select OUTSIDE .within() so CDK overlay opens correctly
+    cy.get('app-mass-mkt-sms-free-resource mat-select .mat-select-trigger')
+      .should('be.visible')
+      .click({ force: true });
+
+    // Step 3: Options are in CDK overlay (body-level), query normally
     cy.get('mat-option:not(.mat-option-disabled)', { timeout: 10000 })
       .should('have.length.gt', 0)
       .then(($options) => {
@@ -4936,6 +4955,7 @@ export const Sms = (): void => {
         cy.wrap($options.eq(randomIndex)).scrollIntoView().click({ force: true });
       });
 
+    // Step 4: Click Add button
     cy.get('app-mass-mkt-sms-free-resource').within(() => {
       cy.contains('button', 'Add').should('be.visible').click({ force: true });
     });
@@ -4969,16 +4989,17 @@ export const Sms = (): void => {
         .click({ force: true });
 
       processFreeResource();
+
       cy.get('app-mass-mkt-sms-rating').within(() => {
         cy.get('.panel-heading').first().click({ force: true });
       });
+
       fillRatingSection('SMS Rating', 'smsExcludingVat');
       fillRatingSection('SMS Delivery Report Rating', 'smsdrExcludingVat');
       fillRatingSection('iSMS Rating', 'iSmsExcludingVat');
     }
   });
 };
-
 const getRandomNumberOfEntries = (): number => {
   const random = Math.random();
   if (random < 0.95) return 1;
@@ -4991,7 +5012,7 @@ const repeatEntries = (label: string, fn: (index: number) => void): void => {
   cy.log(`🔥 ${label}: ${count} entries`);
 
   const runNext = (i: number): void => {
-    if (i >= count) return;
+    if (i >= count) return; // guard is fine — explicit return keeps it clean
     cy.log(`➡️ ${label} รอบที่ ${i + 1}`);
     fn(i);
     cy.then(() => runNext(i + 1));
@@ -5024,6 +5045,9 @@ const openMatSelectWithRetry = (
   maxAttempts: number = 5
 ): void => {
   const attempt = (remaining: number): void => {
+    // FIX 1: when out of attempts, queue diagnostics first, THEN throw inside
+    // cy.then() so the throw fires after Cypress has flushed the diagnostic
+    // commands — not synchronously before them.
     if (remaining === 0) {
       cy.document().then((doc) => {
         const overlayContainer = doc.querySelector('.cdk-overlay-container');
@@ -5039,13 +5063,18 @@ const openMatSelectWithRetry = (
         }
       });
 
-      throw new Error('mat-select panel did not open after max attempts');
+      // FIX 1 (cont.): throw is now inside cy.then() so it runs in-queue,
+      // after the diagnostics above have already executed.
+      cy.then(() => {
+        throw new Error('mat-select panel did not open after max attempts');
+      });
+
+      return; // stop scheduling more commands for this branch
     }
 
     cy.get('body').type('{esc}');
     cy.wait(300);
 
-    // click ที่ .mat-select-trigger โดยตรง แทน mat-select
     getMatSelect()
       .should('be.visible')
       .find('.mat-select-trigger')
@@ -5060,10 +5089,12 @@ const openMatSelectWithRetry = (
 
       if (combined > 0) {
         cy.log(`✅ mat-select panel opened`);
-      } else {
-        cy.log(`⚠️ panel not found, retrying... (${remaining - 1} left)`);
-        attempt(remaining - 1);
+        // FIX 2: explicit return so the else branch below is never reached
+        return;
       }
+
+      cy.log(`⚠️ panel not found, retrying... (${remaining - 1} left)`);
+      attempt(remaining - 1);
     });
   };
 
@@ -5107,7 +5138,9 @@ const handleContentTypeIfExist = (): void => {
     }
   });
 };
-
+// ========================
+// WiFi
+// ========================
 export const WiFi = (): void => {
   openTab(/^WiFi$/);
 
@@ -5123,7 +5156,7 @@ export const WiFi = (): void => {
       .click();
 
     // =====================
-    // STEP 2: select dropdown
+    // STEP 2: select dropdowns
     // =====================
     randomSelect('select[formcontrolname="wiFiUsageType"]');
     randomSelect('select[formcontrolname="wiFiQuotaType"]');
@@ -5146,11 +5179,13 @@ export const WiFi = (): void => {
 
     // =====================
     // STEP 5: validation
+    // FIX 3: scope the form check to app-mass-mkt-wifi so we don't accidentally
+    // match other forms on the page and get false positives/negatives.
     // =====================
-    cy.get('form')
+    cy.get('app-mass-mkt-wifi form')
       .should('not.have.class', 'ng-invalid');
 
-    cy.get('.alert-danger').should('not.exist');
+    cy.get('app-mass-mkt-wifi .alert-danger').should('not.exist');
 
     // =====================
     // STEP 6: Add
@@ -5170,6 +5205,9 @@ export const WiFi = (): void => {
   });
 };
 
+// ========================
+// VerticalApp
+// ========================
 export const VerticalApp = (): void => {
   cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
     .contains(/^Vertical App$/)
@@ -6534,6 +6572,202 @@ const performSimpleClaimAndApprovalRole = (user: string, pass: string, approveFu
   ClaimProject(projectNamePONAME);
   cy.wait(2000);
   approveFunction(projectNamePONAME);
+};
+
+const COMPONENT = 'app-mass-enh-vertical-app';
+
+const checkAndUpdateVerticalAppPriority = (): void => {
+  cy.log('🚀 checkAndUpdateVerticalAppPriority started');
+
+  const fillIfEmpty = (
+    $input: JQuery<HTMLElement>,
+    label: string,
+    onFilled: () => void,
+    onSkip: () => void
+  ): void => {
+    cy.wrap($input).invoke('val').then((val) => {
+      const isEmpty = !val || String(val).trim() === '';
+
+      if (isEmpty) {
+        const randomNum = Math.floor(10000 + Math.random() * 90000);
+        cy.wrap($input)
+          .scrollIntoView()
+          .focus()
+          .clear()
+          .type(randomNum.toString(), { delay: 100 })
+          .blur();
+        cy.log(`✅ ใส่ค่า ${label}: ${randomNum}`);
+        cy.wait(1000);
+        onFilled();
+      } else {
+        cy.log(`ℹ️ ${label} มีค่าอยู่แล้ว: "${val}" — ข้าม`);
+        onSkip();
+      }
+    });
+  };
+
+  const clickUpdateIfVisible = (afterUpdate: () => void): void => {
+    cy.get(`${COMPONENT} .panel-body`).then(($panelBody) => {
+      const $updateBtn = $panelBody.find('button.btn-success').filter((_i, btn) => {
+        return btn.textContent?.trim() === 'Update' &&
+          Cypress.$(btn).closest('[hidden]').length === 0;
+      });
+
+      if ($updateBtn.length) {
+        cy.wrap($updateBtn.first()).click({ force: true });
+        cy.log('✅ คลิก Update');
+        cy.wait(1500);
+      } else {
+        cy.log('⚠️ ไม่พบ Update button');
+      }
+
+      afterUpdate();
+    });
+  };
+
+  const clickCancel = (afterCancel: () => void): void => {
+    cy.get(`${COMPONENT} .panel-body`).then(($panelBody) => {
+      const $cancelBtn = $panelBody.find('button').filter((_i, btn) => {
+        return btn.textContent?.trim() === 'Cancel' &&
+          Cypress.$(btn).closest('[hidden]').length === 0;
+      });
+
+      if ($cancelBtn.length) {
+        cy.wrap($cancelBtn.first()).click({ force: true });
+        cy.log('✅ คลิก Cancel');
+        cy.wait(500);
+      } else {
+        cy.log('⚠️ ไม่พบ Cancel button');
+      }
+
+      afterCancel();
+    });
+  };
+
+  const processRows = (rowIndex: number): void => {
+    cy.get('body').then(($b) => {
+      // ✅ scope เฉพาะ tbody ใน component นี้เท่านั้น
+      const $rows = $b.find(`${COMPONENT} table > tbody > tr`).filter((_i, tr) => {
+        const text = Cypress.$(tr).find('td:first').text().trim();
+        return text !== '' && !text.includes('No data to display');
+      });
+
+      if (rowIndex >= $rows.length) {
+        cy.log(`✅ ทำครบทุกแถวแล้ว (${$rows.length} แถว)`);
+        return;
+      }
+
+      cy.log(`📝 กำลังทำแถวที่ ${rowIndex + 1}/${$rows.length}`);
+
+      const $currentRow = $rows.eq(rowIndex);
+      const $editBtn = $currentRow.find('button.btn-warning[title="Edit"]').first();
+
+      if (!$editBtn.length) {
+        cy.log(`⚠️ ไม่พบ Edit button ในแถวที่ ${rowIndex + 1} — ข้าม`);
+        processRows(rowIndex + 1);
+        return;
+      }
+
+      const isHidden = Cypress.$($editBtn).closest('[hidden]').length > 0;
+      if (isHidden) {
+        cy.log(`⚠️ Edit button ในแถวที่ ${rowIndex + 1} ถูกซ่อนอยู่ — ข้าม`);
+        processRows(rowIndex + 1);
+        return;
+      }
+
+      cy.wrap($editBtn).click({ force: true });
+      cy.wait(800);
+      cy.log(`✅ คลิก Edit button แถวที่ ${rowIndex + 1}`);
+
+      // ✅ scope panel-body ใน component นี้เท่านั้น
+      cy.get(`${COMPONENT} .panel-body`).then(($panelBody) => {
+        const $priorityInput = $panelBody.find('input[formcontrolname="priority"]').filter((_i, el) => {
+          return Cypress.$(el).closest('[hidden]').length === 0 && Cypress.$(el).is(':visible');
+        });
+
+        const $throttlingInput = $panelBody.find('input[formcontrolname="throttlingSpeedPriority"]').filter((_i, el) => {
+          return Cypress.$(el).closest('[hidden]').length === 0 && Cypress.$(el).is(':visible');
+        });
+
+        cy.log(`📋 Priority: ${$priorityInput.length} | ThrottlingSpeedPriority: ${$throttlingInput.length}`);
+
+        if (!$priorityInput.length && !$throttlingInput.length) {
+          cy.log('⚠️ ไม่พบ input ใดๆ ที่มองเห็นได้ — ข้ามแถวนี้');
+          processRows(rowIndex + 1);
+          return;
+        }
+
+        let needsUpdate = false;
+
+        const finishRow = (): void => {
+          if (needsUpdate) {
+            clickUpdateIfVisible(() => processRows(rowIndex + 1));
+          } else {
+            cy.log(`ℹ️ ไม่มีการเปลี่ยนแปลง — กด Cancel`);
+            clickCancel(() => processRows(rowIndex + 1));
+          }
+        };
+
+        const checkThrottlingThenFinish = (): void => {
+          if ($throttlingInput.length) {
+            fillIfEmpty(
+              $throttlingInput.first(),
+              'Throttling Speed Priority',
+              () => { needsUpdate = true; finishRow(); },
+              () => finishRow()
+            );
+          } else {
+            cy.log('ℹ️ ไม่มี Throttling Speed Priority — ข้าม');
+            finishRow();
+          }
+        };
+
+        if ($priorityInput.length) {
+          fillIfEmpty(
+            $priorityInput.first(),
+            'Priority',
+            () => { needsUpdate = true; checkThrottlingThenFinish(); },
+            () => checkThrottlingThenFinish()
+          );
+        } else {
+          cy.log('ℹ️ ไม่มี Priority — ข้ามไปเช็ค Throttling');
+          checkThrottlingThenFinish();
+        }
+      });
+    });
+  };
+
+  // ── Tab check ────────────────────────────────────────────────────────────
+  cy.get('body').then(($body) => {
+    const normalizeText = (text: string | null | undefined): string =>
+      (text ?? '').replace(/\s+/g, ' ').trim();
+
+    const $tab = $body.find(
+      'ul.nav.nav-tabs li a, .scrollmenu > .nav a, .scrollmenu > .nav li a'
+    ).filter((_i, el) => normalizeText(el.textContent) === 'Vertical App');
+
+    if (!$tab.length) {
+      cy.log('⚠️ Tab "Vertical App" not found — skipping');
+      return;
+    }
+
+    cy.log('✅ Found tab: "Vertical App"');
+    cy.wrap($tab.first()).scrollIntoView().click({ force: true });
+    cy.wait(2000);
+
+    cy.get('body').then(($b) => {
+      const $rows = $b.find(`${COMPONENT} table > tbody > tr`);
+
+      if (!$rows.length) {
+        cy.log(`⚠️ ไม่พบแถวใน ${COMPONENT} — skipping`);
+        return;
+      }
+
+      cy.log(`✅ พบ ${$rows.length} แถว — เริ่ม processRows`);
+      processRows(0);
+      cy.log('🎉 checkAndUpdateVerticalAppPriority เสร็จสิ้น');
+    });
+  });
 };
 // ========================
 // PROJECT BASIC INFORMATION HELPERS
