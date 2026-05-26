@@ -1058,6 +1058,85 @@ export const afterMKTOntop_NotComplex = (): void => {
   declarePluginRoleTests();
 };
 
+// ========================
+// ONTOP FLOW FUNCTIONS
+// ========================
+
+export const afterMKTontopPOST = (): void => _afterMKTontopCommon('POST');
+export const afterMKTontopENTER = (): void => _afterMKTontopCommon('ENTER');
+export const afterMKTontopMUSIC = (): void => _afterMKTontopCommon('MUSIC');
+
+const _afterMKTontopCommon = (module: string): void => {
+  executeCKSRole('standard', 'ontop', () => {
+    checkAndFillContentType();
+    checkAndUpdatePriority();
+    checkAndUpdateVerticalAppPriority();
+    smsCKSPOST();
+  });
+  afterCKSCommon(module);
+};
+
+const afterCKSCommon = (Module: string): void => {
+  afterCKSPOST();
+  if (Module === 'MUSIC') {
+    performMusicRoles();
+  }
+};
+
+export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
+export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
+
+const _afterMKTontopPREWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPRE);
+  afterFn(module);
+};
+
+const stepsOntopPRE = (): void => {
+  cy.wait(15000);
+  addauto5gCKS();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  checkAndFillContentType();
+  checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
+  cy.scrollTo('bottom');
+  smsCKSPRE();
+};
+
+export const afterMKTontopPREUsage = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('PRE');
+};
+
+export const afterMKTontopPREUsageEnter = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('Enter');
+};
+
+export const afterMKTontopPREUsageMusic = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('MUSIC');
+};
+
+const stepsOntopPREUsage = (): void => {
+  cy.wait(15000);
+  addauto5gCKS();
+  unregister();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  checkAndFillContentType();
+  checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
+  cy.scrollTo('bottom');
+  smsCKSPRE();
+};
+
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
   executeCKSRole('standard', 'main', () => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
