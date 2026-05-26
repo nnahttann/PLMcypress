@@ -1,4 +1,5 @@
-```
+cypress/e2e/PLM/Approve/Approve/
+
 # Dependencies
 node_modules/
 
@@ -84,4 +85,3 @@ Thumbs.db
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-```
