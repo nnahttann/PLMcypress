@@ -1,0 +1,19 @@
+{
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "cypress": "^13.14.2",
+    "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "cy:open": "cypress open",
+    "cy:run:all": "cypress run",
+    "cy:run:approve-post": "cypress run --spec 'cypress/e2e/PLM/Approve/Approve POST-PAID/**/*.cy.ts'",
+    "cy:run:approve-pre": "cypress run --spec 'cypress/e2e/PLM/Approve/Approve PRE-PAID/**/*.cy.ts'",
+    "cy:run:approve-all": "cypress run --spec 'cypress/e2e/PLM/Approve/**/*.cy.ts'",
+    "cy:run:rom": "cypress run --spec 'cypress/e2e/PLM/Approve/Rom, Easy App Rom/**/*.cy.ts'",
+    "cy:run:master": "cypress run --spec 'cypress/e2e/PLM/Master.ts'"
+  },
+  "dependencies": {
+    "@qwen-code/sdk": "^0.1.7"
+  }
+}

@@ -216,7 +216,7 @@ export const handleAddToUSMP = (): void => {
   });
 };
 
-export const scrollAndWait = (ms: number = 4000): void => {
+export const scrollAndWait = (ms: number = 2000): void => {
   cy.scrollTo('bottom');
   cy.wait(ms);
 };
@@ -302,7 +302,7 @@ const searchInTableWithPagination = (
     filterCallback?: ($row: JQuery<HTMLElement>, index: number) => boolean;
   } = {}
 ): void => {
-  const { waitAfterNext = 4000, filterCallback } = options;
+  const { waitAfterNext = 2000, filterCallback } = options;
 
   const searchInCurrentPage = (): Cypress.Chainable<boolean> => {
     return cy.get('h3').contains(sectionHeader, { timeout: 100000 })
@@ -1051,7 +1051,7 @@ export const afterCKSPREPlugin = (Module: string): void => {
 };
 
 export const afterMKTOntop_NotComplex = (): void => {
-  executeCKSRole('standard', 'ontop', () => {     
+  executeCKSRole('standard', 'ontop', () => {
     addauto5gCKS(); dropdownRecurringCKS(); diyflagCKS(); unregister();
     addauto5gCKS(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
   });
@@ -2409,7 +2409,7 @@ export const CopyDeductFail = (): void => {
       }
 
       cy.wrap($mainTab.first()).click({ force: true });
-      cy.wait(4000);
+      cy.wait(2000);
 
       // ✅ 2. หา Sub-tab "Deduct Fail"
       cy.get('body').then(($b) => {
@@ -2500,1095 +2500,344 @@ const closeSuccessModal = (): void => {
     .click();
 };
 
+import { POWordingPoolsData } from './poWordingPoolsData';
+
 const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
-  const cleanEnglishText = (str: string): string => {
-    if (!str) return '';
-    return str
-      .replace(/[^\x00-\x7F\s]/g, '')
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
+  // ── String helpers ────────────────────────────────────────────────────────
+  const cleanEN = (s: string) => s ? s.replace(/[^\x00-\x7F\s]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim() : '';
+  const cleanTH = (s: string) => s ? s.replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '').replace(/\s+/g, ' ').trim() : '';
 
-  const cleanThaiText = (str: string): string => {
-    if (!str) return '';
-    return str
-      .replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-  };
-
-  const limit = (str: string, maxLen: number): string => {
-    if (!str) return '';
-    let result = str.length > maxLen ? str.substring(0, maxLen) : str;
-    result = result.trimEnd();
-    if (result.length === maxLen && !result.endsWith(' ') && result.includes(' ')) {
-      const lastSpace = result.lastIndexOf(' ');
-      if (lastSpace > maxLen * 0.7) {
-        result = result.substring(0, lastSpace);
-      }
+  const limit = (s: string, max: number) => {
+    if (!s) return '';
+    let r = s.length > max ? s.substring(0, max).trimEnd() : s;
+    if (r.length === max && r.includes(' ')) {
+      const ls = r.lastIndexOf(' ');
+      if (ls > max * 0.7) r = r.substring(0, ls);
     }
-    return result;
+    return r;
   };
 
-  const limitAndCleanEN = (str: string, maxLen: number): string => limit(cleanEnglishText(str), maxLen);
-  const limitAndCleanTH = (str: string, maxLen: number): string => limit(cleanThaiText(str), maxLen);
+  const capEN = (s: string, max: number) => limit(cleanEN(s), max);
+  const capTH = (s: string, max: number) => limit(cleanTH(s), max);
+  const pick  = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const flag  = () => pick(['Send', "Don't Send"]);
 
-  const getRandomSendFlag = (): string => {
-    const options = ['Send', "Don't Send"];
-    return options[Math.floor(Math.random() * options.length)];
+  // ── Timing ────────────────────────────────────────────────────────────────
+  const WAIT   = 500;
+  const SCROLL = 500;
+
+  // ── Pre-roll flags ────────────────────────────────────────────────────────
+  const flags = {
+    greeting:     flag(),
+    delete:       flag(),
+    lastMinute:   flag(),
+    beforeDeduct: flag(),
+    deductOk:     flag(),
+    deductFail:   flag(),
+    promote:      flag(),
   };
 
-  const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const beforePromoVal = flag();
+  const promoExpVal    = beforePromoVal === 'Send' ? "Don't Send" : flag();
 
-  const WAIT_TIME = 500;
-  const SCROLL_DELAY = 500;
-
-  const smsGreetingFlag = getRandomSendFlag();
-  const smsDeleteFlag = getRandomSendFlag();
-  const lastMinuteVal = getRandomSendFlag();
-  const beforeFeeDeductVal = getRandomSendFlag();
-  const deductSuccessVal = getRandomSendFlag();
-  const deductFailVal = getRandomSendFlag();
-  const smsPromotePackVal = getRandomSendFlag();
-
-  const randomExpiryLogic = (): { beforePromoVal: string; promoExpVal: string } => {
-    const options = ['Send', "Don't Send"];
-    const beforePromo = options[Math.floor(Math.random() * options.length)];
-    let promoExp: string;
-    if (beforePromo === 'Send') {
-      promoExp = "Don't Send";
-    } else {
-      promoExp = options[Math.floor(Math.random() * options.length)];
-    }
-    return { beforePromoVal: beforePromo, promoExpVal: promoExp };
-  };
-
-  const { beforePromoVal, promoExpVal } = randomExpiryLogic();
-
-  const scrollToElement = (selector: string, sectionName: string) => {
-    cy.log(`📌 Scrolling to: ${sectionName}`);
-    cy.get(selector).first().scrollIntoView({ duration: SCROLL_DELAY, offset: { top: -100, left: 0 } });
+  // ── Cypress helpers ───────────────────────────────────────────────────────
+  const scrollTo = (sel: string, label: string) => {
+    cy.log(`📌 Scrolling to: ${label}`);
+    cy.get(sel).first().scrollIntoView({ duration: SCROLL, offset: { top: -100, left: 0 } });
     cy.wait(1000);
   };
 
+  const withSection = (sel: string, label: string, fn: () => void) => {
+    cy.get('body').then(($b: any) => {
+      if (!$b.find(sel).length) return;
+      scrollTo(sel, label);
+      fn();
+      cy.wait(WAIT);
+    });
+  };
+
+  const fillTextarea = (sel: string, en: string, th: string, maxEn: number, maxTh: number) => {
+    cy.get(sel).each(($el: any, idx: number) => {
+      const cleaned = idx === 0 ? capEN(en, maxEn) : capTH(th, maxTh);
+      cy.wrap($el).focus().clear({ force: true }).type(cleaned, { delay: 0, force: true }).blur({ force: true });
+    });
+    cy.wait(300);
+  };
+
+  // ── Init ─────────────────────────────────────────────────────────────────
   cy.scrollTo('bottom');
   cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
   cy.get('textarea, select', { timeout: 15000 }).should('exist');
   cy.wait(1500);
 
   cy.then(() => {
-    const finalProjectName =
-      Cypress.env('formattedDateMain') ||
-      Cypress.env('formattedDate') ||
-      Cypress.env('projectName') ||
-      Cypress.env('formattedDateMainPONAME') ||
-      Cypress.env('formattedDateOntopPONAME') ||
-      Cypress.env('poName');
+    const p = Cypress.env('formattedDateMain')
+      || Cypress.env('formattedDate')
+      || Cypress.env('projectName')
+      || Cypress.env('formattedDateMainPONAME')
+      || Cypress.env('formattedDateOntopPONAME')
+      || Cypress.env('poName')
+      || 'Product';
 
-    const p = finalProjectName || 'Product';
 
-    // ==================== WORDING POOLS ====================
-    const wordingPools = {
+    // ── Generate random values for placeholders ───────────────────────────
+    const dataAmount = pick(['10GB', '30GB', '50GB', '100GB', '200GB', 'Unlimited']);
+    const speed      = pick(['100 Mbps', '300 Mbps', '500 Mbps', '1 Gbps', '2 Gbps']);
+    const price      = String(Math.floor(Math.random() * (2999 - 199 + 1)) + 199);
+    const modNameEN  = type === 'POST' ? 'Postpaid' : 'Prepaid';
+    const modNameTH  = type === 'POST' ? 'รายเดือน' : 'เติมเงิน';
+    const benefit1EN = pick(['5G Access', 'Unlimited Calls', 'Free Streaming']);
+    const benefit1TH = pick(['เข้าใช้ 5G', 'โทรฟรีไม่อั้น', 'สตรีมมิ่งฟรี']);
+    const benefit2EN = pick(['No Contract', 'Free SIM', 'eSIM Ready']);
+    const benefit2TH = pick(['ไม่มีสัญญา', 'ซิมฟรี', 'พร้อม eSIM']);
+    const ptNameEN   = 'Monthly';
+    const ptNameTH   = 'รายเดือน';
+    const validity   = pick(['30', '90', '365']);
 
-      shortPromotionName: {
-        EN: [
-          `Promo: ${p}`, `Deal: ${p}`, `Offer – ${p}`, `Package: ${p}`,
-          `Special: ${p}`, `Bundle: ${p}`, `Plan: ${p}`, `Campaign: ${p}`,
-          `Feature: ${p}`, `Highlight: ${p}`, `Pick: ${p}`, `Choice: ${p}`,
-          `Value: ${p}`, `Hit: ${p}`, `Exclusive: ${p}`, `Privilege: ${p}`,
-          `Boost: ${p}`, `Plus: ${p}`, `Prime: ${p}`, `Star: ${p}`,
-          `Super: ${p}`, `Ultra: ${p}`, `Max: ${p}`, `Go ${p}`, `My ${p}`,
-          `${p} Pro`, `${p} Lite`, `${p} Plus+`, `Turbo ${p}`, `Smart ${p}`,
-          `Easy ${p}`, `Quick ${p}`, `Best ${p}`, `Top ${p}`, `Mega ${p}`,
-          `Flash ${p}`, `Swift ${p}`, `Peak ${p}`, `Elite ${p}`, `Core ${p}`,
-          `Power ${p}`, `Fresh ${p}`, `Pure ${p}`, `New ${p}`, `The ${p}`,
-          `${p} Now`, `${p} Go`, `${p} Max`, `${p} 5G`, `${p} Unlimited`,
-          `${p} Saver`, `${p} Combo`, `${p} Family`, `${p} Business`,
-          `${p} Essential`, `${p} Basic`, `${p} Advanced`, `${p} Premium`,
-        ],
-        TH: [
-          `โปรโมชัน: ${p}`, `ดีล: ${p}`, `ข้อเสนอ – ${p}`, `แพ็กเกจ: ${p}`,
-          `พิเศษ: ${p}`, `บันเดิล: ${p}`, `แผน: ${p}`, `แคมเปญ: ${p}`,
-          `ฟีเจอร์: ${p}`, `ไฮไลต์: ${p}`, `ตัวเลือก: ${p}`, `ความคุ้มค่า: ${p}`,
-          `แพ็กฮิต: ${p}`, `เอ็กซ์คลูซีฟ: ${p}`, `สิทธิพิเศษ: ${p}`, `บูสต์: ${p}`,
-          `พลัส: ${p}`, `พรีเมียม: ${p}`, `สตาร์: ${p}`, `ท็อปดีล: ${p}`,
-          `ซูเปอร์: ${p}`, `อัลตร้า: ${p}`, `แม็กซ์: ${p}`, `ไปกับ ${p}`,
-          `${p} ของฉัน`, `${p} โปร`, `${p} ไลท์`, `${p} พลัส+`, `เทอร์โบ ${p}`,
-          `สมาร์ท ${p}`, `ง่ายๆ ${p}`, `ควิก ${p}`, `เบสท์ ${p}`, `ท็อป ${p}`,
-          `เมกะ ${p}`, `แฟลช ${p}`, `สวิฟท์ ${p}`, `พีค ${p}`, `อีลิท ${p}`,
-          `คอร์ ${p}`, `พาวเวอร์ ${p}`, `เฟรช ${p}`, `เพียว ${p}`, `ใหม่ ${p}`,
-          `${p} เลย`, `${p} ไม่จำกัด`, `${p} เซฟเวอร์`, `${p} คอมโบ`,
-          `${p} ครอบครัว`, `${p} ธุรกิจ`, `${p} พื้นฐาน`, `${p} ขั้นสูง`,
-        ],
+    const r = (str: string, isTH: boolean) => str
+      .replace(/{p}/g, p)
+      .replace(/{dataAmount}/g, dataAmount)
+      .replace(/{speed}/g, speed)
+      .replace(/{price}/g, price)
+      .replace(/{modName}/g, isTH ? modNameTH : modNameEN)
+      .replace(/{benefit1}/g, isTH ? benefit1TH : benefit1EN)
+      .replace(/{benefit2}/g, isTH ? benefit2TH : benefit2EN)
+      .replace(/{ptName}/g, isTH ? ptNameTH : ptNameEN)
+      .replace(/{validity}/g, validity);
+
+    const pools = {
+      shortPromo: {
+        EN: () => r(pick(POWordingPoolsData.shortPromotionNameEN), false),
+        TH: () => r(pick(POWordingPoolsData.shortPromotionNameTH), true),
       },
-
       cmsDisplay: {
-        EN: [
-          `Enjoy exclusive benefits with ${p}`, `Get the most out of ${p} today`,
-          `Unlock premium features – ${p}`, `${p}: Your go-to package`,
-          `Stay connected with ${p}`, `Discover what ${p} has to offer`,
-          `Make every moment count with ${p}`, `${p} – designed just for you`,
-          `Experience the difference with ${p}`, `Your perfect plan: ${p}`,
-          `Level up with ${p}`, `${p} keeps you ahead of the game`,
-          `More value, more fun – ${p}`, `${p}: Smart choice, great benefits`,
-          `Start enjoying ${p} right now`, `${p} – packed with perks you'll love`,
-          `Why settle for less? Choose ${p}`, `${p}: Where value meets quality`,
-          `Supercharge your day with ${p}`, `${p} – the package that delivers`,
-          `Upgrade to ${p} today!`, `${p} gives you more freedom`,
-          `Simplify your life with ${p}`, `${p} is the smart move`,
-          `Take control with ${p}`, `${p} – better, faster, stronger`,
-          `You deserve ${p}`, `Make the switch to ${p}`,
-          `${p} works as hard as you`, `Life's better with ${p}`,
-          `Unleash the power of ${p}`, `${p} changes everything`,
-          `Welcome to a new era with ${p}`, `${p} fits your vibe`,
-          `Get more with ${p} every day`, `${p} – the upgrade you've been waiting for`,
-          `${p} brings you closer to what matters`, `Your journey with ${p} starts here`,
-          `${p} is your ticket to better connectivity`, `Experience seamless service with ${p}`,
-          `${p} delivers unmatched value`, `Join thousands of happy ${p} users`,
-          `${p} is the key to unlimited possibilities`, `Elevate your experience with ${p}`,
-          `${p} combines speed and reliability`, `Enjoy peace of mind with ${p}`,
-          `${p} is your partner in connectivity`, `Discover the true meaning of value with ${p}`,
-        ],
-        TH: [
-          `เพลิดเพลินกับสิทธิพิเศษจาก ${p}`, `รับประโยชน์สูงสุดจาก ${p} วันนี้`,
-          `ปลดล็อกฟีเจอร์พรีเมียม – ${p}`, `${p}: แพ็กเกจที่ใช่สำหรับคุณ`,
-          `เชื่อมต่อไม่ขาดกับ ${p}`, `ค้นพบสิ่งที่ ${p} มอบให้คุณ`,
-          `ทุกช่วงเวลามีความหมายกับ ${p}`, `${p} – ออกแบบมาเพื่อคุณโดยเฉพาะ`,
-          `สัมผัสความแตกต่างกับ ${p}`, `แพ็กเกจที่ใช่: ${p}`,
-          `อัปเลเวลกับ ${p}`, `${p} พาคุณนำหน้าทุกการเชื่อมต่อ`,
-          `คุ้มกว่า สนุกกว่า – ${p}`, `${p}: เลือกฉลาด รับสิทธิ์ดี`,
-          `เริ่มเพลิดเพลินกับ ${p} ได้เลยตอนนี้`, `${p} – เต็มไปด้วยสิทธิ์ที่คุณจะชอบ`,
-          `ทำไมต้องน้อยกว่า? เลือก ${p}`, `${p}: จุดที่คุณภาพพบกับความคุ้มค่า`,
-          `เพิ่มพลังให้วันของคุณกับ ${p}`, `${p} – แพ็กเกจที่ตอบโจทย์ทุกอย่าง`,
-          `อัปเกรดเป็น ${p} วันนี้เลย!`, `${p} ให้อิสระคุณมากขึ้น`,
-          `ชีวิตง่ายขึ้นด้วย ${p}`, `${p} คือการเคลื่อนไหวที่ชาญฉลาด`,
-          `ควบคุมทุกอย่างด้วย ${p}`, `${p} – ดีกว่า เร็วกว่า แรงกว่า`,
-          `คุณคู่ควรกับ ${p}`, `เปลี่ยนมาใช้ ${p} เลย`,
-          `${p} ทำงานหนักเท่าคุณ`, `ชีวิตดีขึ้นเมื่อมี ${p}`,
-          `ปลดปล่อยพลังของ ${p}`, `${p} เปลี่ยนทุกสิ่ง`,
-          `ยินดีต้อนรับสู่ยุคใหม่กับ ${p}`, `${p} ตรงกับสไตล์คุณ`,
-          `ได้มากขึ้นทุกวันกับ ${p}`, `${p} – การอัปเกรดที่คุณรอคอย`,
-          `${p} พาคุณเข้าใกล้สิ่งที่สำคัญ`, `การเดินทางกับ ${p} เริ่มที่นี่`,
-          `${p} คือตั๋วสู่การเชื่อมต่อที่ดีกว่า`, `สัมผัสบริการที่ราบรื่นกับ ${p}`,
-          `${p} มอบคุณค่าที่ไม่มีใครเทียบ`, `ร่วมเป็นส่วนหนึ่งกับผู้ใช้ ${p} นับพัน`,
-          `${p} คือกุญแจสู่ความเป็นไปได้ไม่จำกัด`, `ยกระดับประสบการณ์ด้วย ${p}`,
-          `${p} ผสานความเร็วและความน่าเชื่อถือ`, `อุ่นใจทุกการใช้งานกับ ${p}`,
-          `${p} คือคู่หูการเชื่อมต่อของคุณ`, `ค้นพบความหมายที่แท้จริงของความคุ้มค่ากับ ${p}`,
-        ],
+        EN: () => r(pick(POWordingPoolsData.descriptionEN), false),
+        TH: () => r(pick(POWordingPoolsData.descriptionTH), true),
       },
-
-      promotionDescription: {
-        EN: [
-          `Subscribe to ${p} and enjoy unlimited access`, `${p} gives you the best value for your money`,
-          `Experience seamless connectivity with ${p}`, `Upgrade your lifestyle with ${p}`,
-          `${p}: More benefits, better experience`, `Join ${p} today and unlock endless possibilities`,
-          `${p} – tailored for those who want the best`, `Get connected, stay connected with ${p}`,
-          `Your subscription to ${p} comes with amazing perks`, `${p} is the smart way to stay ahead`,
-          `Enjoy priority service and more with ${p}`, `${p} brings you closer to what matters most`,
-          `Activate ${p} and feel the difference immediately`, `The smarter choice for every lifestyle – ${p}`,
-          `${p}: Great network, greater life`, `Explore all that ${p} has in store for you`,
-          `With ${p}, every day is better connected`, `${p} – your key to premium benefits`,
-          `Live more, spend less with ${p}`, `${p}: The package worth talking about`,
-          `${p} unlocks a world of possibilities`, `Get ready for something great with ${p}`,
-          `${p} puts you in the driver's seat`, `Experience the premium side of life with ${p}`,
-          `${p} delivers what you need, when you need it`, `No limits, just benefits – that's ${p}`,
-          `Join thousands who love ${p}`, `${p} fits your life perfectly`,
-          `Stay ahead of the curve with ${p}`, `${p} – because you deserve the best`,
-          `Transform your daily experience with ${p}`, `${p} is the game changer you need`,
-          `Go further with ${p} by your side`, `${p} empowers you every step of the way`,
-          `${p} is designed for those who demand more`, `Your search for the perfect plan ends with ${p}`,
-          `${p} offers unparalleled speed and reliability`, `Make the smart choice – choose ${p} today`,
-          `${p} brings innovation to your fingertips`, `Enjoy premium features without the premium price with ${p}`,
-          `${p} is the ultimate connectivity solution`, `Never miss a moment with ${p}`,
-          `${p} provides exceptional value for modern lifestyles`, `Experience true freedom with ${p}`,
-        ],
-        TH: [
-          `สมัคร ${p} และรับสิทธิ์ใช้งานไม่จำกัด`, `${p} คุ้มค่าที่สุดสำหรับคุณ`,
-          `สัมผัสการเชื่อมต่อที่ลื่นไหลกับ ${p}`, `อัปเกรดไลฟ์สไตล์ของคุณด้วย ${p}`,
-          `${p}: สิทธิพิเศษมากกว่า ประสบการณ์ดีกว่า`, `สมัคร ${p} วันนี้ เปิดโลกไม่มีขีดจำกัด`,
-          `${p} – สร้างมาเพื่อคนที่ต้องการสิ่งที่ดีที่สุด`, `เชื่อมต่อได้ อยู่กับ ${p} ตลอดไป`,
-          `การสมัคร ${p} มาพร้อมสิทธิพิเศษมากมาย`, `${p} คือทางเลือกฉลาดเพื่อก้าวนำหน้า`,
-          `รับบริการพรีออริตี้และอื่นๆ อีกมากกับ ${p}`, `${p} พาคุณเข้าใกล้สิ่งที่สำคัญที่สุด`,
-          `เปิดใช้ ${p} แล้วรู้สึกถึงความแตกต่างทันที`, `ตัวเลือกที่ฉลาดสำหรับทุกไลฟ์สไตล์ – ${p}`,
-          `${p}: เน็ตแรง ชีวิตดีกว่า`, `สำรวจทุกสิ่งที่ ${p} มีให้คุณ`,
-          `กับ ${p} ทุกวันเชื่อมต่อได้ดีกว่าเดิม`, `${p} – กุญแจสู่สิทธิพิเศษระดับพรีเมียม`,
-          `ใช้ชีวิตได้มากขึ้น จ่ายน้อยลงกับ ${p}`, `${p}: แพ็กเกจที่ทุกคนพูดถึง`,
-          `${p} ปลดล็อกโลกแห่งความเป็นไปได้`, `เตรียมพร้อมสำหรับสิ่งดีๆ กับ ${p}`,
-          `${p} ทำให้คุณเป็นผู้ควบคุมทุกอย่าง`, `สัมผัสชีวิตพรีเมียมกับ ${p}`,
-          `${p} ส่งมอบสิ่งที่คุณต้องการ ในเวลาที่คุณต้องการ`, `ไร้ขีดจำกัด แค่สิทธิพิเศษ – นั่นคือ ${p}`,
-          `ร่วมเป็นส่วนหนึ่งกับคนนับพันที่รัก ${p}`, `${p} เหมาะกับชีวิตคุณที่สุด`,
-          `ก้าวนำทุกเส้นทางด้วย ${p}`, `${p} – เพราะคุณสมควรได้รับสิ่งที่ดีที่สุด`,
-          `เปลี่ยนประสบการณ์ในแต่ละวันด้วย ${p}`, `${p} คือตัวเปลี่ยนเกมที่คุณต้องการ`,
-          `ไปได้ไกลขึ้นกับ ${p} ที่เคียงข้างคุณ`, `${p} สร้างพลังให้คุณทุกย่างก้าว`,
-          `${p} ออกแบบมาสำหรับผู้ที่ต้องการมากกว่า`, `การค้นหาแผนที่สมบูรณ์แบบสิ้นสุดที่ ${p}`,
-          `${p} มอบความเร็วและความน่าเชื่อถือที่ไร้เทียมทาน`, `เลือกอย่างฉลาด – เลือก ${p} วันนี้`,
-          `${p} นำนวัตกรรมมาสู่ปลายนิ้วคุณ`, `เพลิดเพลินกับฟีเจอร์พรีเมียมในราคาที่คุ้มค่ากับ ${p}`,
-          `${p} คือโซลูชันการเชื่อมต่อขั้นสุด`, `ไม่พลาดทุกช่วงเวลากับ ${p}`,
-          `${p} มอบคุณค่าพิเศษสำหรับไลฟ์สไตล์ยุคใหม่`, `สัมผัสอิสรภาพที่แท้จริงกับ ${p}`,
-        ],
+      promoDesc: {
+        EN: () => r(pick(POWordingPoolsData.promotionDescriptionEN), false),
+        TH: () => r(pick(POWordingPoolsData.promotionDescriptionTH), true),
       },
-
-      smsCheckCurrent: {
-        EN: [
-          `Check your current plan: ${p}`, `Your active package: ${p}`,
-          `Currently subscribed to: ${p}`, `Package in use: ${p}`,
-          `Your plan today: ${p}`, `Active now: ${p}`,
-          `Running package: ${p}`, `Your service: ${p}`,
-          `On plan: ${p}`, `Subscribed: ${p}`,
-          `Live package: ${p}`, `In effect: ${p}`,
-          `Current deal: ${p}`, `Now active: ${p}`,
-          `Your current offer: ${p}`, `Status: ${p} active`,
-          `Using: ${p}`, `Your chosen plan: ${p}`,
-          `Ongoing package: ${p}`, `Enrolled in: ${p}`,
-          `You're on: ${p}`, `Currently: ${p}`,
-          `Active plan: ${p}`, `Now using: ${p}`,
-          `Your package: ${p}`, `Current subscription: ${p}`,
-          `Plan active: ${p}`, `Service running: ${p}`,
-          `${p} is your plan`, `You have: ${p}`,
-          `Active service: ${p}`, `Your active subscription: ${p}`,
-        ],
-        TH: [
-          `ตรวจสอบแพ็กเกจปัจจุบัน: ${p}`, `แพ็กเกจที่ใช้งานอยู่: ${p}`,
-          `กำลังสมัครใช้งาน: ${p}`, `แพ็กเกจที่เปิดใช้: ${p}`,
-          `แพ็กเกจวันนี้ของคุณ: ${p}`, `ใช้งานอยู่: ${p}`,
-          `แพ็กเกจที่รันอยู่: ${p}`, `บริการของคุณ: ${p}`,
-          `อยู่ในแผน: ${p}`, `สมัครอยู่: ${p}`,
-          `แพ็กเกจที่มีผล: ${p}`, `ใช้งานจริง: ${p}`,
-          `ดีลปัจจุบัน: ${p}`, `กำลังใช้งาน: ${p}`,
-          `ข้อเสนอปัจจุบัน: ${p}`, `สถานะ: ${p} ใช้งานอยู่`,
-          `ใช้อยู่: ${p}`, `แผนที่เลือก: ${p}`,
-          `แพ็กเกจที่ดำเนินอยู่: ${p}`, `ลงทะเบียนอยู่ใน: ${p}`,
-          `คุณใช้: ${p}`, `ปัจจุบัน: ${p}`,
-          `แผนที่ใช้งาน: ${p}`, `กำลังใช้: ${p}`,
-          `แพ็กเกจของคุณ: ${p}`, `การสมัครปัจจุบัน: ${p}`,
-          `แผนใช้งาน: ${p}`, `บริการกำลังทำงาน: ${p}`,
-          `${p} คือแผนของคุณ`, `คุณมี: ${p}`,
-          `บริการที่ใช้งาน: ${p}`, `การสมัครที่ใช้งานอยู่: ${p}`,
-        ],
+      checkCurrent: {
+        EN: () => r(pick(POWordingPoolsData.yourPackageNameEN), false),
+        TH: () => r(pick(POWordingPoolsData.yourPackageNameTH), true),
       },
-
-      smsGreeting: {
-        EN: [
-          `Welcome to ${p}! Your subscription is now active.`,
-          `Hi! You've successfully joined ${p}. Enjoy your benefits!`,
-          `Great news! ${p} is ready for you. Start enjoying now.`,
-          `You're in! ${p} has been activated on your number.`,
-          `Hello and welcome! ${p} is now available for you.`,
-          `Congrats! Your ${p} package is live and ready to use.`,
-          `${p} is ON! Enjoy all the perks starting right now.`,
-          `Your journey with ${p} begins today. Welcome aboard!`,
-          `We're thrilled to have you on ${p}. Enjoy every moment!`,
-          `${p} activated! Get ready to experience something great.`,
-          `Welcome! You're now part of ${p}. Explore your benefits.`,
-          `Hi there! ${p} is all set. Time to enjoy your perks!`,
-          `You're officially on ${p}! Make the most of it.`,
-          `${p} is here for you. Welcome and enjoy!`,
-          `Your ${p} subscription kicks off now. Have a great time!`,
-          `Hello! ${p} is now active on your account. Enjoy!`,
-          `Big welcome to ${p}! Your package is ready to roll.`,
-          `You did it! ${p} is now yours. Start exploring today.`,
-          `Welcome on board ${p}! Great things are waiting for you.`,
-          `${p} is live! We're so glad you're here. Enjoy!`,
-          `Success! ${p} is now on your device. Let's go!`,
-          `Thank you for choosing ${p}. You're all set!`,
-          `Boom! ${p} is activated. Time to enjoy the ride.`,
-          `Ready, set, go! ${p} is now yours to enjoy.`,
-          `You're officially a ${p} member. Welcome to the club!`,
-          `${p} unlocked. Get ready for something amazing.`,
-          `All done! ${p} is active and waiting for you.`,
-          `Welcome to the ${p} family. We're happy to have you!`,
-          `Your ${p} adventure starts now. Enjoy every bit of it!`,
-          `Cheers! ${p} is ready. Make today awesome!`,
-          `Welcome! ${p} is now live on your account. Enjoy the perks!`,
-          `You've made a great choice with ${p}. Welcome!`,
-          `${p} is now active. We're excited to have you with us!`,
-          `Thank you for subscribing to ${p}. Your benefits are ready!`,
-          `Your ${p} plan is now active. Enjoy seamless connectivity!`,
-        ],
-        TH: [
-          `ยินดีต้อนรับสู่ ${p}! แพ็กเกจของคุณพร้อมใช้งานแล้ว`,
-          `สวัสดี! คุณสมัคร ${p} สำเร็จแล้ว ขอให้เพลิดเพลิน`,
-          `ข่าวดี! ${p} พร้อมให้คุณใช้งานแล้ว`,
-          `เรียบร้อยแล้ว! ${p} ถูกเปิดใช้งานบนเบอร์ของคุณแล้ว`,
-          `สวัสดีและยินดีต้อนรับ! ${p} พร้อมสำหรับคุณแล้ว`,
-          `ยินดีด้วย! แพ็กเกจ ${p} ของคุณเปิดใช้งานแล้ว`,
-          `${p} เปิดแล้ว! เพลิดเพลินกับสิทธิพิเศษได้ตั้งแต่ตอนนี้`,
-          `การเดินทางของคุณกับ ${p} เริ่มต้นวันนี้ ยินดีต้อนรับ!`,
-          `เรารู้สึกยินดีที่คุณมาร่วมกับ ${p} ขอให้สนุกทุกช่วงเวลา!`,
-          `${p} เปิดใช้งานแล้ว! เตรียมพร้อมสำหรับประสบการณ์ที่ยอดเยี่ยม`,
-          `ยินดีต้อนรับ! คุณเป็นส่วนหนึ่งของ ${p} แล้ว สำรวจสิทธิพิเศษของคุณได้เลย`,
-          `สวัสดี! ${p} พร้อมแล้ว ถึงเวลาเพลิดเพลินกับสิทธิของคุณ!`,
-          `คุณอยู่บน ${p} อย่างเป็นทางการแล้ว! ใช้งานให้คุ้มค่าที่สุด`,
-          `${p} พร้อมอยู่เคียงข้างคุณ ยินดีต้อนรับและขอให้สนุก!`,
-          `การสมัคร ${p} ของคุณเริ่มต้นแล้ว ขอให้มีวันที่ยอดเยี่ยม!`,
-          `สวัสดี! ${p} เปิดใช้งานบนบัญชีของคุณแล้ว ขอให้สนุก!`,
-          `ยินดีต้อนรับสู่ ${p}! แพ็กเกจของคุณพร้อมเดินหน้าแล้ว`,
-          `คุณทำได้! ${p} เป็นของคุณแล้ว เริ่มสำรวจได้วันนี้เลย`,
-          `ยินดีต้อนรับสู่ ${p}! สิ่งดีๆ กำลังรอคุณอยู่`,
-          `${p} เปิดแล้ว! เรายินดีที่คุณมาอยู่กับเรา ขอให้สนุก!`,
-          `สำเร็จ! ${p} อยู่ในอุปกรณ์ของคุณแล้ว ไปกันเลย!`,
-          `ขอบคุณที่เลือก ${p} คุณพร้อมแล้ว!`,
-          `ปัง! ${p} เปิดใช้งานแล้ว ถึงเวลาเพลิดเพลิน`,
-          `พร้อม...เริ่ม...เลย! ${p} เป็นของคุณแล้ว`,
-          `คุณเป็นสมาชิก ${p} อย่างเป็นทางการแล้ว ยินดีต้อนรับสู่ครอบครัว!`,
-          `ปลดล็อก ${p} แล้ว เตรียมพบกับสิ่งที่น่าทึ่ง`,
-          `เรียบร้อย! ${p} เปิดใช้งานและรอคุณอยู่`,
-          `ยินดีต้อนรับสู่ครอบครัว ${p} เราดีใจที่มีคุณ`,
-          `การผจญภัยกับ ${p} ของคุณเริ่มแล้ว ขอให้สนุกทุกส่วนของมัน!`,
-          `ไชโย! ${p} พร้อมแล้ว ทำให้วันนี้ยอดเยี่ยม!`,
-          `ยินดีต้อนรับ! ${p} พร้อมใช้งานบนบัญชีคุณแล้ว สนุกกับสิทธิพิเศษ!`,
-          `คุณเลือก ${p} ได้ดีมาก ยินดีต้อนรับ!`,
-          `${p} เปิดใช้งานแล้ว เราตื่นเต้นที่มีคุณอยู่กับเรา!`,
-          `ขอบคุณที่สมัคร ${p} สิทธิประโยชน์ของคุณพร้อมแล้ว!`,
-          `แผน ${p} ของคุณเปิดใช้งานแล้ว สนุกกับการเชื่อมต่อที่ราบรื่น!`,
-        ],
+      greeting: {
+        EN: () => r(pick(POWordingPoolsData.smsGreetingEN), false),
+        TH: () => r(pick(POWordingPoolsData.smsGreetingTH), true),
       },
-
-      smsDeletePRE: {
-        EN: [
-          `Your ${p} package has been removed. Thank you for using our service.`,
-          `${p} has been unsubscribed from your number. Hope to see you again!`,
-          `You have successfully cancelled ${p}. We appreciate your loyalty.`,
-          `${p} is now deactivated. Thank you for being our customer.`,
-          `Your subscription to ${p} has ended. We hope you enjoyed it.`,
-          `${p} has been turned off on your number. Thanks for being with us!`,
-          `We've processed your ${p} cancellation. Hope you'll be back soon.`,
-          `${p} service is now stopped. Thank you for choosing us.`,
-          `Your ${p} plan has been removed as requested. Take care!`,
-          `${p} unsubscribed successfully. We'd love to have you back someday.`,
-          `Thanks for using ${p}. Your package has now been cancelled.`,
-          `${p} is no longer active on your number. We hope to serve you again.`,
-          `Your ${p} membership has ended. We value your time with us.`,
-          `${p} cancelled. We appreciate your trust in our services.`,
-          `You've left ${p}. Thank you for the time you spent with us.`,
-          `${p} has been deactivated per your request. See you next time!`,
-          `We confirm ${p} is now off. Thank you for using our network.`,
-          `${p} removed. We hope your experience was great while it lasted.`,
-          `Your ${p} has been cancelled. Come back anytime – we'll be here!`,
-          `${p} is done. Thanks for being part of our service family.`,
-          `Farewell ${p}. You've been removed. Hope to see you again soon!`,
-          `${p} cancelled successfully. We're sad to see you go!`,
-          `Your ${p} subscription is now over. Thanks for the memories!`,
-          `${p} has left your account. Take care and see you next time!`,
-          `We've said goodbye to ${p} on your number. Come back anytime!`,
-          `${p} removed. We appreciate every moment you spent with us.`,
-          `Your ${p} plan has ended. It was a pleasure serving you.`,
-          `${p} is officially off. Thank you for being a valued customer.`,
-          `You've successfully unsubscribed from ${p}. Until next time!`,
-          `${p} cancellation complete. We hope you'll return someday.`,
-          `Your request to cancel ${p} has been processed. Thank you.`,
-          `${p} has been removed from your account. We'll miss you!`,
-          `Goodbye for now. Your ${p} package has been cancelled.`,
-          `We're sorry to see you leave ${p}. Come back soon!`,
-          `${p} deactivation confirmed. Thank you for choosing us.`,
-        ],
-        TH: [
-          `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการ`,
-          `${p} ถูกยกเลิกจากเบอร์ของคุณแล้ว หวังว่าจะพบกันใหม่`,
-          `คุณยกเลิก ${p} สำเร็จแล้ว ขอบคุณที่ไว้วางใจเรา`,
-          `${p} ถูกปิดใช้งานแล้ว ขอบคุณที่เป็นลูกค้าของเรา`,
-          `การสมัครใช้งาน ${p} ของคุณสิ้นสุดแล้ว หวังว่าคุณจะพอใจ`,
-          `${p} ถูกปิดบนเบอร์ของคุณแล้ว ขอบคุณที่อยู่กับเรา!`,
-          `เราดำเนินการยกเลิก ${p} เรียบร้อยแล้ว หวังว่าจะได้พบกันเร็วๆ นี้`,
-          `บริการ ${p} หยุดให้บริการแล้ว ขอบคุณที่เลือกเรา`,
-          `แผน ${p} ของคุณถูกลบออกตามที่ร้องขอ ดูแลตัวเองด้วยนะ!`,
-          `ยกเลิก ${p} สำเร็จแล้ว หวังว่าจะได้ต้อนรับคุณอีกครั้ง`,
-          `ขอบคุณที่ใช้ ${p} แพ็กเกจของคุณถูกยกเลิกแล้ว`,
-          `${p} ไม่ได้ใช้งานบนเบอร์ของคุณแล้ว หวังว่าจะได้ให้บริการอีกครั้ง`,
-          `การสมาชิก ${p} ของคุณสิ้นสุดแล้ว เราขอบคุณทุกช่วงเวลาที่ผ่านมา`,
-          `ยกเลิก ${p} แล้ว ขอบคุณที่ไว้วางใจบริการของเรา`,
-          `คุณออกจาก ${p} แล้ว ขอบคุณสำหรับเวลาที่คุณอยู่กับเรา`,
-          `${p} ถูกปิดการใช้งานตามคำขอของคุณ แล้วพบกันใหม่!`,
-          `เรายืนยันว่า ${p} ปิดแล้ว ขอบคุณที่ใช้เครือข่ายของเรา`,
-          `ลบ ${p} แล้ว หวังว่าประสบการณ์ของคุณจะดีตลอดที่ผ่านมา`,
-          `${p} ของคุณถูกยกเลิกแล้ว กลับมาหาเราได้ตลอดเวลา!`,
-          `${p} เสร็จสิ้นแล้ว ขอบคุณที่เป็นส่วนหนึ่งของครอบครัวบริการเรา`,
-          `ลาก่อน ${p} ถูกลบออกแล้ว หวังว่าจะได้พบคุณอีกเร็วๆ นี้!`,
-          `ยกเลิก ${p} สำเร็จแล้ว เสียใจที่ต้องเสียคุณไป!`,
-          `การสมัคร ${p} ของคุณสิ้นสุดแล้ว ขอบคุณสำหรับความทรงจำ!`,
-          `${p} ออกจากบัญชีของคุณแล้ว ดูแลตัวเองด้วย แล้วพบกันใหม่!`,
-          `เรากล่าวลากับ ${p} บนเบอร์ของคุณแล้ว กลับมาได้ทุกเวลา!`,
-          `ลบ ${p} แล้ว เราขอบคุณทุกช่วงเวลาที่คุณอยู่กับเรา`,
-          `แผน ${p} ของคุณสิ้นสุดแล้ว เป็นเกียรติที่ได้ให้บริการคุณ`,
-          `${p} ปิดอย่างเป็นทางการแล้ว ขอบคุณที่เป็นลูกค้าที่มีค่า`,
-          `คุณยกเลิก ${p} สำเร็จแล้ว เจอกันใหม่คราวหน้า!`,
-          `ยกเลิก ${p} เสร็จสมบูรณ์ หวังว่าคุณจะกลับมาสักวัน`,
-          `คำขอยกเลิก ${p} ได้รับการดำเนินการแล้ว ขอบคุณ`,
-          `${p} ถูกลบออกจากบัญชีคุณแล้ว เราจะคิดถึงคุณ!`,
-          `ลาก่อนก่อนนะ แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว`,
-          `เสียใจที่เห็นคุณออกจาก ${p} กลับมาเร็วๆ นะ!`,
-          `ยืนยันการปิดใช้งาน ${p} ขอบคุณที่เลือกเรา`,
-        ],
+      deletePRE: {
+        EN: () => r(pick(POWordingPoolsData.smsDeleteEN), false),
+        TH: () => r(pick(POWordingPoolsData.smsDeleteTH), true),
       },
-
-      smsDeletePOST: {
-        EN: [
-          `Your ${p} package has been cancelled. We hope to serve you again.`,
-          `${p} subscription ended. Thank you for being with us.`,
-          `We've removed ${p} from your account as requested.`,
-          `${p} is now cancelled. We value your time with us.`,
-          `Your request to cancel ${p} is complete. Thank you.`,
-          `${p} has been successfully removed from your postpaid plan.`,
-          `We confirm the cancellation of ${p}. We appreciate your business.`,
-          `${p} is off. We hope you enjoyed your time with us.`,
-          `Your ${p} postpaid package has been deactivated as requested.`,
-          `${p} cancelled. Feel free to subscribe again anytime.`,
-          `We have processed your ${p} cancellation successfully.`,
-          `${p} removed from your account. Thank you for your loyalty.`,
-          `Your ${p} plan is now terminated. We hope to see you again soon.`,
-          `${p} deactivated. We appreciate you choosing our services.`,
-          `The ${p} package on your account is now closed. Thank you.`,
-          `${p} has been turned off as per your request. Take care!`,
-          `Your cancellation of ${p} is confirmed. We'll miss having you!`,
-          `${p} is no longer part of your plan. Thank you for choosing us.`,
-          `We've successfully cancelled ${p}. Come back whenever you're ready.`,
-          `${p} ended. It was a pleasure serving you. See you next time!`,
-          `Goodbye ${p}. Your postpaid package has been removed.`,
-          `${p} cancellation successful. We hope to welcome you back!`,
-          `Your ${p} subscription is now closed. Thank you for your trust.`,
-          `${p} has left your account. See you again soon!`,
-          `We've processed your request to remove ${p}. Take care!`,
-          `${p} removed from your postpaid plan. It was great having you.`,
-          `Your ${p} package is now cancelled. We appreciate you!`,
-          `${p} deactivation complete. Feel free to rejoin anytime.`,
-          `Thanks for being with ${p}. Your package has been removed.`,
-          `${p} cancelled. Wishing you all the best until we meet again!`,
-          `Postpaid ${p} has been deactivated successfully. Thank you.`,
-          `We're sorry to see you go. ${p} has been cancelled.`,
-          `Your ${p} postpaid service has ended. Hope to see you back!`,
-          `${p} removal confirmed. Thank you for your business.`,
-          `Your ${p} plan is no longer active. We valued your patronage.`,
-        ],
-        TH: [
-          `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว หวังว่าจะได้ให้บริการอีกครั้ง`,
-          `การสมัคร ${p} สิ้นสุดแล้ว ขอบคุณที่อยู่กับเรา`,
-          `เราได้ลบ ${p} ออกจากบัญชีของคุณตามที่ร้องขอ`,
-          `${p} ถูกยกเลิกแล้ว เราขอบคุณในทุกช่วงเวลาที่ผ่านมา`,
-          `คำขอยกเลิก ${p} ของคุณเสร็จสมบูรณ์ ขอบคุณ`,
-          `${p} ถูกลบออกจากแผนโพสต์เพดของคุณสำเร็จแล้ว`,
-          `เรายืนยันการยกเลิก ${p} ขอบคุณที่ใช้บริการของเรา`,
-          `${p} ปิดแล้ว หวังว่าคุณจะสนุกกับช่วงเวลาที่อยู่กับเรา`,
-          `แพ็กเกจโพสต์เพด ${p} ของคุณถูกปิดการใช้งานตามที่ร้องขอ`,
-          `ยกเลิก ${p} แล้ว สามารถสมัครใหม่ได้ตลอดเวลา`,
-          `เราดำเนินการยกเลิก ${p} ของคุณสำเร็จแล้ว`,
-          `ลบ ${p} ออกจากบัญชีของคุณแล้ว ขอบคุณสำหรับความไว้วางใจ`,
-          `แผน ${p} ของคุณถูกยุติแล้ว หวังว่าจะได้พบกันเร็วๆ นี้`,
-          `ปิดการใช้งาน ${p} แล้ว ขอบคุณที่เลือกบริการของเรา`,
-          `แพ็กเกจ ${p} บนบัญชีของคุณถูกปิดแล้ว ขอบคุณ`,
-          `${p} ถูกปิดตามคำขอของคุณ ดูแลตัวเองด้วยนะ!`,
-          `การยกเลิก ${p} ของคุณได้รับการยืนยันแล้ว เราจะคิดถึงคุณ!`,
-          `${p} ไม่ได้เป็นส่วนหนึ่งของแผนของคุณอีกต่อไป ขอบคุณที่เลือกเรา`,
-          `เราได้ยกเลิก ${p} สำเร็จแล้ว กลับมาหาเราได้เมื่อพร้อม`,
-          `${p} สิ้นสุดแล้ว เป็นเกียรติที่ได้ให้บริการคุณ แล้วพบกันใหม่!`,
-          `ลาก่อน ${p} แพ็กเกจโพสต์เพดของคุณถูกลบแล้ว`,
-          `ยกเลิก ${p} สำเร็จแล้ว หวังว่าจะได้ต้อนรับคุณกลับมา!`,
-          `การสมัคร ${p} ของคุณปิดแล้ว ขอบคุณสำหรับความไว้วางใจ`,
-          `${p} ออกจากบัญชีของคุณแล้ว แล้วพบกันใหม่เร็วๆ นี้!`,
-          `เราดำเนินการลบ ${p} ตามคำขอของคุณแล้ว ดูแลตัวเองด้วยนะ!`,
-          `ลบ ${p} ออกจากแผนโพสต์เพดของคุณแล้ว ดีใจที่ได้มีคุณ`,
-          `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว เราขอบคุณคุณ!`,
-          `ปิดการใช้งาน ${p} เสร็จสมบูรณ์ สามารถสมัครใหม่ได้ตลอดเวลา`,
-          `ขอบคุณที่ใช้ ${p} แพ็กเกจของคุณถูกลบแล้ว`,
-          `ยกเลิก ${p} แล้ว ขอให้คุณโชคดีจนกว่าเราจะพบกันใหม่!`,
-          `โพสต์เพด ${p} ถูกปิดใช้งานเรียบร้อยแล้ว ขอบคุณ`,
-          `เสียใจที่เห็นคุณจากไป ${p} ถูกยกเลิกแล้ว`,
-          `บริการโพสต์เพด ${p} ของคุณสิ้นสุดแล้ว หวังว่าจะได้พบคุณอีก!`,
-          `ยืนยันการลบ ${p} ขอบคุณที่ใช้บริการ`,
-          `แผน ${p} ของคุณไม่ทำงานแล้ว เราขอบคุณที่ไว้วางใจเรา`,
-        ],
+      deletePOST: {
+        EN: () => r(pick(POWordingPoolsData.smsDeleteEN), false),
+        TH: () => r(pick(POWordingPoolsData.smsDeleteTH), true),
       },
-
-      marketingName: [
-        `${p} Special Offer`, `${p} Best Value`, `${p} Limited Deal`,
-        `${p} Top Pick`, `${p} Exclusive`, `${p} Premium Choice`,
-        `${p} Handpicked for You`, `${p} Editor Pick`,
-        `${p} Staff Favourite`, `${p} Hot Deal`,
-        `${p} Must Have`, `${p} Smart Pick`,
-        `${p} Today Best`, `${p} Trending Now`,
-        `${p} Featured Plan`, `${p} Value King`,
-        `${p} Recommended`, `${p} Fan Favourite`,
-        `${p} Power Pack`, `${p} Prime Choice`,
-        `${p} Customer Choice`, `${p} Bestseller`,
-        `${p} Limited Time`, `${p} Flash Sale`,
-        `${p} Weekly Deal`, `${p} Monthly Special`,
-        `${p} Year Best`, `${p} All Star Pick`,
-        `${p} Popular Pick`, `${p} Rising Star`,
-        `${p} Community Fave`, `${p} Top Rated`,
-        `${p} Budget Hero`, `${p} Value Champ`,
-        `${p} Smart Saver`, `${p} Money Saver`,
-        `${p} Mega Deal`, `${p} Super Saver`,
-        `${p} Ultimate Plan`, `${p} Premium Deal`,
-        `${p} VIP Offer`, `${p} Gold Package`,
-        `${p} Platinum Deal`, `${p} Diamond Offer`,
-        `${p} Elite Plan`, `${p} Signature Package`,
-        `${p} Essential Pick`, `${p} Everyday Value`,
-        `${p} Great Value`, `${p} Super Value`,
-        `${p} Amazing Deal`, `${p} Fantastic Offer`,
-      ],
-
+      marketingName: () => r(pick(POWordingPoolsData.shortPromotionNameEN), false),
       yourPackage: {
-        EN: [
-          `You are subscribed to ${p}. Enjoy your package benefits.`,
-          `${p} is active on your account. Make the most of it!`,
-          `Thanks for choosing ${p}. Your benefits are ready.`,
-          `Your current package is ${p}. Enjoy every moment.`,
-          `${p} is yours! Enjoy all the perks included.`,
-          `Welcome to ${p}. Your plan is now fully active.`,
-          `${p} is up and running for you. Enjoy the ride!`,
-          `You're on ${p}. All features are unlocked and ready.`,
-          `${p}: Your subscription is confirmed and live.`,
-          `Great choice! ${p} is now your active package.`,
-          `${p} loaded! Time to enjoy everything it offers.`,
-          `Your ${p} plan is in full effect. Enjoy!`,
-          `${p} is running smoothly on your account.`,
-          `You're all set with ${p}. Start using your benefits now.`,
-          `${p} activated. Take full advantage of your plan.`,
-          `Everything's ready with ${p}. Go ahead and explore!`,
-          `${p} – live and loaded just for you.`,
-          `Your account now features ${p}. Enjoy the perks!`,
-          `${p}: all systems go. Your benefits await.`,
-          `Sit back and enjoy ${p}. It's all set for you!`,
-          `Congratulations! ${p} is now your active package.`,
-          `${p} is live on your account. Enjoy every benefit!`,
-          `You're all signed up for ${p}. Let the good times roll!`,
-          `${p} has been added to your account. Enjoy!`,
-          `Your ${p} subscription is ready. Time to celebrate!`,
-          `Welcome to the ${p} experience. You're going to love it!`,
-          `${p} is now yours to enjoy. Make every day count!`,
-          `You've got ${p} on your side. Enjoy the journey!`,
-          `${p} is activated and waiting for you. Dive right in!`,
-          `Success! ${p} is now part of your account. Enjoy!`,
-        ],
-        TH: [
-          `คุณกำลังใช้งาน ${p} ขอให้เพลิดเพลินกับสิทธิประโยชน์`,
-          `${p} เปิดใช้งานแล้วบนบัญชีของคุณ ใช้ให้คุ้มค่า!`,
-          `ขอบคุณที่เลือก ${p} สิทธิประโยชน์พร้อมแล้วสำหรับคุณ`,
-          `แพ็กเกจปัจจุบันของคุณคือ ${p} ขอให้สนุกกับทุกช่วงเวลา`,
-          `${p} เป็นของคุณแล้ว! เพลิดเพลินกับสิทธิพิเศษทั้งหมด`,
-          `ยินดีต้อนรับสู่ ${p} แผนของคุณเปิดใช้งานเต็มรูปแบบแล้ว`,
-          `${p} พร้อมให้บริการคุณแล้ว ขอให้สนุกกับการใช้งาน!`,
-          `คุณอยู่บน ${p} ฟีเจอร์ทั้งหมดพร้อมใช้งานแล้ว`,
-          `${p}: การสมัครของคุณยืนยันและมีผลแล้ว`,
-          `เลือกได้ดีมาก! ${p} คือแพ็กเกจที่ใช้งานอยู่ของคุณ`,
-          `โหลด ${p} แล้ว! ถึงเวลาเพลิดเพลินกับทุกสิ่งที่มีให้`,
-          `แผน ${p} ของคุณมีผลสมบูรณ์แล้ว ขอให้สนุก!`,
-          `${p} ทำงานได้อย่างราบรื่นบนบัญชีของคุณ`,
-          `คุณพร้อมแล้วกับ ${p} เริ่มใช้สิทธิพิเศษของคุณได้เลย`,
-          `${p} เปิดใช้งานแล้ว ใช้ประโยชน์จากแผนของคุณให้เต็มที่`,
-          `ทุกอย่างพร้อมแล้วกับ ${p} ไปสำรวจได้เลย!`,
-          `${p} – พร้อมและโหลดเพื่อคุณโดยเฉพาะ`,
-          `บัญชีของคุณมี ${p} แล้ว เพลิดเพลินกับสิทธิพิเศษ!`,
-          `${p}: ระบบพร้อมทั้งหมด สิทธิประโยชน์รอคุณอยู่`,
-          `นั่งสบายๆ และเพลิดเพลินกับ ${p} ทุกอย่างพร้อมแล้วสำหรับคุณ!`,
-          `ยินดีด้วย! ${p} คือแพ็กเกจที่ใช้งานอยู่ของคุณแล้ว`,
-          `${p} เปิดใช้งานบนบัญชีของคุณแล้ว เพลิดเพลินกับทุกสิทธิประโยชน์!`,
-          `คุณสมัคร ${p} เรียบร้อยแล้ว ให้ความสนุกมาเยือน!`,
-          `${p} ถูกเพิ่มในบัญชีของคุณแล้ว ขอให้สนุก!`,
-          `การสมัคร ${p} ของคุณพร้อมแล้ว ถึงเวลาฉลอง!`,
-          `ยินดีต้อนรับสู่ประสบการณ์ ${p} คุณจะต้องรักมันแน่`,
-          `${p} เป็นของคุณแล้ว ทำให้ทุกวันมีค่า!`,
-          `คุณมี ${p} อยู่เคียงข้างคุณ ขอให้สนุกกับการเดินทาง!`,
-          `${p} เปิดใช้งานและรอคุณอยู่ ลงมือได้เลย!`,
-          `สำเร็จ! ${p} เป็นส่วนหนึ่งของบัญชีคุณแล้ว ขอให้สนุก!`,
-        ],
+        EN: () => r(pick(POWordingPoolsData.yourPackageNameEN), false),
+        TH: () => r(pick(POWordingPoolsData.yourPackageNameTH), true),
       },
-
       greetingLetter: {
-        EN: [
-          `Dear customer thank you for subscribing to ${p}`,
-          `Hello We are glad you have chosen ${p} Welcome aboard`,
-          `Dear valued customer your ${p} subscription is confirmed`,
-          `Hi there ${p} is now ready for your use Enjoy`,
-          `Welcome We are excited to have you on ${p}`,
-          `Dear customer your ${p} plan is now active Enjoy`,
-          `Hello and welcome to ${p} We are happy you are here`,
-          `Greetings Thank you for activating ${p} with us`,
-          `Dear subscriber ${p} is live on your account Enjoy`,
-          `Hi We are delighted to welcome you to ${p}`,
-          `Dear customer it is great to have you on ${p}`,
-          `Hello Your ${p} journey starts now We are with you`,
-          `Welcome to ${p} dear customer Great things ahead`,
-          `Dear customer we are thrilled you chose ${p}`,
-          `Hello ${p} is fully active Enjoy everything it brings`,
-          `Greetings dear customer ${p} is ready for you`,
-          `Hi and welcome ${p} is your plan starting today`,
-          `Dear customer enjoy every bit of ${p} We are here for you`,
-          `Hello Welcome to the ${p} family We are glad you are here`,
-          `Dear customer ${p} is on Sit back and enjoy the benefits`,
-          `Dear customer welcome to ${p} Let the adventure begin`,
-          `Hello Thank you for trusting ${p} with your connectivity`,
-          `Dear valued customer ${p} is now at your fingertips`,
-          `Greetings Your ${p} package is ready to change your day`,
-          `Dear customer we are honored to have you on ${p}`,
-          `Hello ${p} is here to make your life easier and better`,
-          `Dear subscriber welcome to the world of ${p} Enjoy`,
-          `Hi ${p} is officially yours We are excited for you`,
-          `Dear customer your journey with ${p} starts today Enjoy`,
-          `Welcome aboard ${p} will take you further than ever before`,
-        ],
-        TH: [
-          `เรียนลูกค้า ขอบคุณที่สมัครใช้บริการ ${p}`,
-          `สวัสดี ดีใจที่คุณเลือก ${p} ยินดีต้อนรับ`,
-          `เรียนลูกค้าที่มีคุณค่า การสมัคร ${p} ของคุณได้รับการยืนยันแล้ว`,
-          `สวัสดี ${p} พร้อมใช้งานสำหรับคุณแล้ว ขอให้สนุก`,
-          `ยินดีต้อนรับ เรายินดีที่คุณเป็นส่วนหนึ่งของ ${p}`,
-          `เรียนลูกค้า แผน ${p} ของคุณเปิดใช้งานแล้ว ขอให้สนุก`,
-          `สวัสดีและยินดีต้อนรับสู่ ${p} เรายินดีที่คุณมาอยู่ที่นี่`,
-          `ขอทักทาย ขอบคุณที่เปิดใช้งาน ${p} กับเรา`,
-          `เรียนสมาชิก ${p} มีผลบนบัญชีของคุณแล้ว ขอให้สนุก`,
-          `สวัสดี เรายินดีที่ได้ต้อนรับคุณสู่ ${p}`,
-          `เรียนลูกค้า ดีใจที่คุณอยู่บน ${p}`,
-          `สวัสดี การเดินทางกับ ${p} ของคุณเริ่มแล้ว เราอยู่เคียงข้างคุณ`,
-          `ยินดีต้อนรับสู่ ${p} เรียนลูกค้า สิ่งดีๆ กำลังรออยู่ข้างหน้า`,
-          `เรียนลูกค้า เรารู้สึกตื่นเต้นที่คุณเลือก ${p}`,
-          `สวัสดี ${p} เปิดใช้งานเต็มที่แล้ว เพลิดเพลินกับทุกสิ่งที่มี`,
-          `ขอทักทาย เรียนลูกค้า ${p} พร้อมสำหรับคุณแล้ว`,
-          `สวัสดีและยินดีต้อนรับ ${p} คือแผนของคุณตั้งแต่วันนี้เป็นต้นไป`,
-          `เรียนลูกค้า ขอให้เพลิดเพลินกับทุกส่วนของ ${p} เราอยู่เคียงข้างคุณ`,
-          `สวัสดี ยินดีต้อนรับสู่ครอบครัว ${p} เรายินดีที่คุณมาอยู่ที่นี่`,
-          `เรียนลูกค้า ${p} เปิดแล้ว นั่งสบายๆ และเพลิดเพลินกับสิทธิพิเศษ`,
-          `เรียนลูกค้า ยินดีต้อนรับสู่ ${p} ให้การผจญภัยเริ่มต้นขึ้น`,
-          `สวัสดี ขอบคุณที่ไว้วางใจ ${p} ในการเชื่อมต่อของคุณ`,
-          `เรียนลูกค้าที่มีคุณค่า ${p} อยู่แค่ปลายนิ้วคุณแล้ว`,
-          `ขอทักทาย แพ็กเกจ ${p} ของคุณพร้อมที่จะเปลี่ยนวันของคุณ`,
-          `เรียนลูกค้า เรารู้สึกเป็นเกียรติที่ได้มีคุณบน ${p}`,
-          `สวัสดี ${p} อยู่ที่นี่เพื่อทำให้ชีวิตคุณง่ายขึ้นและดีขึ้น`,
-          `เรียนสมาชิก ยินดีต้อนรับสู่โลกของ ${p} ขอให้สนุก`,
-          `สวัสดี ${p} เป็นของคุณอย่างเป็นทางการแล้ว เราตื่นเต้นไปกับคุณ`,
-          `เรียนลูกค้า การเดินทางกับ ${p} ของคุณเริ่มวันนี้ ขอให้สนุก`,
-          `ยินดีต้อนรับ ${p} จะพาคุณไปได้ไกลกว่าที่เคย`,
-        ],
+        EN: () => r(pick(POWordingPoolsData.greetingLetterEN), false),
+        TH: () => r(pick(POWordingPoolsData.greetingLetterTH), true),
       },
-
     };
-    // ==================== END WORDING POOLS ====================
 
-    // ─────────────────────────────────────────────────────────
-    // 🎲  สุ่ม mode: Generate button  vs  Manual type (50/50)
-    // ─────────────────────────────────────────────────────────
+    // ── Mode: 50/50 Generate vs Manual ───────────────────────────────────────
     const useGenerate = Math.random() < 0.5;
     cy.log(`🎲 SMS Wording mode: ${useGenerate ? '🤖 Generate Button' : '✍️ Manual Type'}`);
 
-    // ──────────────────────────────────────────────────────────────────────────
-    //  HELPER A: ตัดทุก textarea ใน component ให้ไม่เกิน maxlength
-    //  (ใช้หลังกด Generate เพราะ generated text อาจยาวเกิน)
-    // ──────────────────────────────────────────────────────────────────────────
-    const trimAllOverflowFields = (): void => {
+    // ── Trim generated overflow ───────────────────────────────────────────────
+    const trimOverflow = (): void => {
       cy.log('✂️ Trimming overflowed generated fields...');
       cy.get('app-mass-mkt-sms-wording-detail textarea').each(($el) => {
-        const maxLen = parseInt($el.attr('maxlength') || '9999', 10);
+        const max = parseInt($el.attr('maxlength') || '9999', 10);
         const val = String($el.val() ?? '');
-        if (val.length > maxLen) {
-          let trimmed = val.substring(0, maxLen).trimEnd();
-          // ตัดย้อนไปที่ช่องว่างสุดท้ายถ้าตัดกลางคำ
-          if (trimmed.includes(' ')) {
-            const lastSpace = trimmed.lastIndexOf(' ');
-            if (lastSpace > maxLen * 0.7) trimmed = trimmed.substring(0, lastSpace);
-          }
-          cy.log(`✂️ Trim [${$el.attr('formcontrolname')}] ${val.length} → ${trimmed.length} chars`);
-          cy.wrap($el)
-            .invoke('val', trimmed)
-            .trigger('input', { bubbles: true, force: true })
-            .trigger('change', { bubbles: true, force: true })
-            .blur({ force: true });
+        if (val.length <= max) return;
+        let trimmed = val.substring(0, max).trimEnd();
+        if (trimmed.includes(' ')) {
+          const ls = trimmed.lastIndexOf(' ');
+          if (ls > max * 0.7) trimmed = trimmed.substring(0, ls);
         }
+        cy.wrap($el)
+          .invoke('val', trimmed)
+          .trigger('input',  { bubbles: true, force: true })
+          .trigger('change', { bubbles: true, force: true })
+          .blur({ force: true });
       });
       cy.wait(500);
     };
 
-    // ──────────────────────────────────────────────────────────────────────────
-    //  HELPER B: เติม field ที่ยังว่างหลัง Generate (หรือ Generate ไม่ครอบ)
-    // ──────────────────────────────────────────────────────────────────────────
-
-    const fillIfEmpty = (
-      selector: string,
-      enText: string,
-      thText: string,
-      maxEn: number,
-      maxTh: number,
-    ): void => {
-      cy.get('body').then(($body: any) => {
-        if ($body.find(selector).length === 0) return;
-
-        cy.get(selector).then(($els: any) => {
-          // ✅ English Field
-          const v0 = String($els.eq(0).val() ?? '').trim();
-          if (!v0) {
-            cy.log(`📝 Fill missing [ENG]: ${selector}`);
-            cy.wrap($els.eq(0))
-              .focus()  // ✅ FIXED: Removed { force: true }
-              .type(limitAndCleanEN(enText, maxEn), { delay: 0, force: true })
-              .blur();  // ✅ FIXED: Removed { force: true }
-          }
-
-          // ✅ Thai Field (if exists)
-          if ($els.length > 1) {
-            const v1 = String($els.eq(1).val() ?? '').trim();
-            if (!v1) {
-              cy.log(`📝 Fill missing [THA]: ${selector}`);
-              cy.wrap($els.eq(1))
-                .focus()  // ✅ FIXED: Removed { force: true }
-                .type(limitAndCleanTH(thText, maxTh), { delay: 0, force: true })
-                .blur();  // ✅ FIXED: Removed { force: true }
-            }
-          }
+    // ── Fill only if empty ────────────────────────────────────────────────────
+    const fillIfEmpty = (sel: string, en: string, th: string, maxEn: number, maxTh: number): void => {
+      cy.get('body').then(($b: any) => {
+        if (!$b.find(sel).length) return;
+        cy.get(sel).then(($els: any) => {
+          if (!String($els.eq(0).val() ?? '').trim())
+            cy.wrap($els.eq(0)).focus().type(capEN(en, maxEn), { delay: 0, force: true }).blur({ force: true });
+          if ($els.length > 1 && !String($els.eq(1).val() ?? '').trim())
+            cy.wrap($els.eq(1)).focus().type(capTH(th, maxTh), { delay: 0, force: true }).blur({ force: true });
         });
-
         cy.wait(300);
       });
     };
 
-    // ══════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     //  PATH A — Generate Button
-    // ══════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     if (useGenerate) {
-      cy.log('🤖 Clicking Generate SMS Wording button...');
       cy.get('app-mass-mkt-sms-wording-detail button[title="generate"]')
-        .first()
-        .scrollIntoView({ duration: SCROLL_DELAY, offset: { top: -100, left: 0 } })
-        .should('be.visible')
-        .click({ force: true });
-      cy.wait(2500); // รอ Angular generate เสร็จ
+        .first().scrollIntoView({ duration: SCROLL, offset: { top: -100, left: 0 } })
+        .should('be.visible').click({ force: true });
+      cy.wait(2500);
+      trimOverflow();
 
-      // FIX 1 — ตัด overflow
-      trimAllOverflowFields();
+      fillIfEmpty('textarea[formcontrolname="shortPromotionName"]',   pools.shortPromo.EN(),   pools.shortPromo.TH(),   50,  50);
+      fillIfEmpty('textarea[formcontrolname="cmsDisplay"]',           pools.cmsDisplay.EN(),   pools.cmsDisplay.TH(),   250, 250);
+      fillIfEmpty('textarea[formcontrolname="promotionDescription"]', pools.promoDesc.EN(),    pools.promoDesc.TH(),    255, 255);
+      fillIfEmpty('textarea[formcontrolname="smsCheckCurrent"]',      pools.checkCurrent.EN(), pools.checkCurrent.TH(), 50,  50);
 
-      // FIX 2 — เติม field ที่ Generate ไม่ได้ทำ / ยังว่าง
-      fillIfEmpty(
-        'textarea[formcontrolname="shortPromotionName"]',
-        pickRandom(wordingPools.shortPromotionName.EN),
-        pickRandom(wordingPools.shortPromotionName.TH),
-        50, 50,
-      );
-      fillIfEmpty(
-        'textarea[formcontrolname="cmsDisplay"]',
-        pickRandom(wordingPools.cmsDisplay.EN),
-        pickRandom(wordingPools.cmsDisplay.TH),
-        250, 250,
-      );
-      fillIfEmpty(
-        'textarea[formcontrolname="promotionDescription"]',
-        pickRandom(wordingPools.promotionDescription.EN),
-        pickRandom(wordingPools.promotionDescription.TH),
-        255, 255,
-      );
-      fillIfEmpty(
-        'textarea[formcontrolname="smsCheckCurrent"]',
-        pickRandom(wordingPools.smsCheckCurrent.EN),
-        pickRandom(wordingPools.smsCheckCurrent.TH),
-        50, 50,
-      );
-      // smsGreeting — เติมเฉพาะถ้า flag = Send
-      if (smsGreetingFlag === 'Send') {
-        fillIfEmpty(
-          'textarea[formcontrolname="smsGreeting"]',
-          pickRandom(wordingPools.smsGreeting.EN),
-          pickRandom(wordingPools.smsGreeting.TH),
-          400, 400,
-        );
+      if (flags.greeting === 'Send')
+        fillIfEmpty('textarea[formcontrolname="smsGreeting"]', pools.greeting.EN(), pools.greeting.TH(), 400, 400);
+
+      if (flags.delete === 'Send') {
+        const dp = type === 'PRE' ? pools.deletePRE : pools.deletePOST;
+        fillIfEmpty('textarea[formcontrolname="smsDelete"]', dp.EN(), dp.TH(), 250, 250);
       }
-      // smsDelete — เติมเฉพาะถ้า flag = Send
-      if (smsDeleteFlag === 'Send') {
-        fillIfEmpty(
-          'textarea[formcontrolname="smsDelete"]',
-          pickRandom(type === 'PRE' ? wordingPools.smsDeletePRE.EN : wordingPools.smsDeletePOST.EN),
-          pickRandom(type === 'PRE' ? wordingPools.smsDeletePRE.TH : wordingPools.smsDeletePOST.TH),
-          250, 250,
-        );
-      }
-      // POST-only fields
+
       if (type === 'POST') {
-        fillIfEmpty(
-          'textarea[formcontrolname="marketingName"]',
-          pickRandom(wordingPools.marketingName),
-          pickRandom(wordingPools.marketingName),
-          40, 40,
-        );
-        fillIfEmpty(
-          'textarea[formcontrolname="yourPackage"]',
-          pickRandom(wordingPools.yourPackage.EN),
-          pickRandom(wordingPools.yourPackage.TH),
-          100, 100,
-        );
-        fillIfEmpty(
-          'textarea[formcontrolname="greetingLetter"]',
-          pickRandom(wordingPools.greetingLetter.EN),
-          pickRandom(wordingPools.greetingLetter.TH),
-          250, 250,
-        );
+        fillIfEmpty('textarea[formcontrolname="marketingName"]',  pools.marketingName(), pools.marketingName(), 40,  40);
+        fillIfEmpty('textarea[formcontrolname="yourPackage"]',    pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100);
+        fillIfEmpty('textarea[formcontrolname="greetingLetter"]', pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250);
       }
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     //  PATH B — Manual Type (sections 1–4)
-    // ══════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
     if (!useGenerate) {
+      withSection('textarea[formcontrolname="shortPromotionName"]', 'Short Promotion Name', () =>
+        fillTextarea('textarea[formcontrolname="shortPromotionName"]', pools.shortPromo.EN(), pools.shortPromo.TH(), 50, 50));
 
-      // SECTION 1: Short Promotion Name
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="shortPromotionName"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="shortPromotionName"]', 'Short Promotion Name');
-          cy.get('textarea[formcontrolname="shortPromotionName"]').then(($els: any) => {
-            cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.shortPromotionName.EN), 50), { delay: 0, force: true });
-            if ($els.length > 1) {
-              cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.shortPromotionName.TH), 50), { delay: 0, force: true });
-            }
-          });
-          cy.wait(WAIT_TIME);
-        }
-      });
+      withSection('textarea[formcontrolname="cmsDisplay"]', 'CMS Display', () =>
+        fillTextarea('textarea[formcontrolname="cmsDisplay"]', pools.cmsDisplay.EN(), pools.cmsDisplay.TH(), 250, 250));
 
-      // SECTION 2: CMS Display
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="cmsDisplay"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="cmsDisplay"]', 'CMS Display');
-          cy.get('textarea[formcontrolname="cmsDisplay"]').then(($els: any) => {
-            cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.cmsDisplay.EN), 250), { delay: 0, force: true });
-            if ($els.length > 1) {
-              cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.cmsDisplay.TH), 250), { delay: 0, force: true });
-            }
-          });
-          cy.wait(WAIT_TIME);
-        }
-      });
+      withSection('textarea[formcontrolname="promotionDescription"]', 'Promotion Description', () =>
+        fillTextarea('textarea[formcontrolname="promotionDescription"]', pools.promoDesc.EN(), pools.promoDesc.TH(), 250, 250));
 
-      // SECTION 3: Promotion Description
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="promotionDescription"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="promotionDescription"]', 'Promotion Description');
-          cy.get('textarea[formcontrolname="promotionDescription"]').then(($els: any) => {
-            cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.promotionDescription.EN), 250), { delay: 0, force: true });
-            if ($els.length > 1) {
-              cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.promotionDescription.TH), 250), { delay: 0, force: true });
-            }
-          });
-          cy.wait(WAIT_TIME);
-        }
-      });
-
-      // SECTION 4: SMS Check Current
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="smsCheckCurrent"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="smsCheckCurrent"]', 'SMS Check Current');
-          cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(0).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.smsCheckCurrent.EN), 50), { delay: 0, force: true });
-          cy.get('textarea[formcontrolname="smsCheckCurrent"]').eq(1).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.smsCheckCurrent.TH), 50), { delay: 0, force: true });
-          cy.wait(WAIT_TIME);
-        }
-      });
+      withSection('textarea[formcontrolname="smsCheckCurrent"]', 'SMS Check Current', () =>
+        fillTextarea('textarea[formcontrolname="smsCheckCurrent"]', pools.checkCurrent.EN(), pools.checkCurrent.TH(), 50, 50));
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  ALWAYS — Sections 5–15: flag selects + save (ทั้ง 2 mode)
-    // ══════════════════════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════════════════════
+    //  ALWAYS — Sections 5–15
+    // ════════════════════════════════════════════════════════════════════════
 
-    // SECTION 5: SMS Greeting flag  +  textarea (Manual mode only)
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="smsGreetingSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="smsGreetingSendFlag"]', 'SMS Greeting');
-        cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(smsGreetingFlag, { force: true });
+    // SECTION 5: SMS Greeting
+    withSection('select[formcontrolname="smsGreetingSendFlag"]', 'SMS Greeting', () => {
+      cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(flags.greeting, { force: true });
+      if (flags.greeting === 'Send' && !useGenerate)
+        fillTextarea('textarea[formcontrolname="smsGreeting"]', pools.greeting.EN(), pools.greeting.TH(), 400, 400);
+    });
 
-        if (smsGreetingFlag === 'Send' && !useGenerate) {
-          cy.get('textarea[formcontrolname="smsGreeting"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? pickRandom(wordingPools.smsGreeting.EN) : pickRandom(wordingPools.smsGreeting.TH);
-            const cleaned = idx === 0 ? limitAndCleanEN(text, 400) : limitAndCleanTH(text, 400);
-            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
+    // SECTION 6: SMS Confirm Subscription (PRE only)
+    cy.get('body').then(($b: any) => {
+      if ($b.find('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').length)
+        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(flags.greeting, { force: true });
+    });
+
+    // SECTION 7: SMS Delete
+    withSection('select[formcontrolname="smsDeleteSendFlag"]', 'SMS Delete', () => {
+      cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(flags.delete, { force: true });
+      cy.wait(WAIT);
+
+      if (flags.delete === 'Send') {
+        if (type === 'PRE') {
+          cy.get('input[formcontrolname="SmsDeletedefaultWordingFlag"]').then(($radios: any) => {
+            if (!$radios.length) return;
+            const defaultVal = pick(['Yes', 'No']);
+            cy.wrap($radios).parent().contains(defaultVal).click({ force: true });
+            cy.wait(WAIT);
+            if (defaultVal === 'No' && !useGenerate)
+              fillTextarea('textarea[formcontrolname="smsDelete"]', pools.deletePRE.EN(), pools.deletePRE.TH(), 250, 250);
           });
+        } else if (!useGenerate) {
+          fillTextarea('textarea[formcontrolname="smsDelete"]', pools.deletePOST.EN(), pools.deletePOST.TH(), 250, 250);
         }
-        cy.wait(WAIT_TIME);
       }
     });
 
-    // SECTION 6: SMS Confirm Subscription (PRE only flag)
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').length > 0) {
-        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(smsGreetingFlag, { force: true });
-      }
-    });
-
-    // SECTION 7: SMS Delete flag  +  textarea (Manual mode only for text)
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="smsDeleteSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="smsDeleteSendFlag"]', 'SMS Delete');
-        cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(smsDeleteFlag, { force: true });
-        cy.wait(WAIT_TIME);
-
-        if (smsDeleteFlag === 'Send') {
-          if (type === 'PRE') {
-            cy.get('input[formcontrolname="SmsDeletedefaultWordingFlag"]').then(($radios: any) => {
-              if ($radios.length > 0) {
-                const defaultOptions = ['Yes', 'No'];
-                const randomDefaultVal = defaultOptions[Math.floor(Math.random() * defaultOptions.length)];
-                // คลิก label ที่ครอบ radio เพื่อให้ Angular รับรู้
-                cy.wrap($radios).parent().contains(randomDefaultVal).click({ force: true });
-                cy.wait(WAIT_TIME);
-
-                // Manual mode + No → type เอง; Generate mode → fillIfEmpty จัดการไปแล้ว
-                if (randomDefaultVal === 'No' && !useGenerate) {
-                  cy.get('textarea[formcontrolname="smsDelete"]').then(($els: any) => {
-                    cy.wrap($els[0]).clear({ force: true }).type(limitAndCleanEN(pickRandom(wordingPools.smsDeletePRE.EN), 250), { delay: 0, force: true });
-                    if ($els.length > 1) {
-                      cy.wrap($els[1]).clear({ force: true }).type(limitAndCleanTH(pickRandom(wordingPools.smsDeletePRE.TH), 250), { delay: 0, force: true });
-                    }
-                  });
-                }
-              }
-            });
-          } else {
-            // POST type — Manual mode → type เอง; Generate mode → fillIfEmpty จัดการไปแล้ว
-            if (!useGenerate) {
-              cy.get('textarea[formcontrolname="smsDelete"]').each(($el: any, idx: number) => {
-                const text = idx === 0 ? pickRandom(wordingPools.smsDeletePOST.EN) : pickRandom(wordingPools.smsDeletePOST.TH);
-                const cleaned = idx === 0 ? limitAndCleanEN(text, 250) : limitAndCleanTH(text, 250);
-                cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
-              });
-            }
-          }
-        }
-        cy.wait(WAIT_TIME);
-      }
-    });
-
-    // SECTION 8: Last Minute Alert
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="lastMinuteAlertSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="lastMinuteAlertSendFlag"]', 'Last Minute Alert');
-        cy.get('select[formcontrolname="lastMinuteAlertSendFlag"]').select(lastMinuteVal, { force: true });
-        cy.wait(WAIT_TIME);
-      }
-    });
-
-    // SECTION 9: Before Fee Deduction
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="smsBeforeFeeDeductSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="smsBeforeFeeDeductSendFlag"]', 'Before Fee Deduction');
-        cy.get('select[formcontrolname="smsBeforeFeeDeductSendFlag"]').select(beforeFeeDeductVal, { force: true });
-        cy.wait(WAIT_TIME);
-      }
-    });
-
-    // SECTION 10: Recurring Deduct Success
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="recurringDeductSuccessAlertSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="recurringDeductSuccessAlertSendFlag"]', 'Recurring Deduct Success');
-        cy.get('select[formcontrolname="recurringDeductSuccessAlertSendFlag"]').select(deductSuccessVal, { force: true });
-        cy.wait(WAIT_TIME);
-      }
-    });
-
-    // SECTION 11: Recurring Deduct Fail
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="recurringDeductFailAlertSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="recurringDeductFailAlertSendFlag"]', 'Recurring Deduct Fail');
-        cy.get('select[formcontrolname="recurringDeductFailAlertSendFlag"]').select(deductFailVal, { force: true });
-        cy.wait(WAIT_TIME);
-      }
-    });
+    // SECTIONS 8–11: simple flag selects
+    const simpleFlagSections: [string, string, string][] = [
+      ['select[formcontrolname="lastMinuteAlertSendFlag"]',            'Last Minute Alert',        flags.lastMinute],
+      ['select[formcontrolname="smsBeforeFeeDeductSendFlag"]',         'Before Fee Deduction',     flags.beforeDeduct],
+      ['select[formcontrolname="recurringDeductSuccessAlertSendFlag"]','Recurring Deduct Success', flags.deductOk],
+      ['select[formcontrolname="recurringDeductFailAlertSendFlag"]',   'Recurring Deduct Fail',    flags.deductFail],
+    ];
+    simpleFlagSections.forEach(([sel, label, val]) =>
+      withSection(sel, label, () => cy.get(sel).select(val, { force: true })));
 
     // SECTION 12: SMS Promote Package
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="smsPromotePackSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="smsPromotePackSendFlag"]', 'SMS Promote Package');
-        cy.get('select[formcontrolname="smsPromotePackSendFlag"]').select(smsPromotePackVal, { force: true });
-        cy.wait(WAIT_TIME);
-
-        if (smsPromotePackVal === 'Send') {
-          cy.get('textarea[formcontrolname="smsPromotePack"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? `Special offer! ${p} - Get it now` : `ข้อเสนอพิเศษ! ${p} - รับเลยตอนนี้`;
-            const cleaned = idx === 0 ? limitAndCleanEN(text, 250) : limitAndCleanTH(text, 250);
-            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
-          });
-        }
-        cy.wait(WAIT_TIME);
-      }
+    withSection('select[formcontrolname="smsPromotePackSendFlag"]', 'SMS Promote Package', () => {
+      cy.get('select[formcontrolname="smsPromotePackSendFlag"]').select(flags.promote, { force: true });
+      if (flags.promote === 'Send')
+        fillTextarea('textarea[formcontrolname="smsPromotePack"]',
+          `Special offer! ${p} - Get it now`, `ข้อเสนอพิเศษ! ${p} - รับเลยตอนนี้`, 250, 250);
     });
 
     // SECTION 13: Before Promotion Expired
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="beforePromotionExpAlertSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="beforePromotionExpAlertSendFlag"]', 'Before Promotion Expired');
-        cy.get('select[formcontrolname="beforePromotionExpAlertSendFlag"]').select(beforePromoVal, { force: true });
-        cy.wait(WAIT_TIME);
-
-        if (beforePromoVal === 'Send') {
-          cy.get('input[formcontrolname="beforePromotionExpAlertDeduction"]')
-            .clear({ force: true }).type(`${Cypress._.random(1, 30)}`, { force: true });
-
-          cy.get('select[formcontrolname="beforePromotionExpAlertDeductionUnit"]').then(($select: any) => {
-            const options = $select.find('option').toArray()
-              .filter((opt: HTMLOptionElement) => opt.value && opt.value !== 'null' && !opt.disabled)
-              .map((opt: HTMLOptionElement) => opt.value);
-            if (options.length) {
-              cy.wrap($select).select(Cypress._.sample(options), { force: true });
-            }
-          });
-        }
-        cy.wait(WAIT_TIME);
+    withSection('select[formcontrolname="beforePromotionExpAlertSendFlag"]', 'Before Promotion Expired', () => {
+      cy.get('select[formcontrolname="beforePromotionExpAlertSendFlag"]').select(beforePromoVal, { force: true });
+      if (beforePromoVal === 'Send') {
+        cy.get('input[formcontrolname="beforePromotionExpAlertDeduction"]')
+          .clear({ force: true }).type(`${Cypress._.random(1, 30)}`, { force: true });
+        cy.get('select[formcontrolname="beforePromotionExpAlertDeductionUnit"]').then(($s: any) => {
+          const opts = $s.find('option').toArray()
+            .filter((o: HTMLOptionElement) => o.value && o.value !== 'null' && !o.disabled)
+            .map((o: HTMLOptionElement) => o.value);
+          if (opts.length) cy.wrap($s).select(Cypress._.sample(opts), { force: true });
+        });
       }
     });
 
-    // SECTION 14: Promotion Expired (mutually exclusive กับ Before Promotion)
-    cy.get('body').then(($body: any) => {
-      if ($body.find('select[formcontrolname="promotionExpAlertSendFlag"]').length > 0) {
-        scrollToElement('select[formcontrolname="promotionExpAlertSendFlag"]', 'Promotion Expired');
-        cy.log(`🔒 Promotion Expired = ${promoExpVal} (mutually exclusive with Before Promotion = ${beforePromoVal})`);
-        cy.get('select[formcontrolname="promotionExpAlertSendFlag"]').select(promoExpVal, { force: true });
-        cy.wait(WAIT_TIME);
-      }
+    // SECTION 14: Promotion Expired
+    withSection('select[formcontrolname="promotionExpAlertSendFlag"]', 'Promotion Expired', () => {
+      cy.log(`🔒 Promo Exp = ${promoExpVal} (excl. Before Promo = ${beforePromoVal})`);
+      cy.get('select[formcontrolname="promotionExpAlertSendFlag"]').select(promoExpVal, { force: true });
     });
 
-    // SECTION 15: POST-only fields (Manual mode only — Generate + fillIfEmpty จัดการแล้ว)
+    // SECTION 15: POST-only fields (Manual only)
     if (type === 'POST' && !useGenerate) {
+      withSection('textarea[formcontrolname="marketingName"]', 'Marketing Name', () =>
+        cy.get('textarea[formcontrolname="marketingName"]').focus()
+          .clear({ force: true })
+          .type(capEN(pools.marketingName(), 40), { delay: 0, force: true })
+          .blur({ force: true }));
 
-      // Marketing Name
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="marketingName"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="marketingName"]', 'Marketing Name');
-          cy.get('textarea[formcontrolname="marketingName"]').clear({ force: true })
-            .type(limitAndCleanEN(pickRandom(wordingPools.marketingName), 40), { delay: 0, force: true });
-          cy.wait(WAIT_TIME);
-        }
-      });
+      withSection('textarea[formcontrolname="yourPackage"]', 'Your Package', () =>
+        fillTextarea('textarea[formcontrolname="yourPackage"]', pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100));
 
-      // Your Package
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="yourPackage"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="yourPackage"]', 'Your Package');
-          cy.get('textarea[formcontrolname="yourPackage"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? pickRandom(wordingPools.yourPackage.EN) : pickRandom(wordingPools.yourPackage.TH);
-            const cleaned = idx === 0 ? limitAndCleanEN(text, 100) : limitAndCleanTH(text, 100);
-            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
-          });
-          cy.wait(WAIT_TIME);
-        }
-      });
-
-      // Greeting Letter
-      cy.get('body').then(($body: any) => {
-        if ($body.find('textarea[formcontrolname="greetingLetter"]').length > 0) {
-          scrollToElement('textarea[formcontrolname="greetingLetter"]', 'Greeting Letter');
-          cy.get('textarea[formcontrolname="greetingLetter"]').each(($el: any, idx: number) => {
-            const text = idx === 0 ? pickRandom(wordingPools.greetingLetter.EN) : pickRandom(wordingPools.greetingLetter.TH);
-            const cleaned = idx === 0 ? limitAndCleanEN(text, 250) : limitAndCleanTH(text, 250);
-            cy.wrap($el).clear({ force: true }).type(cleaned, { delay: 0, force: true });
-          });
-          cy.wait(WAIT_TIME);
-        }
-      });
+      withSection('textarea[formcontrolname="greetingLetter"]', 'Greeting Letter', () =>
+        fillTextarea('textarea[formcontrolname="greetingLetter"]', pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250));
     }
 
-    // ══════════════════════════════════════════════════════════════════════════
-    //  SAVE
-    // ══════════════════════════════════════════════════════════════════════════
-    cy.get('body').then(($body: any) => {
-      if ($body.find('.container-fluid > :nth-child(3) > .btn').length > 0) {
-        scrollToElement('.container-fluid > :nth-child(3) > .btn', 'Save Button');
-        cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-        cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
-        cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-        closeSuccessModal();
-      }
+    // ── Flush all pending Angular form state before Save ──────────────────────
+    cy.get('app-mass-mkt-sms-wording-detail textarea').each(($el: any) => {
+      cy.wrap($el).blur({ force: true });
+    });
+    cy.wait(500);
+
+    // ── Save ─────────────────────────────────────────────────────────────────
+    cy.get('body').then(($b: any) => {
+      if (!$b.find('.container-fluid > :nth-child(3) > .btn').length) return;
+      scrollTo('.container-fluid > :nth-child(3) > .btn', 'Save Button');
+      cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+      cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
+      cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+      closeSuccessModal();
     });
 
   }); // end cy.then()
@@ -3690,7 +2939,7 @@ export const RandomRemark = (
   const randomFloat = (min: number, max: number, decimals: number = 0): number =>
     parseFloat((Math.random() * (max - min) + min).toFixed(decimals));
 
-  const WAIT_TIME = 4000;
+  const WAIT_TIME = 2000;
   const MAX_REMARK_LENGTH = 1000; // จำกัดความยาวตามระบบจริง
 
   const scrollToElement = (selector: string, sectionName: string) => {
@@ -4077,7 +3326,7 @@ export const RandomProjectDescription = (
   const randomInt = (min: number, max: number): number =>
     Math.floor(Math.random() * (max - min + 1)) + min;
 
-  const WAIT_TIME = 4000;
+  const WAIT_TIME = 2000;
   const MAX_DESC_LENGTH = 2000; // จำกัดความยาวตามที่ระบบรับได้จริง
 
   const scrollToElement = (selector: string, sectionName: string) => {
@@ -7261,12 +6510,16 @@ const createProjectBase = (
   RandomProjectDescription(projectName, subModule, Module);
 
   cy.get('button[type="button"]').contains('Save').click();
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getExistPackage', { timeout: 30000 });
+cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+cy.wait('@getExistPackage', { timeout: 30000 });
 
-  cy.get('.modal-body > :nth-child(1) > div > .btn', { timeout: 15000 })
-    .should('be.visible')
-    .click({ force: true });
+// Wait for the modal overlay to fully fade in first
+cy.get('modal-container.modal', { timeout: 15000 })
+  .should('have.css', 'opacity', '1');
+
+cy.get('.modal-body > :nth-child(1) > div > .btn', { timeout: 15000 })
+  .should('be.visible')
+  .click();
 
   cy.get('modal-container').should('not.exist');
 };
@@ -7274,7 +6527,7 @@ const createPOBase = (
   poName: string,
   promotionSubGroupValue: string
 ): void => {
-cy.contains('li.sidebar-brand', 'List of Product Offering:')
+  cy.contains('li.sidebar-brand', 'List of Product Offering:')
     .find('button.btn')
     .first()
     .should('be.visible')
@@ -7325,17 +6578,14 @@ const cleanThaiText = (str: string): string => {
 };
 
 // ===== HELPER: Limit string length =====
-const limit = (str: string, maxLen: number): string => {
-  if (!str) return '';
-  let result = str.length > maxLen ? str.substring(0, maxLen) : str;
-  result = result.trimEnd();
-  if (result.length === maxLen && !result.endsWith(' ') && result.includes(' ')) {
-    const lastSpace = result.lastIndexOf(' ');
-    if (lastSpace > maxLen * 0.7) {
-      result = result.substring(0, lastSpace);
-    }
+const limit = (s: string, max: number) => {
+  if (!s) return '';
+  let r = s.length > max ? s.substring(0, max) : s;
+  if (r.length === max && r.includes(' ')) {
+    const ls = r.lastIndexOf(' ');
+    if (ls > max * 0.7) r = r.substring(0, ls);
   }
-  return result;
+  return r.trimEnd();
 };
 const selectMultipleFromDualList = (controlName: string, maxSelections: number): void => {
   cy.get(`select[formcontrolname="${controlName}"]`).then(($select) => {
@@ -7370,36 +6620,33 @@ const limitAndCleanTH = (str: string, maxLen: number): string => {
 // WORDING POOLS สำหรับ PO Fields
 // ====================================================================
 
+const fillField = (selector: string, text: string) => cy.get(selector).clear().type(text);
+
+const fillBilingual = (
+  enSel: string, thSel: string,
+  enPool: string[], thPool: string[],
+  enLim: number, thLim: number
+) => {
+  fillField(enSel, limitAndCleanEN(pickRandom(enPool), enLim));
+  fillField(thSel, limitAndCleanTH(pickRandom(thPool), thLim));
+};
+
+const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+
+// ==========================================
+// 🔹 DATA POOL (ข้อความคงเดิม 100% จัดรูปแบบให้กระชับ)
+// ==========================================
 const createPOWordingPools = (
-  projectName: string,
-  poName: string,
-  Module: string,
-  PriceType: string,
-  subModule?: string
+  projectName: string, poName: string, Module: string, PriceType: string, subModule?: string
 ) => {
   const p = projectName || `${Module} ${PriceType}`;
   const po = poName || 'Product Offering';
   const mod = Module || 'MOB';
   const sm = subModule || 'POST';
 
-  // ===== DISPLAY NAMES =====
-  const moduleNames: Record<string, { EN: string; TH: string }> = {
-    'MOB': { EN: 'Mobile', TH: 'มือถือ' },
-    'ENTER': { EN: 'Entertainment', TH: 'บันเทิง' },
-    'MUSIC': { EN: 'Music', TH: 'เพลง' },
-    'FBB': { EN: 'Fiber Broadband', TH: 'ไฟเบอร์บรอดแบนด์' },
-    'Fixline': { EN: 'Fixed Line', TH: 'โทรศัพท์บ้าน' },
-  };
-  const modName = moduleNames[mod] || { EN: mod, TH: mod };
+  const modName = { MOB: { EN: 'Mobile', TH: 'มือถือ' }, ENTER: { EN: 'Entertainment', TH: 'บันเทิง' }, MUSIC: { EN: 'Music', TH: 'เพลง' }, FBB: { EN: 'Fiber Broadband', TH: 'ไฟเบอร์บรอดแบนด์' }, Fixline: { EN: 'Fixed Line', TH: 'โทรศัพท์บ้าน' } }[mod] || { EN: mod, TH: mod };
+  const ptName = { onetime: { EN: 'One-Time', TH: 'ครั้งเดียว' }, recurring: { EN: 'Recurring', TH: 'รายเดือน' }, usage: { EN: 'Usage', TH: 'ตามการใช้งาน' } }[PriceType] || { EN: PriceType, TH: PriceType };
 
-  const priceTypeNames: Record<string, { EN: string; TH: string }> = {
-    'onetime': { EN: 'One-Time', TH: 'ครั้งเดียว' },
-    'recurring': { EN: 'Recurring', TH: 'รายเดือน' },
-    'usage': { EN: 'Usage', TH: 'ตามการใช้งาน' },
-  };
-  const ptName = priceTypeNames[PriceType] || { EN: PriceType, TH: PriceType };
-
-  // ===== RANDOM VALUES =====
   const dataAmount = pickRandom(['10GB', '30GB', '50GB', '100GB', '200GB', '300GB', '500GB', 'Unlimited']);
   const speed = pickRandom(['100 Mbps', '300 Mbps', '500 Mbps', '1 Gbps', '2 Gbps', '5G Max']);
   const price = randomInt(199, 2999);
@@ -7412,770 +6659,103 @@ const createPOWordingPools = (
   const benefit2TH = pickRandom(['ไม่มีสัญญา', 'ซิมฟรี', 'พร้อม eSIM', 'บริการพิเศษ', 'ส่วนลดเครื่อง', 'เงินคืน']);
 
   return {
-    // ===== SHORT PROMOTION NAME =====
-    shortPromotionName: {
-      EN: [
-        `${p} Value Pack`,
-        `${p} Smart Deal`,
-        `${p} Power Plan`,
-        `${p} Daily Deal`,
-        `${p} Big Save`,
-        `${p} Speed Pack`,
-        `${p} Data King`,
-        `${p} Net Plus`,
-        `${p} Always On`,
-        `${p} Full Power`,
-        `${p} Next Level`,
-        `${p} My Choice`,
-        `${p} Go Extra`,
-        `${p} Double Up`,
-        `${p} Hero`,
-        `${p} Ace`,
-        `${p} Edge`,
-        `${p} Flex`,
-        `${p} Rise`,
-        `${p} Zone`,
-        `${p} Core Plus`,
-        `${p} Super Plan`,
-        `${p} Fast Lane`,
-        `${p} All Day`,
-        `${p} Family Plan`,
-        `${p} Business Pack`,
-        `${p} Weekend Pick`,
-        `${p} Monthly Star`,
-        `${p} Top Value`,
-        `${p} Best Buy`,
-      ],
-      TH: [
-        `${p} แพ็กคุ้ม`,
-        `${p} ดีลฉลาด`,
-        `${p} พลานพาวเวอร์`,
-        `${p} ดีลรายวัน`,
-        `${p} ประหยัดสุด`,
-        `${p} แพ็กความเร็ว`,
-        `${p} ดาต้าคิง`,
-        `${p} เน็ตพลัส`,
-        `${p} ออนตลอด`,
-        `${p} พลังเต็ม`,
-        `${p} ขั้นต่อไป`,
-        `${p} ของฉัน`,
-        `${p} โกเอ็กซ์ตร้า`,
-        `${p} ดับเบิลอัป`,
-        `${p} ฮีโร่`,
-        `${p} เอซ`,
-        `${p} เอดจ์`,
-        `${p} เฟล็กซ์`,
-        `${p} ไรส์`,
-        `${p} โซน`,
-        `${p} คอร์พลัส`,
-        `${p} ซูเปอร์แพลน`,
-        `${p} เลนเร็ว`,
-        `${p} ตลอดวัน`,
-        `${p} แพลนครอบครัว`,
-        `${p} แพ็กธุรกิจ`,
-        `${p} พิเศษวีคเอนด์`,
-        `${p} สตาร์ประจำเดือน`,
-        `${p} คุ้มสุดคุ้ม`,
-        `${p} ซื้อดีที่สุด`,
-      ],
-    },
-
-    // ===== PROMOTION DESCRIPTION =====
-    promotionDescription: {
-      EN: [
-        `Sign up for ${p} and get ${dataAmount} of data at ${speed} plus unlimited calls for just ${price} THB per month`,
-        `${p} is the ${modName.EN} package that gives you ${dataAmount} data ${speed} speeds and ${benefit1} all in one`,
-        `Get more done every day with ${p} featuring ${dataAmount} data at ${speed} and ${benefit2} included`,
-        `${p} is your complete ${modName.EN} solution with ${dataAmount} data unlimited calls and 5G access at ${price} THB`,
-        `Try ${p} and enjoy ${dataAmount} high speed data plus ${benefit1} and ${benefit2} for only ${price} THB monthly`,
-        `${p} gives you ${dataAmount} of ${modName.EN} data at ${speed} so you never slow down`,
-        `Choose ${p} for ${dataAmount} data ${speed} connectivity and top features at just ${price} THB a month`,
-        `Stay connected with ${p} and enjoy ${dataAmount} data ${benefit1} and unlimited domestic calls all day`,
-        `${p} is built for modern users offering ${dataAmount} data at ${speed} plus ${benefit1} and ${benefit2}`,
-        `Upgrade to ${p} today and get ${dataAmount} of data at ${speed} with full 5G support for ${price} THB`,
-        `${p} combines great speed and generous data giving you ${dataAmount} at ${speed} every single month`,
-        `Subscribe to ${p} and unlock ${dataAmount} data at ${speed} plus exclusive benefits for ${price} THB`,
-        `With ${p} you get ${dataAmount} of high speed data at ${speed} and the freedom to do more`,
-        `${p} packs in ${dataAmount} data ${speed} speeds unlimited calls and ${benefit1} at just ${price} THB per month`,
-        `Activate ${p} now and start enjoying ${dataAmount} data unlimited calls and ${benefit1} right away`,
-        `${p} brings you ${dataAmount} of fast ${modName.EN} data and premium features at an unbeatable price`,
-        `${p} is the all in one ${modName.EN} package with ${dataAmount} data ${benefit1} and ${benefit2} ready for you`,
-        `Take your connectivity to the next level with ${p} and enjoy ${dataAmount} data plus ${benefit2}`,
-        `${p} is designed for those who need ${dataAmount} data ${speed} and ${benefit1} without compromise`,
-        `Get everything you need with ${p} including ${dataAmount} data at ${speed} and ${benefit2} for ${price} THB`,
-      ],
-      TH: [
-        `สมัคร ${p} รับเน็ต ${dataAmount} ความเร็ว ${speed} พร้อมโทรฟรีไม่จำกัดในราคาเพียง ${price} บาทต่อเดือน`,
-        `${p} คือแพ็กเกจ${modName.TH}ที่มอบเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}ครบในที่เดียว`,
-        `ทำได้มากขึ้นทุกวันด้วย ${p} ที่มีเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit2TH}รวมไว้แล้ว`,
-        `${p} คือโซลูชัน${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} โทรฟรีไม่จำกัด และ 5G ที่ ${price} บาท`,
-        `ลอง ${p} และเพลิดเพลินกับเน็ตความเร็วสูง ${dataAmount} พร้อม${benefit1TH}และ${benefit2TH}เพียง ${price} บาทต่อเดือน`,
-        `${p} มอบเน็ต${modName.TH} ${dataAmount} ที่ความเร็ว ${speed} ทำให้คุณไม่มีวันช้าลง`,
-        `เลือก ${p} สำหรับเน็ต ${dataAmount} การเชื่อมต่อ ${speed} และฟีเจอร์ชั้นยอดในราคาเพียง ${price} บาทต่อเดือน`,
-        `เชื่อมต่อกับ ${p} และเพลิดเพลินกับเน็ต ${dataAmount} ${benefit1TH} และโทรฟรีไม่จำกัดตลอดวัน`,
-        `${p} สร้างมาสำหรับผู้ใช้ยุคใหม่ มอบเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อม${benefit1TH}และ${benefit2TH}`,
-        `อัปเกรดเป็น ${p} วันนี้รับเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมรองรับ 5G เต็มรูปแบบในราคา ${price} บาท`,
-        `${p} ผสานความเร็วสูงและเน็ตปริมาณมากมอบ ${dataAmount} ที่ ${speed} ทุกเดือน`,
-        `สมัคร ${p} ปลดล็อกเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมสิทธิพิเศษในราคา ${price} บาท`,
-        `กับ ${p} คุณได้เน็ตความเร็วสูง ${dataAmount} ที่ ${speed} และอิสระในการทำสิ่งต่างๆ มากขึ้น`,
-        `${p} อัดแน่นด้วยเน็ต ${dataAmount} ความเร็ว ${speed} โทรฟรีไม่จำกัด และ${benefit1TH}ในราคาเพียง ${price} บาทต่อเดือน`,
-        `เปิดใช้ ${p} ตอนนี้และเริ่มเพลิดเพลินกับเน็ต ${dataAmount} โทรฟรีไม่จำกัด และ${benefit1TH}ได้ทันที`,
-        `${p} มอบเน็ต${modName.TH}ความเร็วสูง ${dataAmount} และฟีเจอร์พรีเมียมในราคาที่ไม่มีใครเทียบ`,
-        `${p} คือแพ็กเกจ${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} ${benefit1TH} และ${benefit2TH}พร้อมสำหรับคุณ`,
-        `ยกระดับการเชื่อมต่อด้วย ${p} และเพลิดเพลินกับเน็ต ${dataAmount} พร้อม${benefit2TH}`,
-        `${p} ออกแบบมาสำหรับผู้ที่ต้องการเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}โดยไม่ยอมรับน้อยกว่า`,
-        `ได้ทุกสิ่งที่ต้องการกับ ${p} รวมเน็ต ${dataAmount} ที่ความเร็ว ${speed} และ${benefit2TH}ในราคา ${price} บาท`,
-      ],
-    },
-
-    // ===== GREETING LETTER =====
-    greetingLetter: {
-      EN: [
-        `Dear customer we are glad to confirm that your ${p} subscription is now active and ready to use`,
-        `Hello and welcome to ${p} your ${modName.EN} package is live and all features are available to you`,
-        `Dear valued customer your ${p} plan has been successfully activated with ${dataAmount} of data ready for you`,
-        `Welcome to the ${p} family we are thrilled to have you and hope you enjoy every benefit included`,
-        `Dear customer your ${p} subscription has been confirmed and your ${dataAmount} data at ${speed} is now ready`,
-        `Hello we are happy to let you know that ${p} is now active on your account enjoy your benefits`,
-        `Dear customer thank you for trusting us with your ${modName.EN} needs we are proud to bring you ${p}`,
-        `Welcome aboard ${p} we have activated your ${dataAmount} data package and it is ready for you today`,
-        `Dear subscriber your ${p} plan is fully live including ${benefit1} and ${benefit2} starting from today`,
-        `Hello valued customer your ${p} subscription starts now enjoy ${dataAmount} of data at ${speed}`,
-        `Dear customer we are pleased to welcome you to ${p} your account is fully set up and ready`,
-        `Thank you for joining ${p} dear customer your ${modName.EN} package is now confirmed and active`,
-        `Dear customer ${p} is now yours enjoy ${dataAmount} data at ${speed} plus all the premium features included`,
-        `Hello welcome to ${p} we have set everything up for you so you can start enjoying your benefits today`,
-        `Dear customer your ${p} journey starts here we are excited to be part of your connected life`,
-        `Welcome to ${p} dear customer we hope this ${modName.EN} package brings great value to your everyday life`,
-        `Dear valued customer we confirm that ${p} is now running on your account with ${dataAmount} data ready`,
-        `Hello and thank you for choosing ${p} your ${modName.EN} subscription is active and all set for you`,
-        `Dear customer we are honored to have you on ${p} and we are committed to giving you the best experience`,
-        `Welcome dear customer ${p} is now active enjoy ${dataAmount} data ${speed} speeds and unlimited calls`,
-        `Dear customer your ${p} plan includes ${benefit1} and ${benefit2} and everything is ready for you now`,
-        `Hello ${p} is successfully activated on your number enjoy seamless ${modName.EN} service from today`,
-        `Dear subscriber welcome to ${p} your ${dataAmount} data and premium features are all set and ready`,
-        `Thank you for choosing ${p} dear customer we promise to deliver the best ${modName.EN} experience to you`,
-        `Dear customer your ${p} subscription is now live and we are here to support you every step of the way`,
-        `Welcome to ${p} we are glad you are here your package is active and all your benefits are unlocked`,
-        `Dear customer we have activated ${p} for you enjoy ${dataAmount} data at ${speed} starting right now`,
-        `Hello and welcome we are happy to confirm that ${p} is now part of your account`,
-        `Dear customer ${p} is set up and ready for you we hope you enjoy every feature of this package`,
-        `Welcome aboard dear customer ${p} is now live on your number and ready to serve you`,
-      ],
-      TH: [
-        `เรียนลูกค้า เรายินดียืนยันว่าการสมัคร ${p} ของคุณพร้อมใช้งานแล้ว`,
-        `สวัสดีและยินดีต้อนรับสู่ ${p} แพ็กเกจ${modName.TH}ของคุณมีผลแล้วและฟีเจอร์ทั้งหมดพร้อมใช้`,
-        `เรียนลูกค้าที่มีคุณค่า แผน ${p} ของคุณถูกเปิดใช้งานสำเร็จพร้อมเน็ต ${dataAmount} รอคุณอยู่`,
-        `ยินดีต้อนรับสู่ครอบครัว ${p} เรารู้สึกตื่นเต้นที่มีคุณอยู่ด้วยและหวังว่าคุณจะสนุกกับทุกสิทธิพิเศษ`,
-        `เรียนลูกค้า การสมัคร ${p} ของคุณได้รับการยืนยันแล้ว เน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมแล้ว`,
-        `สวัสดี เรายินดีแจ้งให้ทราบว่า ${p} เปิดใช้งานบนบัญชีของคุณแล้ว ขอให้เพลิดเพลินกับสิทธิพิเศษ`,
-        `เรียนลูกค้า ขอบคุณที่ไว้วางใจเราดูแลความต้องการด้าน${modName.TH}ของคุณ เรายินดีนำเสนอ ${p}`,
-        `ยินดีต้อนรับสู่ ${p} เราได้เปิดใช้งานแพ็กเกจเน็ต ${dataAmount} ของคุณและพร้อมให้บริการวันนี้`,
-        `เรียนสมาชิก แผน ${p} ของคุณมีผลสมบูรณ์แล้ว รวมถึง${benefit1TH}และ${benefit2TH}ตั้งแต่วันนี้`,
-        `สวัสดีลูกค้าที่มีคุณค่า การสมัคร ${p} ของคุณเริ่มต้นแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ที่ ${speed}`,
-        `เรียนลูกค้า เรายินดีต้อนรับคุณสู่ ${p} บัญชีของคุณตั้งค่าครบถ้วนและพร้อมใช้งานแล้ว`,
-        `ขอบคุณที่ร่วมใช้ ${p} เรียนลูกค้า แพ็กเกจ${modName.TH}ของคุณได้รับการยืนยันและเปิดใช้งานแล้ว`,
-        `เรียนลูกค้า ${p} เป็นของคุณแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ที่ ${speed} พร้อมฟีเจอร์พรีเมียมทั้งหมด`,
-        `สวัสดี ยินดีต้อนรับสู่ ${p} เราจัดการทุกอย่างไว้ให้คุณแล้ว เริ่มเพลิดเพลินกับสิทธิพิเศษได้วันนี้`,
-        `เรียนลูกค้า การเดินทางกับ ${p} ของคุณเริ่มที่นี่ เรารู้สึกตื่นเต้นที่ได้เป็นส่วนหนึ่งของชีวิตที่เชื่อมต่อของคุณ`,
-        `ยินดีต้อนรับสู่ ${p} เรียนลูกค้า หวังว่าแพ็กเกจ${modName.TH}นี้จะมอบคุณค่าที่ยิ่งใหญ่ให้ชีวิตประจำวันของคุณ`,
-        `เรียนลูกค้าที่มีคุณค่า เรายืนยันว่า ${p} ทำงานบนบัญชีของคุณแล้วพร้อมเน็ต ${dataAmount}`,
-        `สวัสดีและขอบคุณที่เลือก ${p} การสมัคร${modName.TH}ของคุณมีผลและพร้อมสำหรับคุณแล้ว`,
-        `เรียนลูกค้า เรารู้สึกเป็นเกียรติที่มีคุณอยู่บน ${p} และมุ่งมั่นที่จะมอบประสบการณ์ที่ดีที่สุดให้คุณ`,
-        `ยินดีต้อนรับเรียนลูกค้า ${p} เปิดใช้งานแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ความเร็ว ${speed} และโทรฟรีไม่จำกัด`,
-        `เรียนลูกค้า แผน ${p} ของคุณรวม${benefit1TH}และ${benefit2TH}ทุกอย่างพร้อมสำหรับคุณแล้ว`,
-        `สวัสดี ${p} ถูกเปิดใช้งานบนเบอร์ของคุณสำเร็จแล้ว เพลิดเพลินกับบริการ${modName.TH}ที่ราบรื่นตั้งแต่วันนี้`,
-        `เรียนสมาชิก ยินดีต้อนรับสู่ ${p} เน็ต ${dataAmount} และฟีเจอร์พรีเมียมของคุณพร้อมทั้งหมดแล้ว`,
-        `ขอบคุณที่เลือก ${p} เรียนลูกค้า เราสัญญาว่าจะมอบประสบการณ์${modName.TH}ที่ดีที่สุดให้คุณ`,
-        `เรียนลูกค้า การสมัคร ${p} ของคุณมีผลแล้วและเราอยู่เคียงข้างคุณในทุกขั้นตอน`,
-        `ยินดีต้อนรับสู่ ${p} เรายินดีที่คุณอยู่ที่นี่ แพ็กเกจของคุณเปิดใช้งานแล้วและสิทธิพิเศษทั้งหมดพร้อมแล้ว`,
-        `เรียนลูกค้า เราเปิดใช้งาน ${p} ให้คุณแล้ว เพลิดเพลินกับเน็ต ${dataAmount} ที่ ${speed} ตั้งแต่ตอนนี้`,
-        `สวัสดีและยินดีต้อนรับ เรายินดียืนยันว่า ${p} เป็นส่วนหนึ่งของบัญชีคุณแล้ว`,
-        `เรียนลูกค้า ${p} ตั้งค่าและพร้อมสำหรับคุณแล้ว หวังว่าคุณจะสนุกกับทุกฟีเจอร์ของแพ็กเกจนี้`,
-        `ยินดีต้อนรับเรียนลูกค้า ${p} เปิดใช้งานบนเบอร์ของคุณแล้วและพร้อมให้บริการ`,
-      ],
-    },
-
-    // ===== YOUR PACKAGE NAME =====
-    yourPackageName: {
-      EN: [
-        `Your plan: ${p}`,
-        `Currently on: ${p}`,
-        `Active subscription: ${p}`,
-        `Subscribed plan: ${p}`,
-        `Running package: ${p}`,
-        `Now on: ${p}`,
-        `Package in use: ${p}`,
-        `My plan: ${p}`,
-        `Signed up for: ${p}`,
-        `Live package: ${p}`,
-        `Enrolled plan: ${p}`,
-        `Chosen package: ${p}`,
-        `${p} is active`,
-        `${p} ${dataAmount} plan`,
-        `${p} ${modName.EN} ${ptName.EN} active`,
-      ],
-      TH: [
-        `แผนของคุณ: ${p}`,
-        `ใช้งานอยู่: ${p}`,
-        `การสมัครที่ใช้งาน: ${p}`,
-        `แผนที่สมัคร: ${p}`,
-        `แพ็กเกจที่รัน: ${p}`,
-        `ตอนนี้ใช้: ${p}`,
-        `แพ็กเกจที่ใช้: ${p}`,
-        `แผนของฉัน: ${p}`,
-        `สมัครอยู่กับ: ${p}`,
-        `แพ็กเกจที่มีผล: ${p}`,
-        `แผนที่ลงทะเบียน: ${p}`,
-        `แพ็กเกจที่เลือก: ${p}`,
-        `${p} ใช้งานอยู่`,
-        `${p} แผน ${dataAmount}`,
-        `${p} ${modName.TH} ${ptName.TH} ใช้งานอยู่`,
-      ],
-    },
-
-    // ===== SMS GREETING =====
-    smsGreeting: {
-      EN: [
-        `Welcome to ${p} your package is now active and ready`,
-        `You have joined ${p} enjoy ${dataAmount} data starting today`,
-        `${p} is now on enjoy your ${modName.EN} benefits`,
-        `Your ${p} plan is live and all features are unlocked`,
-        `Thanks for choosing ${p} enjoy ${dataAmount} at ${speed}`,
-        `${p} is active on your number enjoy every benefit`,
-        `You are now on ${p} ${dataAmount} data is ready for you`,
-        `${p} subscription confirmed enjoy seamless connectivity`,
-        `Hello and welcome your ${p} package is active now`,
-        `${p} is running on your account enjoy your plan today`,
-        `Great choice ${p} is now live enjoy the full experience`,
-        `${p} activated and ${dataAmount} data ready for you`,
-        `Your journey with ${p} starts now enjoy every moment`,
-        `${p} is set up and ready go ahead and explore`,
-        `You are all set with ${p} start enjoying right now`,
-        `Welcome aboard ${p} your ${modName.EN} plan is live`,
-        `${p} is yours enjoy ${dataAmount} at ${speed} from today`,
-        `${p} is on and your ${dataAmount} data is waiting for you`,
-        `Your ${p} plan is active enjoy unlimited calls and ${benefit1}`,
-        `${p} is fully live welcome and enjoy all the perks`,
-        `You are officially on ${p} make the most of it`,
-        `${p} unlocked and ready enjoy ${dataAmount} data today`,
-        `Thank you for subscribing to ${p} enjoy your benefits`,
-        `${p} is now yours go explore everything it offers`,
-        `Your ${p} package is confirmed and active right now`,
-        `${p} is here for you enjoy ${modName.EN} service today`,
-        `All set ${p} is live and waiting for you`,
-        `You have ${p} now enjoy ${dataAmount} and ${benefit1}`,
-        `${p} is activated enjoy top speed and great value`,
-        `${p} your ${modName.EN} package is active start exploring`,
-      ],
-      TH: [
-        `ยินดีต้อนรับสู่ ${p} แพ็กเกจของคุณพร้อมใช้งานแล้ว`,
-        `คุณเข้าร่วม ${p} แล้ว เพลิดเพลินกับเน็ต ${dataAmount} ตั้งแต่วันนี้`,
-        `${p} เปิดแล้ว เพลิดเพลินกับสิทธิพิเศษ${modName.TH}ของคุณ`,
-        `แผน ${p} ของคุณมีผลแล้วและฟีเจอร์ทั้งหมดพร้อมใช้`,
-        `ขอบคุณที่เลือก ${p} เพลิดเพลินกับ ${dataAmount} ที่ ${speed}`,
-        `${p} เปิดใช้งานบนเบอร์ของคุณแล้ว เพลิดเพลินกับทุกสิทธิพิเศษ`,
-        `ตอนนี้คุณอยู่บน ${p} แล้ว เน็ต ${dataAmount} พร้อมสำหรับคุณ`,
-        `ยืนยันการสมัคร ${p} แล้ว เพลิดเพลินกับการเชื่อมต่อที่ราบรื่น`,
-        `สวัสดีและยินดีต้อนรับ แพ็กเกจ ${p} ของคุณเปิดใช้งานแล้ว`,
-        `${p} ทำงานบนบัญชีของคุณแล้ว เพลิดเพลินกับแผนของคุณวันนี้`,
-        `เลือกได้ดีมาก ${p} เปิดใช้งานแล้ว เพลิดเพลินกับประสบการณ์เต็มรูปแบบ`,
-        `${p} เปิดใช้งานแล้วและเน็ต ${dataAmount} พร้อมสำหรับคุณ`,
-        `การเดินทางกับ ${p} ของคุณเริ่มแล้ว เพลิดเพลินกับทุกช่วงเวลา`,
-        `${p} ตั้งค่าและพร้อมแล้ว ไปสำรวจได้เลย`,
-        `คุณพร้อมหมดแล้วกับ ${p} เริ่มเพลิดเพลินได้ตอนนี้`,
-        `ยินดีต้อนรับ ${p} แผน${modName.TH}ของคุณมีผลแล้ว`,
-        `${p} เป็นของคุณแล้ว เพลิดเพลินกับ ${dataAmount} ที่ ${speed} ตั้งแต่วันนี้`,
-        `${p} เปิดแล้วและเน็ต ${dataAmount} รอคุณอยู่`,
-        `แผน ${p} ของคุณพร้อมแล้ว เพลิดเพลินกับโทรฟรีไม่จำกัดและ${benefit1TH}`,
-        `${p} มีผลสมบูรณ์แล้ว ยินดีต้อนรับและเพลิดเพลินกับสิทธิพิเศษทั้งหมด`,
-        `คุณอยู่บน ${p} อย่างเป็นทางการแล้ว ใช้ให้คุ้มค่าที่สุด`,
-        `${p} ปลดล็อกแล้วและพร้อม เพลิดเพลินกับเน็ต ${dataAmount} วันนี้`,
-        `ขอบคุณที่สมัคร ${p} เพลิดเพลินกับสิทธิพิเศษของคุณ`,
-        `${p} เป็นของคุณแล้ว ไปสำรวจทุกสิ่งที่มีให้`,
-        `ยืนยันและเปิดใช้งานแพ็กเกจ ${p} ของคุณแล้ว`,
-        `${p} อยู่ที่นี่เพื่อคุณ เพลิดเพลินกับบริการ${modName.TH}วันนี้`,
-        `พร้อมหมดแล้ว ${p} เปิดใช้งานและรอคุณอยู่`,
-        `คุณมี ${p} แล้ว เพลิดเพลินกับ ${dataAmount} และ${benefit1TH}`,
-        `${p} เปิดใช้งานแล้ว เพลิดเพลินกับความเร็วสูงและความคุ้มค่ายอดเยี่ยม`,
-        `${p} แพ็กเกจ${modName.TH}ของคุณเปิดใช้งานแล้ว เริ่มสำรวจได้เลย`,
-      ],
-    },
-
-    // ===== SMS DELETE =====
-    smsDelete: {
-      EN: [
-        `Your ${p} package has been cancelled thank you for using our service`,
-        `${p} has been removed from your number we hope to see you again`,
-        `Your ${p} plan is now deactivated thank you for being with us`,
-        `We have cancelled ${p} on your account thank you for your loyalty`,
-        `${p} has been successfully unsubscribed we value your time with us`,
-        `Your request to cancel ${p} is complete we hope you enjoyed the service`,
-        `${p} is now off on your number feel free to rejoin anytime`,
-        `We confirm the removal of ${p} from your account`,
-        `Your ${p} subscription has ended we appreciate every moment you spent with us`,
-        `${p} removed we hope your experience was a great one`,
-        `Thank you for using ${p} your package has now been cancelled`,
-        `${p} is no longer active on your number come back whenever you are ready`,
-        `Your ${p} plan has been successfully deactivated as requested`,
-        `We have processed your ${p} cancellation thank you for choosing us`,
-        `${p} cancelled we hope to welcome you back someday`,
-        `Your ${p} package is now closed thank you for being our customer`,
-        `We confirm that ${p} has been removed from your account`,
-        `${p} is done on your number thank you for your support`,
-        `Your cancellation of ${p} is confirmed we will miss having you`,
-        `${p} is off we hope you enjoyed the benefits while you were with us`,
-        `Thank you for your time with ${p} your package is now cancelled`,
-        `${p} ended we appreciated having you on our network`,
-        `We have removed ${p} from your number it was great serving you`,
-        `${p} cancellation complete we hope to serve you again in the future`,
-        `Your ${p} plan is now closed thank you for your trust in us`,
-        `${p} removed from your account we appreciate you`,
-        `We confirm ${p} is now deactivated on your number`,
-        `Your subscription to ${p} has been cancelled come back anytime`,
-        `${p} is officially off thank you for being a valued customer`,
-        `${p} service ended thanks for choosing us we hope to see you again`,
-      ],
-      TH: [
-        `แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการของเรา`,
-        `${p} ถูกลบออกจากเบอร์ของคุณแล้ว หวังว่าจะพบกันใหม่`,
-        `แผน ${p} ของคุณถูกปิดใช้งานแล้ว ขอบคุณที่อยู่กับเรา`,
-        `เราได้ยกเลิก ${p} บนบัญชีของคุณแล้ว ขอบคุณสำหรับความไว้วางใจ`,
-        `${p} ถูกยกเลิกสำเร็จแล้ว เราขอบคุณในทุกช่วงเวลาที่ผ่านมา`,
-        `คำขอยกเลิก ${p} ของคุณเสร็จสมบูรณ์แล้ว หวังว่าคุณจะพอใจกับบริการ`,
-        `${p} ปิดแล้วบนเบอร์ของคุณ สามารถสมัครใหม่ได้ตลอดเวลา`,
-        `เรายืนยันการลบ ${p} ออกจากบัญชีของคุณ`,
-        `การสมัคร ${p} ของคุณสิ้นสุดแล้ว เราขอบคุณทุกช่วงเวลาที่คุณอยู่กับเรา`,
-        `ลบ ${p} แล้ว หวังว่าประสบการณ์ของคุณจะยอดเยี่ยม`,
-        `ขอบคุณที่ใช้ ${p} แพ็กเกจของคุณถูกยกเลิกแล้ว`,
-        `${p} ไม่ได้ทำงานบนเบอร์ของคุณแล้ว กลับมาได้เมื่อพร้อม`,
-        `แผน ${p} ของคุณถูกปิดใช้งานสำเร็จตามที่ร้องขอ`,
-        `เราดำเนินการยกเลิก ${p} ของคุณแล้ว ขอบคุณที่เลือกเรา`,
-        `ยกเลิก ${p} แล้ว หวังว่าจะได้ต้อนรับคุณกลับมาสักวัน`,
-        `แพ็กเกจ ${p} ของคุณปิดแล้ว ขอบคุณที่เป็นลูกค้าของเรา`,
-        `เรายืนยันว่า ${p} ถูกลบออกจากบัญชีของคุณแล้ว`,
-        `${p} สิ้นสุดบนเบอร์ของคุณแล้ว ขอบคุณสำหรับการสนับสนุน`,
-        `การยกเลิก ${p} ของคุณได้รับการยืนยันแล้ว เราจะคิดถึงคุณ`,
-        `${p} ปิดแล้ว หวังว่าคุณจะสนุกกับสิทธิพิเศษในช่วงที่อยู่กับเรา`,
-        `ขอบคุณสำหรับเวลากับ ${p} แพ็กเกจของคุณถูกยกเลิกแล้ว`,
-        `${p} สิ้นสุดแล้ว เราขอบคุณที่มีคุณอยู่บนเครือข่ายของเรา`,
-        `เราลบ ${p} ออกจากเบอร์ของคุณแล้ว เป็นเกียรติที่ได้ให้บริการคุณ`,
-        `ยกเลิก ${p} เสร็จสมบูรณ์ หวังว่าจะได้ให้บริการคุณอีกในอนาคต`,
-        `แผน ${p} ของคุณปิดแล้ว ขอบคุณสำหรับความไว้วางใจ`,
-        `ลบ ${p} ออกจากบัญชีของคุณแล้ว เราขอบคุณคุณ`,
-        `เรายืนยันว่า ${p} ถูกปิดใช้งานบนเบอร์ของคุณแล้ว`,
-        `การสมัคร ${p} ของคุณถูกยกเลิกแล้ว กลับมาได้ทุกเวลา`,
-        `${p} ปิดอย่างเป็นทางการแล้ว ขอบคุณที่เป็นลูกค้าที่มีคุณค่า`,
-        `บริการ ${p} สิ้นสุดแล้ว ขอบคุณที่เลือกเรา หวังว่าจะพบกันใหม่`,
-      ],
-    },
-
-    // ===== WORDING IN STATEMENT =====
-    wordingInStatement: {
-      EN: [
-        `${p} ${modName.EN} ${ptName.EN} monthly charge`,
-        `${p} data package ${dataAmount} at ${speed}`,
-        `${p} subscription ${price} THB`,
-        `Monthly fee ${p}`,
-        `${p} service charge`,
-        `${p} billing ${price} THB per month`,
-        `${p} ${ptName.EN} plan charge`,
-        `Payment for ${p}`,
-        `${p} plan ${dataAmount} monthly`,
-        `${p} subscription fee ${price} THB`,
-        `Charge for ${p} ${modName.EN}`,
-        `${p} account deduction`,
-        `${p} recurring charge`,
-        `${p} monthly package fee`,
-        `Billed: ${p}`,
-        `${p} ${modName.EN} service fee`,
-        `${p} data plan ${price} THB`,
-        `${p} thank you for your payment`,
-        `${p} plan renewal charge`,
-        `${p} ${ptName.EN} monthly billing`,
-      ],
-      TH: [
-        `ค่าบริการรายเดือน ${p} ${modName.TH} ${ptName.TH}`,
-        `แพ็กเกจเน็ต ${p} ${dataAmount} ที่ ${speed}`,
-        `การสมัคร ${p} ${price} บาท`,
-        `ค่าบริการรายเดือน ${p}`,
-        `ค่าบริการ ${p}`,
-        `การเรียกเก็บเงิน ${p} ${price} บาทต่อเดือน`,
-        `ค่าบริการแผน ${p} ${ptName.TH}`,
-        `ชำระเงินสำหรับ ${p}`,
-        `แผน ${p} ${dataAmount} รายเดือน`,
-        `ค่าสมัคร ${p} ${price} บาท`,
-        `ค่าบริการ ${p} ${modName.TH}`,
-        `การหักบัญชี ${p}`,
-        `ค่าบริการประจำ ${p}`,
-        `ค่าแพ็กเกจรายเดือน ${p}`,
-        `เรียกเก็บ: ${p}`,
-        `ค่าบริการ${modName.TH} ${p}`,
-        `แผนเน็ต ${p} ${price} บาท`,
-        `${p} ขอบคุณสำหรับการชำระเงิน`,
-        `ค่าต่ออายุแผน ${p}`,
-        `ค่าบริการรายเดือน ${p} ${ptName.TH}`,
-      ],
-    },
-
-    // ===== DESCRIPTION =====
-    description: {
-      EN: [
-        `${p} is a ${ptName.EN} ${modName.EN} package with ${dataAmount} data ${speed} speeds and unlimited domestic calls`,
-        `${p} offers ${dataAmount} of high speed ${modName.EN} data at ${speed} including ${benefit1} and ${benefit2}`,
-        `${p} is the ${ptName.EN} plan for modern users delivering ${dataAmount} data ${speed} and 5G access`,
-        `${p} provides ${dataAmount} data at ${speed} plus unlimited calls and premium features for ${price} THB monthly`,
-        `${p} is a ${modName.EN} package designed to give you ${dataAmount} data ${benefit1} and ${benefit2} at great value`,
-        `${p} includes ${dataAmount} of fast data at ${speed} with full 5G support and unlimited domestic calls`,
-        `${p} is the smart ${ptName.EN} choice offering ${dataAmount} data ${speed} connectivity and exclusive benefits`,
-        `${p} delivers ${dataAmount} data ${speed} speeds and ${benefit1} in one comprehensive ${modName.EN} plan`,
-        `${p} is a feature packed ${modName.EN} package with ${dataAmount} data ${benefit1} and ${benefit2} at ${price} THB`,
-        `${p} brings you ${dataAmount} of ${modName.EN} data at ${speed} with top tier connectivity and great value`,
-        `${p} is a complete ${modName.EN} solution with ${dataAmount} data ${speed} unlimited calls and 5G ready`,
-        `${p} gives you the ultimate ${ptName.EN} ${modName.EN} experience with ${dataAmount} data and ${benefit1}`,
-        `${p} is your go to ${modName.EN} package with ${dataAmount} data at ${speed} for just ${price} THB`,
-        `${p} combines ${dataAmount} data ${speed} and ${benefit2} in one powerful ${modName.EN} package`,
-        `${p} is a reliable ${ptName.EN} ${modName.EN} plan with ${dataAmount} data and unlimited domestic calls`,
-      ],
-      TH: [
-        `${p} คือแพ็กเกจ${modName.TH}แบบ${ptName.TH}ด้วยเน็ต ${dataAmount} ความเร็ว ${speed} และโทรฟรีทุกเครือข่ายไม่จำกัด`,
-        `${p} มอบเน็ต${modName.TH}ความเร็วสูง ${dataAmount} ที่ ${speed} รวมถึง${benefit1TH}และ${benefit2TH}`,
-        `${p} คือแผน${ptName.TH}สำหรับผู้ใช้ยุคใหม่ มอบเน็ต ${dataAmount} ความเร็ว ${speed} และการเข้าถึง 5G`,
-        `${p} มอบเน็ต ${dataAmount} ที่ ${speed} พร้อมโทรฟรีไม่จำกัดและฟีเจอร์พรีเมียมในราคา ${price} บาทต่อเดือน`,
-        `${p} คือแพ็กเกจ${modName.TH}ที่ออกแบบมาเพื่อมอบเน็ต ${dataAmount} ${benefit1TH}และ${benefit2TH}ในราคาที่คุ้มค่า`,
-        `${p} รวมเน็ตความเร็วสูง ${dataAmount} ที่ ${speed} พร้อมรองรับ 5G เต็มรูปแบบและโทรฟรีไม่จำกัด`,
-        `${p} คือตัวเลือก${ptName.TH}ที่ฉลาด มอบเน็ต ${dataAmount} การเชื่อมต่อ ${speed} และสิทธิพิเศษเฉพาะ`,
-        `${p} ส่งมอบเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}ในแผน${modName.TH}ที่ครอบคลุม`,
-        `${p} คือแพ็กเกจ${modName.TH}ที่เต็มไปด้วยฟีเจอร์ด้วยเน็ต ${dataAmount} ${benefit1TH}และ${benefit2TH}ในราคา ${price} บาท`,
-        `${p} มอบเน็ต${modName.TH} ${dataAmount} ที่ ${speed} พร้อมการเชื่อมต่อระดับสูงสุดและความคุ้มค่าที่ยอดเยี่ยม`,
-        `${p} คือโซลูชัน${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} ความเร็ว ${speed} โทรฟรีไม่จำกัดและรองรับ 5G`,
-        `${p} มอบประสบการณ์${ptName.TH}${modName.TH}ขั้นสุดด้วยเน็ต ${dataAmount} และ${benefit1TH}`,
-        `${p} คือแพ็กเกจ${modName.TH}ที่ใช่สำหรับคุณด้วยเน็ต ${dataAmount} ที่ ${speed} ในราคาเพียง ${price} บาท`,
-        `${p} ผสานเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit2TH}ในแพ็กเกจ${modName.TH}อันทรงพลัง`,
-        `${p} คือแผน${ptName.TH}${modName.TH}ที่เชื่อถือได้ด้วยเน็ต ${dataAmount} และโทรฟรีไม่จำกัด`,
-      ],
-    },
-
-    // ===== OTHER CONDITION =====
-    otherCondition: {
-      EN: [
-        `Promotion is valid for new ${modName.EN} customers only`,
-        `This offer is available for a limited time only`,
-        `Valid for ${validity} days from the date of activation`,
-        `Fair usage policy applies once the ${dataAmount} data limit is reached`,
-        `This promotion cannot be combined with any other offer`,
-        `Subject to credit check and approval`,
-        `Auto renews each month unless cancelled before the renewal date`,
-        `Terms and conditions of this promotion apply`,
-        `Available to Thai nationals and residents only`,
-        `Minimum contract period of ${contractMonths} months applies`,
-        `Network availability may vary by location`,
-        `Prices are inclusive of VAT unless stated otherwise`,
-        `Package must be activated within ${validity} days of subscription`,
-        `Data speed may be reduced after reaching ${dataAmount} limit`,
-        `This offer applies to personal use accounts only`,
-        `Promotional pricing valid for the first ${contractMonths} months`,
-        `Service subject to network coverage in your area`,
-        `One promotional package per customer account`,
-        `Package features and pricing are subject to change without notice`,
-        `Data allowance resets at the start of each billing cycle`,
-      ],
-      TH: [
-        `โปรโมชันสำหรับลูกค้า${modName.TH}ใหม่เท่านั้น`,
-        `ข้อเสนอนี้มีระยะเวลาจำกัดเท่านั้น`,
-        `มีอายุ ${validity} วันนับจากวันที่เปิดใช้งาน`,
-        `นโยบายการใช้งานที่เหมาะสมมีผลเมื่อใช้เน็ตครบ ${dataAmount}`,
-        `โปรโมชันนี้ไม่สามารถใช้ร่วมกับข้อเสนออื่นได้`,
-        `ขึ้นอยู่กับการตรวจสอบและอนุมัติเครดิต`,
-        `ต่ออายุอัตโนมัติทุกเดือนหากไม่ยกเลิกก่อนวันต่ออายุ`,
-        `ข้อกำหนดและเงื่อนไขของโปรโมชันนี้มีผลบังคับใช้`,
-        `สำหรับบุคคลสัญชาติไทยและผู้มีถิ่นพำนักในประเทศไทยเท่านั้น`,
-        `มีระยะสัญญาขั้นต่ำ ${contractMonths} เดือน`,
-        `ความครอบคลุมเครือข่ายอาจแตกต่างกันตามพื้นที่`,
-        `ราคารวมภาษีมูลค่าเพิ่มแล้วหากไม่ระบุเป็นอย่างอื่น`,
-        `ต้องเปิดใช้งานแพ็กเกจภายใน ${validity} วันหลังการสมัคร`,
-        `ความเร็วอินเทอร์เน็ตอาจลดลงหลังใช้ครบ ${dataAmount}`,
-        `ข้อเสนอนี้ใช้ได้กับบัญชีส่วนตัวเท่านั้น`,
-        `ราคาโปรโมชันใช้ได้สำหรับ ${contractMonths} เดือนแรก`,
-        `บริการขึ้นอยู่กับการครอบคลุมสัญญาณในพื้นที่ของคุณ`,
-        `หนึ่งแพ็กเกจโปรโมชันต่อบัญชีลูกค้าหนึ่งราย`,
-        `ฟีเจอร์และราคาของแพ็กเกจอาจเปลี่ยนแปลงได้โดยไม่ต้องแจ้งล่วงหน้า`,
-        `ปริมาณเน็ตจะรีเซ็ตในช่วงต้นรอบการเรียกเก็บเงินใหม่แต่ละรอบ`,
-      ],
-    },
-
-    // ===== MEMO DESCRIPTION =====
-    memoDescription: {
-      EN: [
-        `${p} internal configuration notes for reference and validation`,
-        `${p} ${modName.EN} ${ptName.EN} setup memo PO ${po}`,
-        `Product parameters: ${dataAmount} data at ${speed} price ${price} THB`,
-        `${p} created for system testing and quality validation`,
-        `Memo: ${p} configuration completed with standard settings`,
-        `${p} package details: ${dataAmount} ${speed} ${price} THB for internal use`,
-        `Internal reference: ${p} ${ptName.EN} ${modName.EN} PO ${po}`,
-        `${p} setup record: data ${dataAmount} speed ${speed} monthly ${price} THB`,
-        `Validation memo for ${p} ${modName.EN} package configuration`,
-        `${p} created and verified for deployment PO ${po}`,
-      ],
-      TH: [
-        `บันทึกการกำหนดค่าภายในสำหรับ ${p} เพื่อใช้อ้างอิงและตรวจสอบ`,
-        `บันทึกการตั้งค่า ${p} ${modName.TH} ${ptName.TH} PO ${po}`,
-        `พารามิเตอร์ผลิตภัณฑ์: เน็ต ${dataAmount} ที่ ${speed} ราคา ${price} บาท`,
-        `${p} สร้างขึ้นเพื่อการทดสอบระบบและการตรวจสอบคุณภาพ`,
-        `บันทึก: การกำหนดค่า ${p} เสร็จสมบูรณ์ด้วยการตั้งค่ามาตรฐาน`,
-        `รายละเอียดแพ็กเกจ ${p}: เน็ต ${dataAmount} ${speed} ${price} บาทสำหรับใช้ภายใน`,
-        `อ้างอิงภายใน: ${p} ${ptName.TH} ${modName.TH} PO ${po}`,
-        `บันทึกการตั้งค่า ${p}: เน็ต ${dataAmount} ความเร็ว ${speed} รายเดือน ${price} บาท`,
-        `บันทึกการตรวจสอบสำหรับการกำหนดค่าแพ็กเกจ ${p} ${modName.TH}`,
-        `${p} สร้างและตรวจสอบพร้อมสำหรับการใช้งาน PO ${po}`,
-      ],
-    },
-
-    // ===== DISCOUNT NAME =====
-    discountName: {
-      EN: [
-        `${p} New Member Discount`,
-        `${p} Loyalty Reward`,
-        `${p} Activation Saving`,
-        `${p} Early Bird Saving`,
-        `${p} Seasonal Offer`,
-        `${p} Bundle Saving`,
-        `${p} Data Bonus`,
-        `${p} Speed Upgrade`,
-        `${p} Referral Reward`,
-        `${p} Renewal Discount`,
-        `${p} First Month Saving`,
-        `${p} Annual Discount`,
-        `${p} Intro Rate`,
-        `${p} Welcome Discount`,
-        `${p} Sign Up Saving`,
-        `${p} Upgrade Benefit`,
-        `${p} Member Privilege`,
-        `${p} Value Boost`,
-        `${p} Price Cut`,
-        `${p} Trade In Offer`,
-      ],
-      TH: [
-        `ส่วนลดสมาชิกใหม่ ${p}`,
-        `รางวัลความภักดี ${p}`,
-        `ส่วนลดเปิดใช้งาน ${p}`,
-        `ส่วนลดจองล่วงหน้า ${p}`,
-        `ข้อเสนอตามฤดูกาล ${p}`,
-        `ประหยัดจากบันเดิล ${p}`,
-        `โบนัสเน็ต ${p}`,
-        `อัปเกรดความเร็ว ${p}`,
-        `รางวัลแนะนำเพื่อน ${p}`,
-        `ส่วนลดต่ออายุ ${p}`,
-        `ประหยัดเดือนแรก ${p}`,
-        `ส่วนลดรายปี ${p}`,
-        `ราคาแนะนำ ${p}`,
-        `ส่วนลดต้อนรับ ${p}`,
-        `ประหยัดจากการสมัคร ${p}`,
-        `สิทธิพิเศษอัปเกรด ${p}`,
-        `สิทธิพิเศษสมาชิก ${p}`,
-        `เพิ่มคุณค่า ${p}`,
-        `ลดราคา ${p}`,
-        `ข้อเสนอเปลี่ยนเครือข่าย ${p}`,
-      ],
-    },
+    shortPromotionName: { EN: [`${p} Value Pack`, `${p} Smart Deal`, `${p} Power Plan`, `${p} Daily Deal`, `${p} Big Save`, `${p} Speed Pack`, `${p} Data King`, `${p} Net Plus`, `${p} Always On`, `${p} Full Power`, `${p} Next Level`, `${p} My Choice`, `${p} Go Extra`, `${p} Double Up`, `${p} Hero`, `${p} Ace`, `${p} Edge`, `${p} Flex`, `${p} Rise`, `${p} Zone`, `${p} Core Plus`, `${p} Super Plan`, `${p} Fast Lane`, `${p} All Day`, `${p} Family Plan`, `${p} Business Pack`, `${p} Weekend Pick`, `${p} Monthly Star`, `${p} Top Value`, `${p} Best Buy`], TH: [`${p} แพ็กคุ้ม`, `${p} ดีลฉลาด`, `${p} พลานพาวเวอร์`, `${p} ดีลรายวัน`, `${p} ประหยัดสุด`, `${p} แพ็กความเร็ว`, `${p} ดาต้าคิง`, `${p} เน็ตพลัส`, `${p} ออนตลอด`, `${p} พลังเต็ม`, `${p} ขั้นต่อไป`, `${p} ของฉัน`, `${p} โกเอ็กซ์ตร้า`, `${p} ดับเบิลอัป`, `${p} ฮีโร่`, `${p} เอซ`, `${p} เอดจ์`, `${p} เฟล็กซ์`, `${p} ไรส์`, `${p} โซน`, `${p} คอร์พลัส`, `${p} ซูเปอร์แพลน`, `${p} เลนเร็ว`, `${p} ตลอดวัน`, `${p} แพลนครอบครัว`, `${p} แพ็กธุรกิจ`, `${p} พิเศษวีคเอนด์`, `${p} สตาร์ประจำเดือน`, `${p} คุ้มสุดคุ้ม`, `${p} ซื้อดีที่สุด`] },
+    promotionDescription: { EN: [`Sign up for ${p} and get ${dataAmount} of data at ${speed} plus unlimited calls for just ${price} THB per month`, `${p} is the ${modName.EN} package that gives you ${dataAmount} data ${speed} speeds and ${benefit1} all in one`, `Get more done every day with ${p} featuring ${dataAmount} data at ${speed} and ${benefit2} included`, `${p} is your complete ${modName.EN} solution with ${dataAmount} data unlimited calls and 5G access at ${price} THB`, `Try ${p} and enjoy ${dataAmount} high speed data plus ${benefit1} and ${benefit2} for only ${price} THB monthly`, `${p} gives you ${dataAmount} of ${modName.EN} data at ${speed} so you never slow down`, `Choose ${p} for ${dataAmount} data ${speed} connectivity and top features at just ${price} THB a month`, `Stay connected with ${p} and enjoy ${dataAmount} data ${benefit1} and unlimited domestic calls all day`, `${p} is built for modern users offering ${dataAmount} data at ${speed} plus ${benefit1} and ${benefit2}`], TH: [`สมัคร ${p} รับเน็ต ${dataAmount} ความเร็ว ${speed} พร้อมโทรฟรีไม่จำกัดในราคาเพียง ${price} บาทต่อเดือน`, `${p} คือแพ็กเกจ${modName.TH}ที่มอบเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit1TH}ครบในที่เดียว`, `ทำได้มากขึ้นทุกวันด้วย ${p} ที่มีเน็ต ${dataAmount} ความเร็ว ${speed} และ${benefit2TH}รวมไว้แล้ว`, `${p} คือโซลูชัน${modName.TH}ครบวงจรด้วยเน็ต ${dataAmount} โทรฟรีไม่จำกัด และ 5G ที่ ${price} บาท`, `ลอง ${p} และเพลิดเพลินกับเน็ตความเร็วสูง ${dataAmount} พร้อม${benefit1TH}และ${benefit2TH}เพียง ${price} บาทต่อเดือน`, `${p} มอบเน็ต${modName.TH} ${dataAmount} ที่ความเร็ว ${speed} ทำให้คุณไม่มีวันช้าลง`, `เลือก ${p} สำหรับเน็ต ${dataAmount} การเชื่อมต่อ ${speed} และฟีเจอร์ชั้นยอดในราคาเพียง ${price} บาทต่อเดือน`, `เชื่อมต่อกับ ${p} และเพลิดเพลินกับเน็ต ${dataAmount} ${benefit1TH} และโทรฟรีไม่จำกัดตลอดวัน`, `${p} สร้างมาสำหรับผู้ใช้ยุคใหม่ มอบเน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อม${benefit1TH}และ${benefit2TH}`] },
+    greetingLetter: { EN: [`Dear customer we are glad to confirm that your ${p} subscription is now active and ready to use`, `Hello and welcome to ${p} your ${modName.EN} package is live and all features are available to you`, `Dear valued customer your ${p} plan has been successfully activated with ${dataAmount} of data ready for you`, `Welcome to the ${p} family we are thrilled to have you and hope you enjoy every benefit included`, `Dear customer your ${p} subscription has been confirmed and your ${dataAmount} data at ${speed} is now ready`], TH: [`เรียนลูกค้า เรายินดียืนยันว่าการสมัคร ${p} ของคุณพร้อมใช้งานแล้ว`, `สวัสดีและยินดีต้อนรับสู่ ${p} แพ็กเกจ${modName.TH}ของคุณมีผลแล้วและฟีเจอร์ทั้งหมดพร้อมใช้`, `เรียนลูกค้าที่มีคุณค่า แผน ${p} ของคุณถูกเปิดใช้งานสำเร็จพร้อมเน็ต ${dataAmount} รอคุณอยู่`, `ยินดีต้อนรับสู่ครอบครัว ${p} เรารู้สึกตื่นเต้นที่มีคุณอยู่ด้วยและหวังว่าคุณจะสนุกกับทุกสิทธิพิเศษ`, `เรียนลูกค้า การสมัคร ${p} ของคุณได้รับการยืนยันแล้ว เน็ต ${dataAmount} ที่ความเร็ว ${speed} พร้อมแล้ว`] },
+    yourPackageName: { EN: [`Your plan: ${p}`, `Currently on: ${p}`, `Active subscription: ${p}`, `Subscribed plan: ${p}`, `Running package: ${p}`, `Now on: ${p}`, `Package in use: ${p}`, `My plan: ${p}`, `Signed up for: ${p}`, `Live package: ${p}`, `Enrolled plan: ${p}`, `Chosen package: ${p}`, `${p} is active`, `${p} ${dataAmount} plan`, `${p} ${modName.EN} ${ptName.EN} active`], TH: [`แผนของคุณ: ${p}`, `ใช้งานอยู่: ${p}`, `การสมัครที่ใช้งาน: ${p}`, `แผนที่สมัคร: ${p}`, `แพ็กเกจที่รัน: ${p}`, `ตอนนี้ใช้: ${p}`, `แพ็กเกจที่ใช้: ${p}`, `แผนของฉัน: ${p}`, `สมัครอยู่กับ: ${p}`, `แพ็กเกจที่มีผล: ${p}`, `แผนที่ลงทะเบียน: ${p}`, `แพ็กเกจที่เลือก: ${p}`, `${p} ใช้งานอยู่`, `${p} แผน ${dataAmount}`, `${p} ${modName.TH} ${ptName.TH} ใช้งานอยู่`] },
+    smsGreeting: { EN: [`Welcome to ${p} your package is now active and ready`, `You have joined ${p} enjoy ${dataAmount} data starting today`, `${p} is now on enjoy your ${modName.EN} benefits`, `Your ${p} plan is live and all features are unlocked`, `Thanks for choosing ${p} enjoy ${dataAmount} at ${speed}`], TH: [`ยินดีต้อนรับสู่ ${p} แพ็กเกจของคุณพร้อมใช้งานแล้ว`, `คุณเข้าร่วม ${p} แล้ว เพลิดเพลินกับเน็ต ${dataAmount} ตั้งแต่วันนี้`, `${p} เปิดแล้ว เพลิดเพลินกับสิทธิพิเศษ${modName.TH}ของคุณ`, `แผน ${p} ของคุณมีผลแล้วและฟีเจอร์ทั้งหมดพร้อมใช้`, `ขอบคุณที่เลือก ${p} เพลิดเพลินกับ ${dataAmount} ที่ ${speed}`] },
+    smsDelete: { EN: [`Your ${p} package has been cancelled thank you for using our service`, `${p} has been removed from your number we hope to see you again`, `Your ${p} plan is now deactivated thank you for being with us`, `We have cancelled ${p} on your account thank you for your loyalty`, `${p} has been successfully unsubscribed we value your time with us`], TH: [`แพ็กเกจ ${p} ของคุณถูกยกเลิกแล้ว ขอบคุณที่ใช้บริการของเรา`, `${p} ถูกลบออกจากเบอร์ของคุณแล้ว หวังว่าจะพบกันใหม่`, `แผน ${p} ของคุณถูกปิดใช้งานแล้ว ขอบคุณที่อยู่กับเรา`, `เราได้ยกเลิก ${p} บนบัญชีของคุณแล้ว ขอบคุณสำหรับความไว้วางใจ`, `${p} ถูกยกเลิกสำเร็จแล้ว เราขอบคุณในทุกช่วงเวลาที่ผ่านมา`] },
+    wordingInStatement: { EN: [`${p} ${modName.EN} ${ptName.EN} monthly charge`, `${p} data package ${dataAmount} at ${speed}`, `${p} subscription ${price} THB`, `Monthly fee ${p}`, `${p} service charge`, `${p} billing ${price} THB per month`, `${p} ${ptName.EN} plan charge`, `Payment for ${p}`, `${p} plan ${dataAmount} monthly`, `${p} subscription fee ${price} THB`], TH: [`ค่าบริการรายเดือน ${p} ${modName.TH} ${ptName.TH}`, `แพ็กเกจเน็ต ${p} ${dataAmount} ที่ ${speed}`, `การสมัคร ${p} ${price} บาท`, `ค่าบริการรายเดือน ${p}`, `ค่าบริการ ${p}`, `การเรียกเก็บเงิน ${p} ${price} บาทต่อเดือน`, `ค่าบริการแผน ${p} ${ptName.TH}`, `ชำระเงินสำหรับ ${p}`, `แผน ${p} ${dataAmount} รายเดือน`, `ค่าสมัคร ${p} ${price} บาท`] },
+    description: { EN: [`${p} is a ${ptName.EN} ${modName.EN} package with ${dataAmount} data ${speed} speeds and unlimited domestic calls`, `${p} offers ${dataAmount} of high speed ${modName.EN} data at ${speed} including ${benefit1} and ${benefit2}`, `${p} is the ${ptName.EN} plan for modern users delivering ${dataAmount} data ${speed} and 5G access`, `${p} provides ${dataAmount} data at ${speed} plus unlimited calls and premium features for ${price} THB monthly`, `${p} is a ${modName.EN} package designed to give you ${dataAmount} data ${benefit1} and ${benefit2} at great value`], TH: [`${p} คือแพ็กเกจ${modName.TH}แบบ${ptName.TH}ด้วยเน็ต ${dataAmount} ความเร็ว ${speed} และโทรฟรีทุกเครือข่ายไม่จำกัด`, `${p} มอบเน็ต${modName.TH}ความเร็วสูง ${dataAmount} ที่ ${speed} รวมถึง${benefit1TH}และ${benefit2TH}`, `${p} คือแผน${ptName.TH}สำหรับผู้ใช้ยุคใหม่ มอบเน็ต ${dataAmount} ความเร็ว ${speed} และการเข้าถึง 5G`, `${p} มอบเน็ต ${dataAmount} ที่ ${speed} พร้อมโทรฟรีไม่จำกัดและฟีเจอร์พรีเมียมในราคา ${price} บาทต่อเดือน`, `${p} คือแพ็กเกจ${modName.TH}ที่ออกแบบมาเพื่อมอบเน็ต ${dataAmount} ${benefit1TH}และ${benefit2TH}ในราคาที่คุ้มค่า`] },
+    otherCondition: { EN: [`Promotion is valid for new ${modName.EN} customers only`, `This offer is available for a limited time only`, `Valid for ${validity} days from the date of activation`, `Fair usage policy applies once the ${dataAmount} data limit is reached`, `This promotion cannot be combined with any other offer`, `Subject to credit check and approval`, `Auto renews each month unless cancelled before the renewal date`, `Terms and conditions of this promotion apply`, `Available to Thai nationals and residents only`, `Minimum contract period of ${contractMonths} months applies`], TH: [`โปรโมชันสำหรับลูกค้า${modName.TH}ใหม่เท่านั้น`, `ข้อเสนอนี้มีระยะเวลาจำกัดเท่านั้น`, `มีอายุ ${validity} วันนับจากวันที่เปิดใช้งาน`, `นโยบายการใช้งานที่เหมาะสมมีผลเมื่อใช้เน็ตครบ ${dataAmount}`, `โปรโมชันนี้ไม่สามารถใช้ร่วมกับข้อเสนออื่นได้`, `ขึ้นอยู่กับการตรวจสอบและอนุมัติเครดิต`, `ต่ออายุอัตโนมัติทุกเดือนหากไม่ยกเลิกก่อนวันต่ออายุ`, `ข้อกำหนดและเงื่อนไขของโปรโมชันนี้มีผลบังคับใช้`, `สำหรับบุคคลสัญชาติไทยและผู้มีถิ่นพำนักในประเทศไทยเท่านั้น`, `มีระยะสัญญาขั้นต่ำ ${contractMonths} เดือน`] },
+    memoDescription: { EN: [`${p} internal configuration notes for reference and validation`, `${p} ${modName.EN} ${ptName.EN} setup memo PO ${po}`, `Product parameters: ${dataAmount} data at ${speed} price ${price} THB`, `${p} created for system testing and quality validation`, `Memo: ${p} configuration completed with standard settings`], TH: [`บันทึกการกำหนดค่าภายในสำหรับ ${p} เพื่อใช้อ้างอิงและตรวจสอบ`, `บันทึกการตั้งค่า ${p} ${modName.TH} ${ptName.TH} PO ${po}`, `พารามิเตอร์ผลิตภัณฑ์: เน็ต ${dataAmount} ที่ ${speed} ราคา ${price} บาท`, `${p} สร้างขึ้นเพื่อการทดสอบระบบและการตรวจสอบคุณภาพ`, `บันทึก: การกำหนดค่า ${p} เสร็จสมบูรณ์ด้วยการตั้งค่ามาตรฐาน`] },
+    discountName: { EN: [`${p} New Member Discount`, `${p} Loyalty Reward`, `${p} Activation Saving`, `${p} Early Bird Saving`, `${p} Seasonal Offer`, `${p} Bundle Saving`, `${p} Data Bonus`, `${p} Speed Upgrade`, `${p} Referral Reward`, `${p} Renewal Discount`], TH: [`ส่วนลดสมาชิกใหม่ ${p}`, `รางวัลความภักดี ${p}`, `ส่วนลดเปิดใช้งาน ${p}`, `ส่วนลดจองล่วงหน้า ${p}`, `ข้อเสนอตามฤดูกาล ${p}`, `ประหยัดจากบันเดิล ${p}`, `โบนัสเน็ต ${p}`, `อัปเกรดความเร็ว ${p}`, `รางวัลแนะนำเพื่อน ${p}`, `ส่วนลดต่ออายุ ${p}`] }
   };
 };
 
-const fillServicePOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
-  const promotionLevels = ['Mobile', 'Account', 'Non-Mobile'] as const;
-  const randomPromotion = promotionLevels[Math.floor(Math.random() * promotionLevels.length)];
+// ==========================================
+// 🔹 CYPRESS FILL FUNCTIONS (Logic กระชับ)
+// ==========================================
+const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
 
-  cy.get('select[formcontrolname="promotionLevel"]')
-    .select(randomPromotion)
-    .should('have.value', randomPromotion);
+  cy.get('select[formcontrolname="promotionLevel"]').select(pickRandom(['Mobile', 'Account', 'Non-Mobile']));
+  fillBilingual('textarea[formcontrolname="wordingInStatementEn"]', 'textarea[formcontrolname="wordingInStatementTh"]', pools.wordingInStatement.EN, pools.wordingInStatement.TH, 250, 250);
 
-  const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
-  const pOName = poName || 'ServicePO';
+  const smsFlag = pickRandom(['Send', "Don't Send"]);
+  cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(smsFlag);
+  if (smsFlag === 'Send') fillBilingual('textarea[formcontrolname="smsGreetingEn"]', 'textarea[formcontrolname="smsGreetingTh"]', pools.smsGreeting.EN, pools.smsGreeting.TH, 400, 400);
 
-  const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
+  const delFlag = pickRandom(['Send', "Don't Send"]);
+  cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(delFlag);
+  if (delFlag === 'Send') fillBilingual('textarea[formcontrolname="smsDeleteEn"]', 'textarea[formcontrolname="smsDeleteTh"]', pools.smsDelete.EN, pools.smsDelete.TH, 250, 250);
 
-  // Wording In Statement
-  cy.get('textarea[formcontrolname="wordingInStatementEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
-  cy.get('textarea[formcontrolname="wordingInStatementTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
+  fillBilingual('textarea[formcontrolname="descriptionEn"]', 'textarea[formcontrolname="descriptionTh"]', pools.description.EN, pools.description.TH, 500, 500);
+  fillField('input[formcontrolname="discountRevenueCode"]', 'APCP-009');
+  selectMultipleFromDualList('availableListBox', randInt(1, 3));
 
-  // SMS Greeting
-  const smsFlags = ['Send', "Don't Send"];
-  const randomSmsFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
-  cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(randomSmsFlag);
-
-  if (randomSmsFlag === 'Send') {
-    cy.get('textarea[formcontrolname="smsGreetingEn"]')
-      .clear().type(limitAndCleanEN(pickRandom(pools.smsGreeting.EN), 400));
-    cy.get('textarea[formcontrolname="smsGreetingTh"]')
-      .clear().type(limitAndCleanTH(pickRandom(pools.smsGreeting.TH), 400));
-  }
-
-  // SMS Delete
-  const randomDeleteFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
-  cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(randomDeleteFlag);
-
-  if (randomDeleteFlag === 'Send') {
-    cy.get('textarea[formcontrolname="smsDeleteEn"]')
-      .clear().type(limitAndCleanEN(pickRandom(pools.smsDelete.EN), 250));
-    cy.get('textarea[formcontrolname="smsDeleteTh"]')
-      .clear().type(limitAndCleanTH(pickRandom(pools.smsDelete.TH), 250));
-  }
-
-  // Description
-  cy.get('textarea[formcontrolname="descriptionEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
-  cy.get('textarea[formcontrolname="descriptionTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
-
-  cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
-
-  selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
-
-  // Other Condition
-  const conditionCount = Math.floor(Math.random() * 5) + 2;
-  const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
-  cy.get('textarea[formcontrolname="otherCondition"]')
-    .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
-
-  // Memo Description
-  cy.get('textarea[formcontrolname="memoDescription"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
+  fillField('textarea[formcontrolname="otherCondition"]', limitAndCleanEN(pickMultiple(pools.otherCondition.EN, randInt(2, 6)).join(' '), 1000));
+  fillField('textarea[formcontrolname="memoDescription"]', limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
-const fillCashBackPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
-  const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
-  const pOName = poName || 'CashBackPO';
+const fillCashBackPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'CashBackPO', Module, PriceType, subModule);
 
-  const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
-
-  // Short Promotion Name
-  cy.get('textarea[formcontrolname="shortPromotionNameEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.shortPromotionName.EN), 100));
-  cy.get('textarea[formcontrolname="shortPromotionNameTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.shortPromotionName.TH), 100));
-
-  // Promotion Description
-  cy.get('textarea[formcontrolname="promotionDescriptionEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.promotionDescription.EN), 500));
-  cy.get('textarea[formcontrolname="promotionDescriptionTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.promotionDescription.TH), 500));
-
-  // Greeting Letter
-  cy.get('textarea[formcontrolname="greetingLetterEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.greetingLetter.EN), 500));
-  cy.get('textarea[formcontrolname="greetingLetterTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.greetingLetter.TH), 500));
-
-  // Your Package Name
-  cy.get('textarea[formcontrolname="yourPackageNameEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.yourPackageName.EN), 100));
-  cy.get('textarea[formcontrolname="yourPackageNameTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.yourPackageName.TH), 100));
-
-  selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+  fillBilingual('textarea[formcontrolname="shortPromotionNameEn"]', 'textarea[formcontrolname="shortPromotionNameTh"]', pools.shortPromotionName.EN, pools.shortPromotionName.TH, 100, 100);
+  fillBilingual('textarea[formcontrolname="promotionDescriptionEn"]', 'textarea[formcontrolname="promotionDescriptionTh"]', pools.promotionDescription.EN, pools.promotionDescription.TH, 500, 500);
+  fillBilingual('textarea[formcontrolname="greetingLetterEn"]', 'textarea[formcontrolname="greetingLetterTh"]', pools.greetingLetter.EN, pools.greetingLetter.TH, 500, 500);
+  fillBilingual('textarea[formcontrolname="yourPackageNameEn"]', 'textarea[formcontrolname="yourPackageNameTh"]', pools.yourPackageName.EN, pools.yourPackageName.TH, 100, 100);
+  selectMultipleFromDualList('availableListBox', randInt(1, 3));
 };
 
+const fillStandardPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'StandardPO', Module, PriceType, subModule);
 
-const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
-  const productTypes = ['FBB', 'Fixline', 'Mobile', 'Non Mobile'] as const;
-  const randomValue = productTypes[Math.floor(Math.random() * productTypes.length)];
-  cy.get('select[formcontrolname="productType"]').select(randomValue).should('have.value', randomValue);
+  cy.get('select[formcontrolname="productType"]').select(pickRandom(['FBB', 'Fixline', 'Mobile', 'Non Mobile']));
+  fillBilingual('textarea[formcontrolname="wordingInStatementEn"]', 'textarea[formcontrolname="wordingInStatementTh"]', pools.wordingInStatement.EN, pools.wordingInStatement.TH, 250, 250);
+  fillBilingual('textarea[formcontrolname="descriptionEn"]', 'textarea[formcontrolname="descriptionTh"]', pools.description.EN, pools.description.TH, 500, 500);
+  fillField('input[formcontrolname="discountRevenueCode"]', 'APCP-009');
+  selectMultipleFromDualList('availableListBox', randInt(1, 3));
 
-  const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
-  const pOName = poName || 'StandardPO';
-
-  const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
-
-  // Wording In Statement
-  cy.get('textarea[formcontrolname="wordingInStatementEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
-  cy.get('textarea[formcontrolname="wordingInStatementTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
-
-  // Description
-  cy.get('textarea[formcontrolname="descriptionEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
-  cy.get('textarea[formcontrolname="descriptionTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
-
-  cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
-  selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
-
-  // Other Condition
-  const conditionCount = Math.floor(Math.random() * 5) + 2;
-  const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
-  cy.get('textarea[formcontrolname="otherCondition"]')
-    .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
-
-  // Memo Description
-  cy.get('textarea[formcontrolname="memoDescription"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
+  fillField('textarea[formcontrolname="otherCondition"]', limitAndCleanEN(pickMultiple(pools.otherCondition.EN, randInt(2, 6)).join(' '), 1000));
+  fillField('textarea[formcontrolname="memoDescription"]', limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
-const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectName?: string, poName?: string): void => {
-  const pName = projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`;
-  const pOName = poName || 'CashBackDiscount';
+const fillCashBackDiscountConfig = (Module: string, PriceType: string, projectName?: string, poName?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`, poName || 'CashBackDiscount', Module, PriceType);
 
-  const pools = createPOWordingPools(pName, pOName, Module, PriceType);
-
-  // Duration
-  const durationOptions = [1, 3, 6, 12, 24, 36];
-  const randomDuration = durationOptions[Math.floor(Math.random() * durationOptions.length)];
-  cy.get('input[formcontrolname="duration"]').clear().type(randomDuration.toString());
+  fillField('input[formcontrolname="duration"]', pickRandom([1, 3, 6, 12, 24, 36]).toString());
   cy.get('button[class*="btn-primary"][type="button"]').first().click();
+  fillField('input[formcontrolname="durationFrom"]', pickRandom([0, 1, 2, 3]).toString());
 
-  // Duration From
-  const durationFromOptions = [0, 1, 2, 3];
-  const randomDurationFrom = durationFromOptions[Math.floor(Math.random() * durationFromOptions.length)];
-  cy.get('input[formcontrolname="durationFrom"]').clear().type(randomDurationFrom.toString());
-
-  // Discount Type
-  cy.get('select[formcontrolname="discountType"]')
-    .find('option:not([disabled])')
-    .then(($options) => {
-      if ($options.length > 0) {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        cy.get('select[formcontrolname="discountType"]').select(($options[randomIndex] as HTMLOptionElement).value);
-      }
-    });
-
-  // Discount Name
-  cy.get('textarea[formcontrolname="discountNameEn"]')
-    .clear().type(limitAndCleanEN(pickRandom(pools.discountName.EN), 100));
-  cy.get('textarea[formcontrolname="discountNameTh"]')
-    .clear().type(limitAndCleanTH(pickRandom(pools.discountName.TH), 100));
-
-  const randomIndex = Math.floor(Math.random() * 2);
-  cy.get('input[formcontrolname="marginalDiscount"]').eq(randomIndex).check({ force: true });
-  cy.get('button[class*="btn-primary"][type="button"]').eq(1).click();
-  cy.get('input[formcontrolname="prorate"]').eq(randomIndex).check({ force: true });
-
-  const getRandomNumber = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
-
-  if (randomIndex === 0) {
-    const cashbackTypes = Math.floor(Math.random() * 2);
-
-    if (cashbackTypes === 0) {
-      cy.get('input[formcontrolname="cashBackType"]').first().check({ force: true });
-      const totalUsage = getRandomNumber(1000, 5000);
-      const cashBackExc = getRandomNumber(50, 500);
-      cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(totalUsage.toString());
-      cy.get('input[formcontrolname="cashBackExcVat"]').clear().type(cashBackExc.toString());
-      cy.get('input[formcontrolname="cashBackIncVat"]').clear().type(Math.round(cashBackExc * 1.07).toString());
-    } else {
-      cy.get('input[formcontrolname="cashBackType"]').last().check({ force: true });
-      cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
-      cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
+  cy.get('select[formcontrolname="discountType"]').find('option:not([disabled])').then(($opts) => {
+    if ($opts.length) {
+      const randomOpt = $opts[randInt(0, $opts.length - 1)] as HTMLOptionElement;
+      cy.get('select[formcontrolname="discountType"]').select(randomOpt.value);
     }
+  });
+  
+  fillBilingual('textarea[formcontrolname="discountNameEn"]', 'textarea[formcontrolname="discountNameTh"]', pools.discountName.EN, pools.discountName.TH, 100, 100);
+
+  const idx = randInt(0, 1);
+  cy.get('input[formcontrolname="marginalDiscount"]').eq(idx).check({ force: true });
+  cy.get('button[class*="btn-primary"][type="button"]').eq(1).click();
+  cy.get('input[formcontrolname="prorate"]').eq(idx).check({ force: true });
+
+  // Logic เดิม: ถ้า idx=0 มีโอกาส 50% เป็น Fixed, ถ้า idx=1 เป็น Percent เสมอ
+  const isFixed = idx === 0 && randInt(0, 1) === 0;
+  cy.get('input[formcontrolname="cashBackType"]').eq(isFixed ? 0 : 1).check({ force: true });
+  fillField('input[formcontrolname="totalUsageFromExcVat"]', randomInt(1000, 5000).toString());
+
+  if (isFixed) {
+    const cashBack = randomInt(50, 500);
+    fillField('input[formcontrolname="cashBackExcVat"]', cashBack.toString());
+    fillField('input[formcontrolname="cashBackIncVat"]', Math.round(cashBack * 1.07).toString());
   } else {
-    cy.get('input[formcontrolname="cashBackType"]').last().check({ force: true });
-    cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
-    cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
+    fillField('input[formcontrolname="cashBackPercent"]', randomInt(1, 20).toString());
   }
-  cy.wait(2000)
+
+  cy.wait(2000);
   cy.get('button.btn.btn-primary').contains('Add').click();
   cy.wait(2000);
   cy.get('button.btn.btn-primary').contains('Add').click();
@@ -8346,17 +6926,14 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
   cy.get('.col-md-10 > .btn').should('be.visible').click();
 
   cy.get('input[formcontrolname="projectName"]').type(projectName);
-  Cypress.env('projectName', projectName);
-
   const date = new Date();
   date.setDate(date.getDate() + 1);
   const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.get('input[aria-label="Date input field"]').type(formattedDate);
   cy.wait(1500);
   cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
-  RandomProjectDescription(projectName, Module);
+  RandomProjectDescription(projectName, undefined, undefined, undefined, undefined, Module);
   cy.get('button[type="button"]').contains('Save').click();
   cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
   cy.wait(8000);

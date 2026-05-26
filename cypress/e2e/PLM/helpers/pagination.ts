@@ -1,3 +1,5 @@
+/// <reference types="cypress" />
+
 // ========================================
 // PAGINATION HELPER WITH SEARCH
 // ========================================
@@ -9,10 +11,10 @@
 export const searchInTableWithPagination = (
   sectionHeader: string,
   searchText: string,
-  rowCallback: ($row: JQuery<HTMLElement>, index: number) => void,
+  rowCallback: ($row: JQuery<Element>, index: number) => void,
   options: {
     waitAfterNext?: number;
-    filterCallback?: ($row: JQuery<HTMLElement>, index: number) => boolean;
+    filterCallback?: ($row: JQuery<Element>, index: number) => boolean;
   } = {}
 ): void => {
   const { waitAfterNext = 4000, filterCallback } = options;

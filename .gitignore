@@ -3,7 +3,7 @@
 node_modules/
 
 # Test files
-cypress/e2e/PLM/**/*.ts
+# cypress/e2e/PLM/**/*.ts
 
 # Logs and temp files
 *.log

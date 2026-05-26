@@ -101,7 +101,7 @@ const prepaidTestConfigs = [
 
 // ⭐ กำหนด case ที่ต้องการรันตรงนี้ที่เดียว
 // ใส่ชื่อ config.name ที่ต้องการ หรือ [] เพื่อรันทั้งหมด
-const ACTIVE_CASES: string[] = ['Main Usage'];
+const ACTIVE_CASES: string[] = ['Ontop Recurring'];
 // const ACTIVE_CASES: string[] = []; // ← รันทั้ง 9 เคส
 
 // Test Suite Runner

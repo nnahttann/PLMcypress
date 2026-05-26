@@ -133,6 +133,25 @@ export {
   approveProjectSPADdeploy
 } from './approvalFlows/spadApprovals';
 
+// CGMD Approval Functions
+export {
+  approveProjectCGMD,
+  approveProjectCGMDPRE,
+  approveProjectCGMDPREMainNotComplex,
+  approveProjectCGMDPREPlugin,
+  approveProjectCGMDPREMain,
+  approveProjectCGMDtester,
+  approveProjectCGMDtesterPRE,
+  approveProjectCGMDtesterPREPlugin
+} from './approvalFlows/cgmdApprovals';
+
+// Simple Approval Functions
+export {
+  approveProjectACTM,
+  approveProjectOPER,
+  approveProjectAPO
+} from './approvalFlows/simpleApprovals';
+
 // ============================================================================================
 // LEGACY CODE - EXTRACTION IN PROGRESS
 // ============================================================================================
