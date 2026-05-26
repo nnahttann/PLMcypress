@@ -1,5 +1,5 @@
 import { createFullPageApprovalFlow } from './baseFlows';
-import { scrollAndWait, clickYesIfExists } from '../helpers/utils';
+import { scrollAndWait, selectRandomOption, clickYesIfExists } from '../helpers/uiHelpers';
 import { FinalAction } from '../helpers/types';
 
 // ========================================
