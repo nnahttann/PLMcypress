@@ -2,6 +2,10 @@
 // SPAD APPROVAL FUNCTIONS
 // ========================
 
+import { createFullPageApprovalFlow } from './baseFlows.core';
+import { scrollAndWait, selectRandomOption, clickYesIfExists } from '../helpers/uiHelpers.core';
+import { FinalAction } from '../helpers/types.core';
+
 const _approveSPADLogic = (projectName: string, isComplex: boolean): void => {
   const buttonText = isComplex ? 'Approve as complex' : 'Approve as non complex';
 
@@ -165,3 +169,5 @@ export const approveProjectSPADdeploy = (projectName: string): void => {
     },
     'AlertAndLogout'
   );
+};
+

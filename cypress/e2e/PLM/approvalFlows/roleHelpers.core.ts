@@ -2,6 +2,11 @@
 // ROLE HELPERS
 // ========================
 
+import { assignTeamTask } from '../projectWorkflows/projectManagement.core';
+import { loginAndWaitReady } from '../helpers/auth.core';
+import { getStandardProjectName } from '../projectWorkflows/projectNameManagement.core';
+import { ApproveFunction } from '../helpers/types.core';
+
 const assignTaskViaTracking = (projectName: string, assignee: string, billingSystem: string = ''): void => {
   cy.contains('span', 'Menu', { timeout: 100000 }).click();
   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');

@@ -1,5 +1,5 @@
 import { createFullPageApprovalFlow } from './baseFlows';
-import { scrollAndWait, handleAddToUSMP, selectRandomOption, clickYesIfExists } from '../helpers/utils';
+import { scrollAndWait, handleAddToUSMP, selectRandomOption, clickYesIfExists } from '../helpers/uiHelpers';
 
 // ========================================
 // CGMD APPROVAL FUNCTIONS

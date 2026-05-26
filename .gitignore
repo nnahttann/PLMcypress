@@ -1,89 +1,20 @@
 ```
 # Cypress test artifacts
-cypress/screenshots/
 cypress/videos/
-cypress/downloads/
-
-# Build/test artifacts
-*.log
-*.tmp
-*.swp
-
-# Environment files
-.env
-.env.local
-*.env.*
+cypress/screenshots/
 
 # Dependencies
 node_modules/
 
-# IDE files
-.vscode/
-.idea/
+# Environment variables
+.env
+.env.local
+*.env.*
 
-# OS files
-.DS_Store
-Thumbs.db
+# Logs
+*.log
 
 # Coverage reports
 coverage/
-htmlcov/
-*.coverage
-
-# Compiled files
-*.pyc
-__pycache__/
-*.class
-*.o
-*.obj
-*.exe
-*.dll
-*.so
-*.a
-*.out
-
-# Distribution/packaging
-dist/
-build/
-target/
-
-# Python specific
-*.py[co]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.git/
-*.sublime-workspace
-.pytest_cache/
-.mypy_cache/
-.hypothesis/
-
-# Node.js specific
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-node_modules/
-jspm_packages/
-typings/
-.nyc_output
-coverage/
 .nyc_output/
-istanbul/
-.mocha.opts
-.travis.yml
-circle.yml
-appveyor.yml
 ```

@@ -152,14 +152,33 @@ export {
   approveProjectAPO
 } from './approvalFlows/simpleApprovals';
 
+// ========================================
+// LEGACY ROLE EXECUTION EXPORTS
+// ========================================
+// Export functions from Master-legacy that orchestrate full role flows
+export {
+  afterCKSCommonPRE,
+  afterCKSPREPlugin,
+  afterMKTOntop_NotComplex,
+  afterMKTMainPRE_FullSpadFlow,
+  afterMKTMainPRE_NotComplex,
+  afterMKTMAINPOST,
+  afterMKTMainUsagePOST,
+  afterCKSPOST,
+  afterMKTothersubgroup,
+  CKSroleRJ,
+  performMusicRoles,
+  performSimpleClaimAndApprovalRole
+} from './Master-legacy';
+
 // ============================================================================================
-// LEGACY CODE - EXTRACTION IN PROGRESS
+// REMAINING LEGACY CODE - STILL BEING REFACTORED
 // ============================================================================================
 // Functions below are still being extracted to dedicated modules.
-// These are re-exports from Master.ts.backup until they are properly modularized.
+// These are re-exports from Master-legacy.ts until they are properly modularized.
 // ============================================================================================
 
-// Import remaining unextracted content from the backup
+// Import remaining unextracted content from the legacy file
 // This ensures backward compatibility while refactoring continues
 import * as LegacyCode from './Master-legacy';
 
