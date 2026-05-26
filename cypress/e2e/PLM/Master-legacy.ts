@@ -1508,7 +1508,7 @@ export const diyflagCKS = (): void => {
 // MUSIC ROLES
 // ========================
 
-const performMusicRoles = (): void => {
+export const performMusicRoles = (): void => {
   it('TSCENTER role', () => {
     loginAndWaitReady(tscenter, tscenterpass);
 
@@ -6291,7 +6291,7 @@ const checkAndUpdatePriority = (): void => {
     processRows(0);
   });
 };
-const performSimpleClaimAndApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
+export const performSimpleClaimAndApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
   loginAndWaitReady(user, pass);
   const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
