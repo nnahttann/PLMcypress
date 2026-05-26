@@ -1,5 +1,5 @@
 import { createSimplePageApprovalFlow } from './baseFlows';
-import { scrollAndWait } from '../helpers/utils';
+import { scrollAndWait } from '../helpers/uiHelpers';
 
 // ========================================
 // SIMPLE APPROVAL FUNCTIONS

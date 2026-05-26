@@ -2,6 +2,9 @@
 // CGMD APPROVAL FUNCTIONS
 // ========================
 
+import { createFullPageApprovalFlow } from './baseFlows.core';
+import { handleAddToUSMP, scrollAndWait, selectRandomOption, clickYesIfExists } from '../helpers/uiHelpers.core';
+
 export const approveProjectCGMD = (projectName: string): void => {
   createFullPageApprovalFlow(
     projectName,

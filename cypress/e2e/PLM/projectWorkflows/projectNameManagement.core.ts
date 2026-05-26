@@ -2,6 +2,8 @@
 // PROJECT NAME GETTERS
 // ========================
 
+import { formattedDateOntop } from '../helpers/config.core';
+
 export const registerProjectName = (name: string, index: number = 0): void => {
   projectManager.register(name, index);
 };

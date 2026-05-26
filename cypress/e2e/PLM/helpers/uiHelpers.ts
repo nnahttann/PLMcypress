@@ -1,8 +1,8 @@
-import { scrollAndWait } from './utils';
-
 // ========================================
 // DOMAIN-SPECIFIC UI HELPERS
 // ========================================
+
+export { scrollAndWait, handleAddToUSMP, selectRandomOption, clickYesIfExists } from './uiHelpers.core';
 
 /**
  * Check and fill Content Type for various tabs (Karaoke, Music, etc.)

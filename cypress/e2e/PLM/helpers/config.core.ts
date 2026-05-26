@@ -25,3 +25,6 @@ export const {
   e2edp, e2edppass,
   sasff, sasffpass
 } = env as Record<string, string>;
+
+export let formattedDateOntop = '';
+export let formattedDateMain = '';
