@@ -1,0 +1,24 @@
+// ========================
+// APPROVE PROJECT
+// ========================
+
+export const approveProject = (projectName: string): void => {
+  searchInTableWithPagination(
+    'To Do List',
+    projectName,
+    ($row) => {
+      cy.wrap($row)
+        .find('span')
+        .should('be.visible')
+        .click();
+      cy.log(`✅ Successfully approved project: ${projectName}`);
+    },
+    {
+      waitAfterNext: 2000,
+      filterCallback: ($row) => {
+        const rowText = $row.text().trim();
+        return rowText.includes(projectName) && !rowText.includes('Fetching data');
+      }
+    }
+  );
+};
