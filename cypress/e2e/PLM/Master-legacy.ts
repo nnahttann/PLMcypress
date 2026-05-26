@@ -1058,6 +1058,93 @@ export const afterMKTOntop_NotComplex = (): void => {
   declarePluginRoleTests();
 };
 
+// ========================
+// AFTER MKT ONTOP PRE FUNCTIONS
+// ========================
+
+export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
+export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
+
+const _afterMKTontopPREWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPRE);
+  afterFn(module);
+};
+
+const stepsOntopPRE = (): void => {
+  cy.wait(15000);
+  addauto5gCKS();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  checkAndFillContentType();
+  checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
+  cy.scrollTo('bottom');
+  smsCKSPRE();
+};
+
+const afterCKSCommonPRE_Internal = (): void => {
+  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
+  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
+  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup));
+  it('Spaddoer role', () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER));
+  it('Spadtester role', () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester));
+  it('Spaddeploy role', () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy));
+  it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM));
+  it('APO role', () => performSimpleApprovalRole(apo, apopass, approveProjectAPO));
+};
+
+const afterCKSCommonPRE = (Module: string): void => {
+  afterCKSCommonPRE_Internal();
+  if (Module === 'MUSIC') {
+    performMusicRoles();
+  }
+};
+
+const afterCKSPREPlugin = (Module: string): void => {
+  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
+  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
+  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin));
+  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN'));
+  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'PlugIN'));
+
+  if (Module === 'MUSIC') {
+    performMusicRoles();
+  }
+};
+
+export const afterMKTontopPREUsage = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('PRE');
+};
+
+export const afterMKTontopPREUsageEnter = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('Enter');
+};
+
+export const afterMKTontopPREUsageMusic = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('MUSIC');
+};
+
+const stepsOntopPREUsage = (): void => {
+  cy.wait(15000);
+  addauto5gCKS();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  checkAndFillContentType();
+  checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
+  cy.scrollTo('bottom');
+  smsCKSPRE();
+};
+
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
   executeCKSRole('standard', 'main', () => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
