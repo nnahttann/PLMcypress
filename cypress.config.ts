@@ -1,4 +1,4 @@
-import { defineConfig } from "cypress";
+import { defineConfig } from "cypress/types";
 
 export default defineConfig({
   // 🔹 Root-level options (วางนอก e2e)
