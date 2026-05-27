@@ -1,6 +1,12 @@
 // ========================
 // CKS PO ENHANCEMENT FLOW
 // ========================
+
+import { login } from '../helpers/auth';
+import { cks, ckspass } from '../helpers/config';
+import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import type { GetProjectNameFn, EnhanceStepsCallback } from '../types';
+
 const standardCksPoEnhancementFlow = (
   getProjectNameFn: GetProjectNameFn,
   enhanceStepsCallback: EnhanceStepsCallback

@@ -1,82 +1,58 @@
+```
 # Cypress test artifacts
 cypress/screenshots/
 cypress/videos/
 cypress/downloads/
 
-# Test reports
-coverage/
-.nyc_output/
-junit.xml
-test-results/
+# Compiled and build artifacts
+*.pyc
+__pycache__/
+*.o
+*.obj
+*.out
+dist/
+build/
+target/
+*.class
+*.dll
+*.so
+*.a
 
-# IDE files
+# Dependencies
+node_modules/
+.venv/
+venv/
+.env
+.env.local
+.env.*
+
+# Logs and temp files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# Logs
-*.log
-*.tmp
-
-# Environment
-.env
-.env.local
-*.env.*
-
-# Dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS generated files
+# System files
 .DS_Store
 Thumbs.db
 
-# Build outputs
-dist/
-build/
-target/
-.out
-.exe
-.dll
-.so
-.a
-.obj
-
-# Python artifacts
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-.coverage
+# Coverage
+coverage/
 htmlcov/
-.pytest_cache/
+.coverage
+
+# Gradle
+.gradle/
+
+# MyPy cache
 .mypy_cache/
 
-# Compressed files
-*.zip
-*.gz
-*.tar
-*.tgz
-*.bz2
-*.xz
-*.7z
-*.rar
-*.zst
-*.lz4
-*.lzh
-*.cab
-*.arj
-*.rpm
-*.deb
-*.Z
-*.lz
-*.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+# Pytest cache
+.pytest_cache/
+```

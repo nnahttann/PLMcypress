@@ -2,6 +2,11 @@
 // CKS ROLE EXECUTION
 // ========================
 
+import type { GetProjectNameFn } from '../types';
+import { getStandardProjectName, getOntopProjectName } from '../helpers/config';
+import { standardCksPoEnhancementFlow } from './cksPoEnhancement.core';
+import { beforeapproveCKS, beforeapproveCKSontop } from './beforeApproveCks.core';
+
 const executeCKSRole = (
   projectNameStrategy: 'standard' | 'ontop',
   approvalType: 'main' | 'ontop',
