@@ -2,7 +2,7 @@
 // MUSIC ROLES
 // ========================
 
-const performMusicRoles = (): void => {
+export const performMusicRoles = (): void => {
   it('TSCENTER role', () => {
     loginAndWaitReady(tscenter, tscenterpass);
 
