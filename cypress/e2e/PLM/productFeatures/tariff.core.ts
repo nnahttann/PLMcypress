@@ -2,6 +2,8 @@
 // TARIFF
 // ========================
 
+import { closeSuccessModal } from '../contentGeneration/smsMms';
+
 export const Tariff = (): void => {
   cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount').scrollIntoView().should('be.visible').click();
   cy.contains('.panel-heading', 'Tariff Plan')

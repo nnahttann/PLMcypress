@@ -2,6 +2,12 @@
 // HELPER FUNCTIONS
 // ========================
 
+const now = new Date();
+const day = String(now.getDate()).padStart(2, '0');
+const month = String(now.getMonth() + 1).padStart(2, '0');
+const hours = String(now.getHours()).padStart(2, '0');
+const minutes = String(now.getMinutes()).padStart(2, '0');
+
 export const getCredentials = (module: Module): { user: string, pass: string } => {
   const credMap: Record<Module, { user: string, pass: string }> = {
     'POST': { user: MKTpost, pass: MKTpost1 },
