@@ -1,4 +1,1 @@
-```
-# Backup files
-*.ts.backup
-```
+Nothing needs to be added to the .gitignore file based on the provided file changes. The modified file 'cypress/e2e/PLM/Master-legacy.ts' is a TypeScript source file which should not be ignored.
