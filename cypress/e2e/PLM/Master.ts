@@ -155,7 +155,7 @@ export {
 // ========================================
 // LEGACY ROLE EXECUTION EXPORTS
 // ========================================
-// Export functions from Master-legacy that orchestrate full role flows
+// Export functions from modularized structure (previously in Master-legacy)
 export {
   afterCKSCommonPRE,
   afterCKSPREPlugin,
@@ -169,17 +169,8 @@ export {
   CKSroleRJ,
   performMusicRoles,
   performSimpleClaimAndApprovalRole
-} from './Master-legacy';
+} from './roleExecution';
 
 // ============================================================================================
-// REMAINING LEGACY CODE - STILL BEING REFACTORED
+// ALL CODE NOW MODULARIZED - NO MORE LEGACY IMPORTS NEEDED
 // ============================================================================================
-// Functions below are still being extracted to dedicated modules.
-// These are re-exports from Master-legacy.ts until they are properly modularized.
-// ============================================================================================
-
-// Import remaining unextracted content from the legacy file
-// This ensures backward compatibility while refactoring continues
-import * as LegacyCode from './Master-legacy';
-
-export * from './Master-legacy';

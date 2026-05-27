@@ -1,1 +1,4 @@
-Nothing should be ignored based on the provided file changes. The modified files are TypeScript test files (.ts) which are source code and should not be ignored.
+```
+# Backup files
+*.ts.backup
+```
