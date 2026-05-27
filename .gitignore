@@ -1,58 +1,81 @@
-```
-# Cypress test artifacts
+# =========================
+# Dependencies
+# =========================
+node_modules/
+.venv/
+venv/
+env/
+.Python
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+.env.*
+*.env.*
+
+# =========================
+# Cypress & Testing
+# =========================
 cypress/screenshots/
 cypress/videos/
 cypress/downloads/
+coverage/
+.nyc_output/
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+nosetests.xml
+coverage.xml
+*.cover
 
-# Compiled and build artifacts
-*.pyc
-__pycache__/
-*.o
-*.obj
-*.out
+# =========================
+# Build Outputs & Compiled
+# =========================
 dist/
 build/
 target/
+.gradle/
 *.class
+*.o
+*.obj
+*.out
+*.exe
 *.dll
 *.so
 *.a
 
-# Dependencies
-node_modules/
-.venv/
-venv/
-.env
-.env.local
-.env.*
+# =========================
+# Python Caches & Tools
+# =========================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.mypy_cache/
+.tox/
+.cache
 
-# Logs and temp files
+# =========================
+# Logs & Temp Files
+# =========================
 *.log
 *.tmp
-*.swp
-*.swo
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Editors
+# =========================
+# IDEs & Editors
+# =========================
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# System files
+# =========================
+# OS & System Files
+# =========================
 .DS_Store
 Thumbs.db
-
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Gradle
-.gradle/
-
-# MyPy cache
-.mypy_cache/
-
-# Pytest cache
-.pytest_cache/
-```
