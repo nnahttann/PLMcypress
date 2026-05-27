@@ -148,28 +148,28 @@ export {
   afterMKTOntop_NotComplex,
   afterMKTMainPRE_FullSpadFlow,
   afterMKTMainPRE_NotComplex
-} from './roleExecution/afterMktPre';
+} from './roleExecution/afterMktPre.core';
 
 export {
   afterMKTMAINPOST,
   afterMKTMainUsagePOST
-} from './roleExecution/afterMktFunctions';
+} from './roleExecution/afterMktFunctions.core';
 
 export {
   afterCKSPOST
-} from './roleExecution/afterCksPost';
+} from './roleExecution/afterCksPost.core';
 
 export {
   afterMKTothersubgroup
-} from './roleExecution/afterMktOtherSubgroup';
+} from './roleExecution/afterMktOtherSubgroup.core';
 
 export {
   CKSroleRJ
-} from './roleExecution/rejectNote';
+} from './roleExecution/rejectNote.core';
 
 export {
   performMusicRoles
-} from './roleExecution/musicRoles';
+} from './roleExecution/musicRoles.core';
 
 // ========================================
 // ADDITIONAL ROLE EXECUTION EXPORTS
