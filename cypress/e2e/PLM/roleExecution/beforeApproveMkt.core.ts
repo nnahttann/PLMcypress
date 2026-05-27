@@ -2,6 +2,9 @@
 // BEFORE APPROVE MKT
 // ========================
 
+import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import { getStandardProjectName } from '../helpers/config';
+
 export const beforeapproveMKT = (): void => {
 
   const poName = `PO-${Math.floor(Math.random() * 900 + 100)}`;

@@ -2,6 +2,10 @@
 // TYPE REJECT NOTE BY ROLE
 // ========================
 
+import { login } from '../helpers/auth';
+import { cks, ckspass, getStandardProjectName } from '../helpers/config';
+import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+
 export const typeRejectNoteByRole = (role: string): void => {
   const message = `reject from ${role}`;
 

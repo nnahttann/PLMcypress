@@ -2,6 +2,20 @@
 // MUSIC ROLES
 // ========================
 
+import { loginAndWaitReady } from '../helpers/auth';
+import { getStandardProjectName } from '../helpers/config';
+import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import {
+  tscenter, tscenterpass,
+  csisp, csisppass,
+  aafsp, aafsppass,
+  csidp, csidppass,
+  aafdp, aafdppass,
+  e2etest, e2etestpass,
+  music, musicpass,
+  e2edp, e2edppass
+} from '../helpers/config';
+
 export const performMusicRoles = (): void => {
   it('TSCENTER role', () => {
     loginAndWaitReady(tscenter, tscenterpass);

@@ -2,6 +2,21 @@
 // AFTER MKT OTHER SUBGROUP
 // ========================
 
+import { executeCKSRole } from './cksRoleExecution.core';
+import { performRoleTaskWithAssignment, performSimpleClaimAndApprovalRole, performSimpleApprovalRole } from '../approvalFlows/roleHelpers.core';
+import { 
+  cgcirb, cgcirbpass, cgtirb, cgtirbpass,
+  cgccbs, cgccbspass, cgtcbs, cgtcbspass,
+  sasff, sasffpass,
+  actm, actmpass, oper, operpass,
+  spadsup, spadsuppass, spaddoer, spaddoerpass,
+  spadtest, spadtestpass, spaddp, spaddppass,
+  apo, apopass
+} from '../helpers/config';
+import { approveProjectCGMD, approveProjectCGMDtester, approveProjectACTM, approveProjectOPER } from './beforeApproveCks.core';
+import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE, approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectAPO } from './beforeApproveMkt.core';
+import { loginAndWaitReady, ClaimProject, approveProject, getStandardProjectName } from '../helpers/commonActions.core';
+
 export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void => {
   if (Module === 'POST') {
     executeCKSRole('standard', 'main', () => { });

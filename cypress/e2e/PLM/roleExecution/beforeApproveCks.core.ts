@@ -2,6 +2,9 @@
 // BEFORE APPROVE CKS
 // ========================
 
+import { standardBeforeApproveCKS } from '../approvalFlows/roleHelpers';
+import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import { getStandardProjectName } from '../helpers/config';
 
 export const beforeapproveCKS = (): void => {
   standardBeforeApproveCKS();
