@@ -1088,36 +1088,6 @@ const stepsOntopPRE = (): void => {
   smsCKSPRE();
 };
 
-const afterCKSCommonPRE_Internal = (): void => {
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
-  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup));
-  it('Spaddoer role', () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER));
-  it('Spadtester role', () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester));
-  it('Spaddeploy role', () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy));
-  it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM));
-  it('APO role', () => performSimpleApprovalRole(apo, apopass, approveProjectAPO));
-};
-
-const afterCKSCommonPRE = (Module: string): void => {
-  afterCKSCommonPRE_Internal();
-  if (Module === 'MUSIC') {
-    performMusicRoles();
-  }
-};
-
-const afterCKSPREPlugin = (Module: string): void => {
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS'));
-  it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin));
-  it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN'));
-  it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'PlugIN'));
-
-  if (Module === 'MUSIC') {
-    performMusicRoles();
-  }
-};
-
 export const afterMKTontopPREUsage = (): void => {
   executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
   afterCKSCommonPRE('PRE');
