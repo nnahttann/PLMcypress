@@ -1,6 +1,10 @@
 // ==========================================
 // 🔹 CYPRESS FILL FUNCTIONS (Logic กระชับ)
 // ==========================================
+import { createPOWordingPools } from '../helpers/poWordingPools.core';
+import { pickRandom, fillBilingual, selectMultipleFromDualList, limitAndCleanEN, randInt, randomInt } from '../helpers/poUtilities.core';
+import { generateProjectNames, createProjectBase, createPOBase } from '../helpers/projectNameManager.core';
+
 const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
 
@@ -232,3 +236,4 @@ export const ProjectBasicInformationComplete = (
   cy.log(`✅ All ${poCount} PO(s) processed. Finalizing...`);
   backBacicInfo();
   addFile();
+};

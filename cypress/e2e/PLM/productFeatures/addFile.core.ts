@@ -2,6 +2,8 @@
 // ADD FILE
 // ========================
 
+import { beforeapproveMKT } from '../roleExecution/beforeApproveMkt.core';
+
 export const addFile = (): void => {
   cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
 

@@ -159,3 +159,4 @@ export const RandomHumanTouchPoint = (subModule: string): void => {
           cy.wait(3500);
         });
     });
+};

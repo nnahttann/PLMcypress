@@ -125,22 +125,101 @@ export const RandomProductSpecification = (
     cy.then(() => {
       cy.log(`⚙️ configQueue: ${configQueue.join(', ')}`);
 
-      if (configQueue.includes('Voice')) { cy.log('▶️ Voice()'); Voice(); }
-      if (configQueue.includes('SMS')) { cy.log('▶️ Sms()'); Sms(); }
-      if (configQueue.includes('MMS')) { cy.log('▶️ Mms()'); Mms(); }
-      if (configQueue.includes('Internet')) { cy.log('▶️ InternetRandom()'); InternetRandom(productClass, subModule, Module); }
-      if (configQueue.includes('Vertical App')) { cy.log('▶️ VerticalApp()'); VerticalApp(); }
-      if (configQueue.includes('Cloud Game')) { cy.log('▶️ CloudGame()'); CloudGame(); }
-      if (configQueue.includes('AI IP Camera')) { cy.log('▶️ AIIPCamera()'); AIIPCamera(); }
-      if (configQueue.includes('WiFi')) { cy.log('▶️ WiFi()'); WiFi(); }
-      if (configQueue.includes('Karaoke')) { cy.log('▶️ Karaoke()'); Karaoke(); }
-      if (configQueue.includes('VRBT')) { cy.log('▶️ VRBT()'); VRBT(); }
-      if (configQueue.includes('Music Streaming')) { cy.log('▶️ MusicStreaming()'); MusicStreaming(); }
+      if (configQueue.includes('Voice')) { 
+        cy.log('▶️ Voice()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'Voice').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('SMS')) { 
+        cy.log('▶️ Sms()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'SMS').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('MMS')) { 
+        cy.log('▶️ Mms()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'MMS').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('Internet')) { 
+        cy.log('▶️ InternetRandom()'); 
+        InternetRandom(productClass, subModule, Module); 
+      }
+      if (configQueue.includes('Vertical App')) { 
+        cy.log('▶️ VerticalApp()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'Vertical App').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('Cloud Game')) { 
+        cy.log('▶️ CloudGame()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'Cloud Game').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('AI IP Camera')) { 
+        cy.log('▶️ AIIPCamera()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'AI IP Camera').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('WiFi')) { 
+        cy.log('▶️ WiFi()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'WiFi').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('Karaoke')) { 
+        cy.log('▶️ Karaoke()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'Karaoke').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('VRBT')) { 
+        cy.log('▶️ VRBT()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'VRBT').dblclick({ force: true });
+          });
+      }
+      if (configQueue.includes('Music Streaming')) { 
+        cy.log('▶️ MusicStreaming()'); 
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            cy.get('select[formcontrolname="availableListBox"]').first().contains('option', 'Music Streaming').dblclick({ force: true });
+          });
+      }
 
       const entItems = configQueue.filter(i => ['Arcade', 'TV Plus', 'Youtube Premium'].includes(i));
       if (entItems.length > 0) {
         cy.log(`▶️ EntertainmentPartnership(${entItems.join(', ')})`);
-        EntertainmentPartnership(entItems as any);
+        cy.contains('.panel-heading', '*Product Specification')
+          .closest('.panel')
+          .within(() => {
+            entItems.forEach(item => {
+              cy.get('select[formcontrolname="availableListBox"]').first().contains('option', item).dblclick({ force: true });
+            });
+          });
       }
     });
   });
