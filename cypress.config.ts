@@ -1,4 +1,4 @@
-import { defineConfig } from "cypress/types";
+import { defineConfig } from "cypress";
 
 export default defineConfig({
   // 🔹 Root-level options (วางนอก e2e)
@@ -22,6 +22,6 @@ export default defineConfig({
     },
     specPattern: "cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
     supportFile: "cypress/support/e2e.ts",
-    baseUrl: "https://test-plm.intra.ais",
+    baseUrl: "https://test-plm2.intra.ais",
   },
 });
