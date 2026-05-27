@@ -2,6 +2,21 @@
 // AFTER MKT PRE FUNCTIONS
 // ========================
 
+import { executeCKSRole } from './cksRoleExecution.core';
+import { performRoleTaskWithAssignment, performSimpleClaimAndApprovalRole, performSimpleApprovalRole } from '../approvalFlows/roleHelpers.core';
+import { 
+  cgccbs, cgccbspass, cgtcbs, cgtcbspass, 
+  spadsup, spadsuppass, spaddoer, spaddoerpass,
+  spadtest, spadtestpass, spaddp, spaddppass,
+  actm, actmpass, apo, apopass 
+} from '../helpers/config';
+import { 
+  approveProjectCGMDPRE, approveProjectCGMDtesterPRE,
+  approveProjectSPADSup, approveProjectSPADDOER,
+  approveProjectSPADTester, approveProjectSPADdeploy,
+  approveProjectACTM, approveProjectAPO 
+} from './beforeApproveMkt.core';
+
 type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
 
 const shuffleArray = <T>(array: T[]): T[] => {
