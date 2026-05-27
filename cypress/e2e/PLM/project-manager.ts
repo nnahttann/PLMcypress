@@ -1,4 +1,4 @@
-import { formattedDateMain, formattedDateOntop } from './Master-legacy';
+import { formattedDateMain, formattedDateOntop } from './helpers/config';
 
 export class ProjectManager {
   private static instance: ProjectManager;
