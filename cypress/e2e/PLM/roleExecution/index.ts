@@ -2,15 +2,15 @@
 // ROLE EXECUTION - CENTRALIZED EXPORTS
 // ========================================
 
-export * from './afterCksPost';
-export * from './afterMktFunctions';
-export * from './afterMktOtherSubgroup';
-export * from './afterMktPre';
-export * from './beforeApproveCks';
-export * from './beforeApproveMkt';
-export * from './cksPoEnhancement';
-export * from './cksRoleExecution';
-export * from './diyFlagCks';
-export * from './musicRoles';
-export * from './rejectNote';
-export * from './unregister';
+export * from './afterCksPost.core';
+export * from './afterMktFunctions.core';
+export * from './afterMktOtherSubgroup.core';
+export * from './afterMktPre.core';
+export * from './beforeApproveCks.core';
+export * from './beforeApproveMkt.core';
+export * from './cksPoEnhancement.core';
+export * from './cksRoleExecution.core';
+export * from './diyFlagCks.core';
+export * from './musicRoles.core';
+export * from './rejectNote.core';
+export * from './unregister.core';
