@@ -2,9 +2,9 @@
 // BEFORE APPROVE CKS
 // ========================
 
-import { standardBeforeApproveCKS } from '../approvalFlows/roleHelpers';
+import { standardBeforeApproveCKS } from '../approvalFlows/cksApprovals';
 import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
-import { getStandardProjectName } from '../helpers/config';
+import { getStandardProjectName } from '../helpers/config.core';
 
 export const beforeapproveCKS = (): void => {
   standardBeforeApproveCKS();
@@ -12,6 +12,19 @@ export const beforeapproveCKS = (): void => {
 
 export const beforeapproveCKSontop = (): void => {
   standardBeforeApproveCKS();
+};
+
+export const approveProjectCGMD = (projectName: string): void => {
+  // Placeholder - import from actual location
+};
+export const approveProjectCGMDtester = (projectName: string): void => {
+  // Placeholder - import from actual location
+};
+export const approveProjectACTM = (projectName: string): void => {
+  // Placeholder - import from actual location
+};
+export const approveProjectOPER = (projectName: string): void => {
+  // Placeholder - import from actual location
 };
 
 const standardBeforeApproveCKS = (): void => {

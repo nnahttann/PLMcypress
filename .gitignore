@@ -1,1 +1,34 @@
-Nothing should be ignored based on the provided file changes. The modified file 'cypress/e2e/PLM/contentGeneration/smsWording.core.ts' is a TypeScript source file that should be tracked in version control. No build artifacts, dependencies, or temporary files are present in the changes.
+```
+# Dependencies
+node_modules/
+
+# Test artifacts
+cypress/screenshots/
+cypress/videos/
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.swp
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+```
