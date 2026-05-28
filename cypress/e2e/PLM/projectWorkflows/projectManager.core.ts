@@ -86,3 +86,5 @@ class ProjectManager {
 }
 
 const projectManager = ProjectManager.getInstance();
+
+export { projectManager };
