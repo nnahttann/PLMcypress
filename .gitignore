@@ -1,4 +1,1 @@
-```
-# Cypress test files
-cypress/e2e/PLM/productFeatures/targetGroupSelection.core.ts
-```
+Nothing needs to be added to the .gitignore file since the changes only include TypeScript test files (.ts) which are source code files and should not be ignored.
