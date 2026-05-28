@@ -4,7 +4,7 @@
 
 import { TaskListHeader, CoreTaskCallback, FinalAction } from '../helpers/types.core';
 
-const createFullPageApprovalFlow = (
+export const createFullPageApprovalFlow = (
   projectName: string,
   taskListHeader: TaskListHeader,
   expectedUrl: string,
@@ -60,7 +60,7 @@ const createFullPageApprovalFlow = (
   }
 };
 
-const createSimplePageApprovalFlow = (
+export const createSimplePageApprovalFlow = (
   projectName: string,
   taskListHeader: TaskListHeader,
   expectedUrl: string,

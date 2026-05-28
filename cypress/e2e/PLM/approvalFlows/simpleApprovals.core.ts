@@ -2,8 +2,9 @@
 // OTHER APPROVAL FUNCTIONS
 // ========================
 
-import { createFullPageApprovalFlow, createSimplePageApprovalFlow } from './baseFlows';
+import { createFullPageApprovalFlow, createSimplePageApprovalFlow } from './baseFlows.core';
 import { scrollAndWait } from '../helpers/uiHelpers.core';
+import { performSimpleClaimAndApprovalRole } from './roleHelpers.core';
 
 export const approveProjectACTM = (projectName: string): void => {
   createFullPageApprovalFlow(
