@@ -1,22 +1,28 @@
 ```
+# Cypress test artifacts
+cypress/videos/
+cypress/screenshots/
+
+# Build outputs
+dist/
+build/
+*.js.map
+*.ts.map
+
 # Dependencies
 node_modules/
-
-# Test artifacts
-cypress/downloads/
-cypress/screenshots/
-cypress/videos/
-
-# Environment
-.env
-.env.local
-.env.*
 
 # Logs
 *.log
 
-# Temporary files
-*.tmp
+# Environment
+.env
+.env.local
+*.env.*
+
+# Editors
+.vscode/
+.idea/
 *.swp
 *.swo
 
@@ -27,8 +33,15 @@ Thumbs.db
 # Coverage reports
 coverage/
 htmlcov/
+*.coverage
 
-# IDE files
-.vscode/
-.idea/
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Temporary files
+*.tmp
+*.temp
 ```

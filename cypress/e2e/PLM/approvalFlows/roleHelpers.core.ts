@@ -2,7 +2,7 @@
 // ROLE HELPERS
 // ========================
 
-import { assignTeamTask } from './assignTeamTask.core';
+import { assignTeamTask } from '../projectWorkflows/assignTeamTask.core';
 import { loginAndWaitReady } from '../helpers/auth.core';
 import { getStandardProjectName } from '../projectWorkflows/projectNameManagement.core';
 import { ApproveFunction } from '../helpers/types.core';
