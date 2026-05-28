@@ -1,20 +1,26 @@
-name: Auto-merge Qwen PRs
+name: Auto Merge PR
 
 on:
+  # ตั้งค่าให้ Workflow ทำงานเมื่อมี Pull Request ถูกเปิดขึ้นมา หรือมีการอัปเดตโค้ดใหม่เข้าไปใน PR
   pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+    types: [opened, synchronize, reopened]
 
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
-    # เช็คเงื่อนไขให้ทำงานเฉพาะ PR ของ Qwen
-    if: startsWith(github.event.pull_request.title, 'Update from task')
+    
+    # ส่วนสำคัญที่ช่วยแก้ Error ก่อนหน้านี้: ให้สิทธิ์บอทในการเขียน/แก้ไข PR และ Branch
+    permissions:
+      pull-requests: write
+      contents: write
+
     steps:
-      - name: Merge Pull Request directly
-        run: gh pr merge "$PR_URL" --merge --delete-branch
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Auto Merge and Delete Branch
+        # รันคำสั่ง gh pr merge และดึง URL ของ PR ที่ทริกเกอร์ Workflow นี้มาใช้งาน
+        run: gh pr merge "${{ github.event.pull_request.html_url }}" --merge --delete-branch
         env:
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          # ใช้ Token มาตรฐานที่ GitHub มีให้ (ตอนนี้มีสิทธิ์ Write แล้ว)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
