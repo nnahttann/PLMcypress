@@ -7,7 +7,7 @@ import { cks, ckspass } from '../helpers/config';
 import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
 import type { GetProjectNameFn, EnhanceStepsCallback } from '../types';
 
-const standardCksPoEnhancementFlow = (
+export const standardCksPoEnhancementFlow = (
   getProjectNameFn: GetProjectNameFn,
   enhanceStepsCallback: EnhanceStepsCallback
 ): void => {
