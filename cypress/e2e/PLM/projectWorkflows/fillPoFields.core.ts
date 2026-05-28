@@ -6,6 +6,7 @@ import { pickRandom, fillBilingual, selectMultipleFromDualList, limitAndCleanEN,
 import { generateProjectNames, createProjectBase, createPOBase } from '../helpers/projectNameManager.core';
 import { getCredentials } from '../helpers/utils';
 import { registerProjectName } from './projectNameManagement.core';
+import { PriceExcluding } from '../productFeatures/priceExcluding.core';
 
 export const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
