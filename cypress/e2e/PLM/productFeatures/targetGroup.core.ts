@@ -74,13 +74,18 @@ export const targetgroup = (): void => {
 
       cy.log(`🔍 Found option: ${$option.length > 0 ? 'YES' : 'NO'}`);
       if ($option.length > 0) {
-        cy.log(`📌 Option value: "${$option.val()}", text: "${$option.text()}"`);
+        const optionValue = $option.val();
+        cy.log(`📌 Option value: "${optionValue}", text: "${$option.text()}"`);
         
         // เลือกค่าโดยใช้ jQuery เพื่อ trigger change event สำหรับ Angular
-        $select.val($option.val()).trigger('change');
-        
-        cy.log(`✅ Successfully selected: ${randomOption}`);
-        cy.log(`📝 New value: "${$select.val()}"`);
+        if (optionValue !== undefined) {
+          $select.val(optionValue).trigger('change');
+          
+          cy.log(`✅ Successfully selected: ${randomOption}`);
+          cy.log(`📝 New value: "${$select.val()}"`);
+        } else {
+          cy.log(`❌ Option value is undefined for: ${randomOption}`);
+        }
       } else {
         cy.log(`❌ Option not found: ${randomOption}`);
       }
