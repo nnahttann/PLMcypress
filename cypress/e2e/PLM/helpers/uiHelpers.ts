@@ -400,7 +400,7 @@ export function checkAndUpdateVerticalAppPriority(): void {
 
       if (isEmpty) {
         const randomNum = Math.floor(10000 + Math.random() * 90000);
-        cy.wrap($input).scrollIntoView().focus({ force: true }).clear().type(randomNum.toString(), { delay: 150 }).blur();
+        cy.wrap($input).scrollIntoView().focus().clear().type(randomNum.toString(), { delay: 150 }).blur();
         cy.wait(2000);
         onFilled();
       } else {

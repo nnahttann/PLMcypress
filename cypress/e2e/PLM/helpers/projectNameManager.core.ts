@@ -5,6 +5,7 @@
 import { getTimeSuffix, getTruncatedName, getRandomPhone } from './uiHelpers.core';
 import { RandomProjectDescription } from '../contentGeneration/randomProjectDescription.core';
 import { login } from './auth.core';
+import { Module } from './types.core';
 
 export const generateProjectNames = (
   prefix: string,

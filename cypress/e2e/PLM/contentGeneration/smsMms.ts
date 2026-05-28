@@ -18,7 +18,7 @@ export const closeSuccessModal = (): void => {
 /**
  * Generate random message code for SMS
  */
-const randomMessageCode = (): string => {
+export const randomMessageCode = (): string => {
   return `PRO${Math.floor(Math.random() * 10000)}`;
 };
 
