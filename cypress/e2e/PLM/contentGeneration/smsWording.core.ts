@@ -323,10 +323,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     // SECTION 15: POST-only fields (Manual only)
     if (type === 'POST' && !useGenerate) {
       withSection('textarea[formcontrolname="marketingName"]', 'Marketing Name', () =>
-        cy.get('textarea[formcontrolname="marketingName"]').focus({ force: true })
-          .clear({ force: true })
-          .type(capEN(pools.marketingName(), 40), { delay: 0, force: true })
-          .blur({ force: true }));
+        cy.get('textarea[formcontrolname="marketingName"]')
+          .focus()
+          .clear()
+          .type(capEN(pools.marketingName(), 40), { delay: 0 })
+          .blur());
 
       withSection('textarea[formcontrolname="yourPackage"]', 'Your Package', () =>
         fillTextarea('textarea[formcontrolname="yourPackage"]', pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100));
