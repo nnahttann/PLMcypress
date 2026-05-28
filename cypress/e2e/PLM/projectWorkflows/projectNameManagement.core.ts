@@ -3,6 +3,7 @@
 // ========================
 
 import { formattedDateOntop } from '../helpers/config.core';
+import { projectManager } from './projectManager.core';
 
 export const registerProjectName = (name: string, index: number = 0): void => {
   projectManager.register(name, index);
