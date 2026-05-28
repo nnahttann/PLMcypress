@@ -9,4 +9,5 @@ export * from './dropdownPromotionGroup.core';
 export * from './priceExcluding.core';
 export * from './retryPattern.core';
 export * from './targetGroup.core';
+export * from './targetGroupSelection.core';
 export * from './tariff.core';

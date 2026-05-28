@@ -14,3 +14,6 @@ export * from './diyFlagCks.core';
 export * from './musicRoles.core';
 export * from './rejectNote.core';
 export * from './unregister.core';
+
+// Import from approvalFlows for role helpers
+export { performSimpleClaimAndApprovalRole } from '../approvalFlows/roleHelpers.core';
