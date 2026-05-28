@@ -139,7 +139,7 @@ export function checkAndFillContentType(): void {
                 }
 
                 const randomOption = validOptions[Math.floor(Math.random() * validOptions.length)];
-                cy.wrap($select).select(randomOption.value, { force: true });
+                cy.wrap($select).select(randomOption.value);
                 cy.wait(600);
 
                 cy.get('body').then(($b4) => {
@@ -208,7 +208,7 @@ const tryFillVisible = ($scope: JQuery, formControlName: string, label: string):
     return;
   }
   cy.wrap($input)
-    .focus({ force: true }).clear({ force: true }).type(randomPriority(), { force: true, delay: 50 }).blur();
+    .focus().clear().type(randomPriority(), { delay: 50 }).blur();
   cy.wait(300);
   cy.log(`✅ กรอก ${label} สำเร็จ`);
 };
@@ -255,7 +255,7 @@ const updatePriorityInPanel = (): void => {
     if ($priorityInput.length && Cypress.$($priorityInput[0]).closest('[hidden]').length === 0 && Cypress.$($priorityInput[0]).is(':visible')) {
       const existing = (($priorityInput.val() as string) || '').trim();
       if (existing === '') {
-        cy.wrap($priorityInput).focus({ force: true }).clear({ force: true }).type(randomPriority(), { force: true, delay: 50 }).blur();
+        cy.wrap($priorityInput).focus().clear().type(randomPriority(), { delay: 50 }).blur();
         cy.wait(300);
       }
 

@@ -37,7 +37,7 @@ export const beforeapproveMKT = (): void => {
   cy.log(`📎 Attachment Description: ${attachmentDesc}`);
   cy.get('textarea[formcontrolname="fileDescription"]', { timeout: 10000 })
     .should('be.visible')
-    .focus({ force: true })
+    .focus()
     .type(attachmentDesc, { delay: 50 });
 
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
@@ -46,7 +46,7 @@ export const beforeapproveMKT = (): void => {
   cy.get(':nth-child(3) > :nth-child(1) > .btn').click();
   cy.contains('.row', 'Approve memo')
     .find('input[type="checkbox"]')
-    .check({ force: true });
+    .check();
 
   cy.intercept('POST', '**/api-mkt/promoteFromMktDoer').as('submitApprove');
   cy.get('button.btn.btn-primary.btn-xs.ng-star-inserted')
