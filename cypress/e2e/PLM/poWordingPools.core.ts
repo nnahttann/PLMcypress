@@ -2,6 +2,8 @@
 // WORDING POOLS สำหรับ PO Fields
 // ====================================================================
 
+import { limitAndCleanEN, limitAndCleanTH, pickRandom } from './helpers/poUtilities.core';
+
 const fillField = (selector: string, text: string) => cy.get(selector).clear().type(text);
 
 const fillBilingual = (
@@ -14,11 +16,12 @@ const fillBilingual = (
 };
 
 const randInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
+const randomInt = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
 // ==========================================
 // 🔹 DATA POOL (ข้อความคงเดิม 100% จัดรูปแบบให้กระชับ)
 // ==========================================
-const createPOWordingPools = (
+export const createPOWordingPools = (
   projectName: string, poName: string, Module: string, PriceType: string, subModule?: string
 ) => {
   const p = projectName || `${Module} ${PriceType}`;

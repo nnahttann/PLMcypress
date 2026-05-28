@@ -2,7 +2,7 @@
 // 🔹 CYPRESS FILL FUNCTIONS (Logic กระชับ)
 // ==========================================
 import { createPOWordingPools } from '../poWordingPools.core';
-import { pickRandom, fillBilingual, selectMultipleFromDualList, limitAndCleanEN, randInt, randomInt } from '../helpers/poUtilities.core';
+import { pickRandom, pickMultiple, fillBilingual, fillField, selectMultipleFromDualList, limitAndCleanEN, limitAndCleanTH, randInt, randomInt } from '../helpers/poUtilities.core';
 import { generateProjectNames, createProjectBase, createPOBase } from '../helpers/projectNameManager.core';
 import { getCredentials } from '../helpers/utils';
 import { registerProjectName } from './projectNameManagement.core';
@@ -10,6 +10,19 @@ import { PriceExcluding } from '../productFeatures/priceExcluding.core';
 import { selectTargetGroup } from '../productFeatures/targetGroup.core';
 import { dropdownPromotionGroup } from '../productFeatures/dropdownPromotionGroup.core';
 import { RandomProductSpecification } from '../contentGeneration/randomProductSpecification.core';
+import { RandomRemark } from '../contentGeneration/randomRemark.core';
+import { smsWording } from '../contentGeneration/smsWording.core';
+import { RetryPattern } from '../productFeatures/retryPattern.core';
+import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
+import { backBacicInfo } from '../productFeatures/backBasicInfo.core';
+import { addFile } from '../productFeatures/addFile.core';
+import { PriceType, ProductClass, ProjectBasicOptions } from '../helpers/types.core';
+
+const now = new Date();
+const day = String(now.getDate()).padStart(2, '0');
+const month = String(now.getMonth() + 1).padStart(2, '0');
+const hours = String(now.getHours()).padStart(2, '0');
+const minutes = String(now.getMinutes()).padStart(2, '0');
 
 export const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
@@ -155,7 +168,7 @@ export const ProjectBasicInformationComplete = (
       const retrySelectProductClass = (attemptsLeft: number) => {
         cy.contains('.panel-heading', '*Product Specification').scrollIntoView().closest('.panel').within(() => {
           cy.get('select[formcontrolname="selectedListBox"]').then($select => {
-            const selected = [...$select.find('option')].map(el => el.textContent?.trim() || '');
+            const selected = Array.from($select.find('option')).map(el => el.textContent?.trim() || '');
             const hasAllDefaults = defaultItems.every(d => selected.includes(d));
             cy.wrap(hasAllDefaults).as('defaultsReady');
           });
@@ -212,7 +225,6 @@ export const ProjectBasicInformationComplete = (
       });
     }
 
-    targetgroup();
     RandomRemark(projectName, currentPoName, PriceType, ProductClass, subModule);
 
     if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {

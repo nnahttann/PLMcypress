@@ -67,11 +67,11 @@ export const limitAndCleanEN = (str: string, maxLen: number): string => {
   return limit(cleanEnglishText(str), maxLen);
 };
 
-const limitAndCleanTH = (str: string, maxLen: number): string => {
+export const limitAndCleanTH = (str: string, maxLen: number): string => {
   return limit(cleanThaiText(str), maxLen);
 };
 
-const fillField = (selector: string, text: string) => cy.get(selector).clear().type(text);
+export const fillField = (selector: string, text: string) => cy.get(selector).clear().type(text);
 
 export const fillBilingual = (
   enSel: string, thSel: string,
