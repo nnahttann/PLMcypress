@@ -68,7 +68,7 @@ export const targetgroup = (): void => {
       cy.log(`📝 Current value: "${$select.val()}"`);
 
       // หา option ที่มี text ตรงกับที่ต้องการ
-      const $option = $select.find('option').filter(function() {
+      const $option = $select.find('option').filter(function(this: HTMLElement) {
         return $(this).text() === randomOption;
       });
 
@@ -78,8 +78,8 @@ export const targetgroup = (): void => {
         cy.log(`📌 Option value: "${optionValue}", text: "${$option.text()}"`);
         
         // เลือกค่าโดยใช้ jQuery เพื่อ trigger change event สำหรับ Angular
-        if (optionValue !== undefined) {
-          $select.val(optionValue).trigger('change');
+        if (optionValue !== undefined && optionValue !== null) {
+          $select.val(optionValue.toString()).trigger('change');
           
           cy.log(`✅ Successfully selected: ${randomOption}`);
           cy.log(`📝 New value: "${$select.val()}"`);
