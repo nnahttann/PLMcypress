@@ -2,6 +2,9 @@
 // HELPER FUNCTIONS
 // ========================
 
+import { Module } from './types';
+import { MKTpost, MKTpost1, MKTpre, MKTpre1, enter, enterpass, music, musicpass } from './config';
+
 const now = new Date();
 const day = String(now.getDate()).padStart(2, '0');
 const month = String(now.getMonth() + 1).padStart(2, '0');

@@ -158,7 +158,7 @@ export const standardCksPoEnhancementFlow = (
   enhanceStepsCallback();
 };
 
-const standardBeforeApproveCKS = (): void => {
+export const standardBeforeApproveCKS = (): void => {
   cy.contains('button', 'Back').should('be.visible').and('not.be.disabled').click();
   cy.contains('button', 'Yes').should('be.visible').click();
 
