@@ -1,19 +1,15 @@
-name: Auto-merge Qwen PRs
-
-on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
-
 jobs:
-  auto-merge:
+  your-job-name:
     runs-on: ubuntu-latest
-    # เช็คเงื่อนไขให้ทำงานเฉพาะ PR ของ Qwen
-    if: startsWith(github.event.pull_request.title, 'Update from task')
+    # Add this permissions block:
+    permissions:
+      pull-requests: write
+      contents: write 
     steps:
-      - name: Merge Pull Request directly
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Merge PR
         run: gh pr merge "$PR_URL" --merge --delete-branch
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
