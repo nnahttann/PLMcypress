@@ -178,7 +178,7 @@ function checkAndFillContentType(): void {
 
                 const randomOption = validOptions[Math.floor(Math.random() * validOptions.length)];
 
-                cy.wrap($select).select(randomOption.value, { force: true });
+                cy.wrap($select).select(randomOption.value);
                 cy.wait(600);
                 cy.log(`✅ [${tabConfig.name}] Selected: "${randomOption.text?.trim() || 'Unknown'}"`);
 
@@ -258,7 +258,7 @@ const tryFillVisible = ($scope: JQuery, formControlName: string, label: string):
     return;
   }
   cy.wrap($input)
-    .focus({ force: true }).clear({ force: true }).type(randomPriority(), { force: true, delay: 50 }).blur();
+    .focus().clear().type(randomPriority(), { delay: 50 }).blur();
   cy.wait(300);
   cy.log(`✅ กรอก ${label} สำเร็จ`);
 };
@@ -322,7 +322,7 @@ const updatePriorityInPanel = (): void => {
         cy.log(`ℹ️ priority มีค่า "${existing}" — ใช้ค่าเดิม`);
       } else {
         cy.wrap($priorityInput)
-          .focus({ force: true }).clear({ force: true }).type(randomPriority(), { force: true, delay: 50 }).blur();
+          .focus().clear().type(randomPriority(), { delay: 50 }).blur();
         cy.wait(300);
         cy.log('✅ กรอก priority (sub-panel) สำเร็จ');
       }
@@ -528,7 +528,7 @@ const checkAndUpdateVerticalAppPriority = (): void => {
         const randomNum = Math.floor(10000 + Math.random() * 90000);
         cy.wrap($input)
           .scrollIntoView()
-          .focus({ force: true })
+          .focus()
           .clear()
           .type(randomNum.toString(), { delay: 150 })
           .blur();

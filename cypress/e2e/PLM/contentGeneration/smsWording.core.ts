@@ -71,7 +71,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   const fillTextarea = (sel: string, en: string, th: string, maxEn: number, maxTh: number) => {
     cy.get(sel).each(($el: any, idx: number) => {
       const cleaned = idx === 0 ? capEN(en, maxEn) : capTH(th, maxTh);
-      cy.wrap($el).focus({ force: true }).clear({ force: true }).type(cleaned, { delay: 0, force: true }).blur({ force: true });
+      cy.wrap($el).focus().clear().type(cleaned, { delay: 0 }).blur();
     });
     cy.wait(300);
   };
@@ -188,9 +188,9 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         if (!$b.find(sel).length) return;
         cy.get(sel).then(($els: any) => {
           if (!String($els.eq(0).val() ?? '').trim())
-            cy.wrap($els.eq(0)).focus({ force: true }).type(capEN(en, maxEn), { delay: 0, force: true }).blur({ force: true });
+            cy.wrap($els.eq(0)).focus().type(capEN(en, maxEn), { delay: 0 }).blur();
           if ($els.length > 1 && !String($els.eq(1).val() ?? '').trim())
-            cy.wrap($els.eq(1)).focus({ force: true }).type(capTH(th, maxTh), { delay: 0, force: true }).blur({ force: true });
+            cy.wrap($els.eq(1)).focus().type(capTH(th, maxTh), { delay: 0 }).blur();
         });
         cy.wait(300);
       });
@@ -249,7 +249,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
     // SECTION 5: SMS Greeting
     withSection('select[formcontrolname="smsGreetingSendFlag"]', 'SMS Greeting', () => {
-      cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(flags.greeting, { force: true });
+      cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(flags.greeting);
       if (flags.greeting === 'Send' && !useGenerate)
         fillTextarea('textarea[formcontrolname="smsGreeting"]', pools.greeting.EN(), pools.greeting.TH(), 400, 400);
     });
@@ -257,12 +257,12 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     // SECTION 6: SMS Confirm Subscription (PRE only)
     cy.get('body').then(($b: any) => {
       if ($b.find('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').length)
-        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(flags.greeting, { force: true });
+        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(flags.greeting);
     });
 
     // SECTION 7: SMS Delete
     withSection('select[formcontrolname="smsDeleteSendFlag"]', 'SMS Delete', () => {
-      cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(flags.delete, { force: true });
+      cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(flags.delete);
       cy.wait(WAIT);
 
       if (flags.delete === 'Send') {
