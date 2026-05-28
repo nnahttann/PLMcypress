@@ -37,7 +37,10 @@ export const selectTargetGroup = (type:
     value = targetGroupMap[type as keyof typeof targetGroupMap];
   }
 
+  cy.log(`🎯 Selecting Target Group: ${value}`);
   cy.get('select[formcontrolname="targetGroup"]')
+    .should('be.visible')
+    .and('not.be.disabled')
     .select(value)
     .should('have.value', value);
 };
