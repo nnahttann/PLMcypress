@@ -116,6 +116,11 @@ export {
   ProjectBasicInformationComplete
 } from './projectWorkflows/fillPoFields.core';
 
+// Project Basic Information Other PO Sub
+export {
+  ProjectBasicInformationCompleteOtherPOSub
+} from './projectWorkflows/projectBasicInfoComplete.core';
+
 // ========================================
 // APPROVAL FLOWS MODULE EXPORTS
 // ========================================
@@ -173,8 +178,56 @@ export {
   afterMKTothersubgroup,
   CKSroleRJ,
   performMusicRoles,
-  performSimpleClaimAndApprovalRole
+  performSimpleClaimAndApprovalRole,
+  // Additional role execution functions
+  Randomdropdown,
+  dropdownRecurringCKS,
+  dropdownRecurringCKSMain,
+  dropdownRecurringPreMainCKS,
+  unregister,
+  addauto5gCKS,
+  diyflagCKS,
+  typeRejectNoteByRole,
+  beforeapproveCKS,
+  beforeapproveCKSontop,
+  beforeapproveMKT
 } from './roleExecution';
+
+// Product Features
+export {
+  Tariff,
+  PriceExcluding,
+  selectTargetGroup,
+  dropdownPromotionGroup,
+  RetryPattern,
+  CopyDeductFail,
+  backBacicInfo,
+  addFile
+} from './productFeatures';
+
+// Content Generation
+export {
+  smsWording,
+  smsWordingpre,
+  smsCKSPRE,
+  smsCKSPOST,
+  RandomRemark,
+  RandomProjectDescription,
+  RandomProductSpecification,
+  Voice,
+  Mms,
+  Sms,
+  WiFi,
+  VerticalApp,
+  CloudGame,
+  EntertainmentPartnership,
+  AIIPCamera,
+  Karaoke,
+  MusicStreaming,
+  VRBT,
+  InternetRandom,
+  RandomHumanTouchPoint
+} from './contentGeneration';
 
 // ============================================================================================
 // ALL CODE NOW MODULARIZED - NO MORE LEGACY IMPORTS NEEDED

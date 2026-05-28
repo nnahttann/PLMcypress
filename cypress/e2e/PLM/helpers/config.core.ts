@@ -28,3 +28,6 @@ export const {
 
 export let formattedDateOntop = '';
 export let formattedDateMain = '';
+
+export const getStandardProjectName = (): string => Cypress.env('formattedDateMain') as string;
+export const getOntopProjectName = (): string => Cypress.env('formattedDateOntop') as string;
