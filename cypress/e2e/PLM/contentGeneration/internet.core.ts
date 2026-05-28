@@ -1,6 +1,11 @@
 // ========================
 // CHECK AND FILL CONTENT TYPE 
 // ========================
+import { loginAndWaitReady } from '../helpers/auth.core';
+import { getStandardProjectName } from '../projectWorkflows/projectNameManagement.core';
+import { ClaimProject } from '../projectWorkflows/claimProject.core';
+import { ApproveFunction } from '../helpers/types.core';
+
 const COMPONENT = 'app-mass-enh-vertical-app';
 function checkAndFillContentType(): void {
   cy.log('🚀 checkAndFillContentType started');

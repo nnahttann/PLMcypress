@@ -2,6 +2,8 @@
 // APPROVAL FLOW BASE FUNCTIONS
 // ========================
 
+import { TaskListHeader, CoreTaskCallback, FinalAction } from '../helpers/types.core';
+
 const createFullPageApprovalFlow = (
   projectName: string,
   taskListHeader: TaskListHeader,
