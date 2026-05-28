@@ -4,7 +4,7 @@
 
 import { login } from '../helpers/auth';
 import { cks, ckspass } from '../helpers/config';
-import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
 import type { GetProjectNameFn, EnhanceStepsCallback } from '../types';
 
 const standardCksPoEnhancementFlow = (

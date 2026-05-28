@@ -4,7 +4,7 @@
 
 import { loginAndWaitReady } from '../helpers/auth';
 import { getStandardProjectName } from '../helpers/config';
-import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
 import {
   tscenter, tscenterpass,
   csisp, csisppass,

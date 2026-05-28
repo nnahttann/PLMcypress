@@ -3,7 +3,7 @@
 // ========================
 
 import { standardBeforeApproveCKS } from '../approvalFlows/roleHelpers';
-import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
+import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
 import { getStandardProjectName } from '../helpers/config';
 
 export const beforeapproveCKS = (): void => {
