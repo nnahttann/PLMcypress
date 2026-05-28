@@ -2,8 +2,8 @@
 // BEFORE APPROVE MKT
 // ========================
 
-import { ClaimProject, approveProject } from '../approvalFlows/projectWorkflow.core';
-import { getStandardProjectName } from '../helpers/config';
+import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
+import { getStandardProjectName } from '../projectWorkflows/projectNameManagement';
 
 export const beforeapproveMKT = (): void => {
 

@@ -15,7 +15,8 @@ import {
 } from '../helpers/config';
 import { approveProjectCGMD, approveProjectCGMDtester, approveProjectACTM, approveProjectOPER } from './beforeApproveCks.core';
 import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE, approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectAPO } from './beforeApproveMkt.core';
-import { loginAndWaitReady, ClaimProject, approveProject, getStandardProjectName } from '../helpers/commonActions.core';
+import { loginAndWaitReady, ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
+import { getStandardProjectName } from '../projectWorkflows/projectNameManagement';
 
 export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void => {
   if (Module === 'POST') {

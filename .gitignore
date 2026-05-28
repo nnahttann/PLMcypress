@@ -1,81 +1,34 @@
-# =========================
+```
 # Dependencies
-# =========================
 node_modules/
-.venv/
-venv/
-env/
-.Python
 
-# =========================
-# Environment Variables
-# =========================
+# Test artifacts
+cypress/downloads/
+cypress/screenshots/
+cypress/videos/
+
+# Environment
 .env
 .env.local
 .env.*
-*.env.*
 
-# =========================
-# Cypress & Testing
-# =========================
-cypress/screenshots/
-cypress/videos/
-cypress/downloads/
-coverage/
-.nyc_output/
-htmlcov/
-.coverage
-.coverage.*
-.pytest_cache/
-nosetests.xml
-coverage.xml
-*.cover
-
-# =========================
-# Build Outputs & Compiled
-# =========================
-dist/
-build/
-target/
-.gradle/
-*.class
-*.o
-*.obj
-*.out
-*.exe
-*.dll
-*.so
-*.a
-
-# =========================
-# Python Caches & Tools
-# =========================
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.mypy_cache/
-.tox/
-.cache
-
-# =========================
-# Logs & Temp Files
-# =========================
+# Logs
 *.log
-*.tmp
-pip-log.txt
-pip-delete-this-directory.txt
 
-# =========================
-# IDEs & Editors
-# =========================
-.vscode/
-.idea/
+# Temporary files
+*.tmp
 *.swp
 *.swo
 
-# =========================
-# OS & System Files
-# =========================
+# OS generated files
 .DS_Store
 Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+
+# IDE files
+.vscode/
+.idea/
+```
