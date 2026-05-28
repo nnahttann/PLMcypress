@@ -4,8 +4,9 @@
 import { createPOWordingPools } from '../poWordingPools.core';
 import { pickRandom, fillBilingual, selectMultipleFromDualList, limitAndCleanEN, randInt, randomInt } from '../helpers/poUtilities.core';
 import { generateProjectNames, createProjectBase, createPOBase } from '../helpers/projectNameManager.core';
+import { getCredentials } from '../helpers/utils';
 
-const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
+export const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
 
   cy.get('select[formcontrolname="promotionLevel"]').select(pickRandom(['Mobile', 'Account', 'Non-Mobile']));
@@ -27,7 +28,7 @@ const fillServicePOFields = (Module: string, PriceType: string, projectName?: st
   fillField('textarea[formcontrolname="memoDescription"]', limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
-const fillCashBackPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
+export const fillCashBackPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'CashBackPO', Module, PriceType, subModule);
 
   fillBilingual('textarea[formcontrolname="shortPromotionNameEn"]', 'textarea[formcontrolname="shortPromotionNameTh"]', pools.shortPromotionName.EN, pools.shortPromotionName.TH, 100, 100);
@@ -37,7 +38,7 @@ const fillCashBackPOFields = (Module: string, PriceType: string, projectName?: s
   selectMultipleFromDualList('availableListBox', randInt(1, 3));
 };
 
-const fillStandardPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
+export const fillStandardPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'StandardPO', Module, PriceType, subModule);
 
   cy.get('select[formcontrolname="productType"]').select(pickRandom(['FBB', 'Fixline', 'Mobile', 'Non Mobile']));
@@ -50,7 +51,7 @@ const fillStandardPOFields = (Module: string, PriceType: string, projectName?: s
   fillField('textarea[formcontrolname="memoDescription"]', limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
-const fillCashBackDiscountConfig = (Module: string, PriceType: string, projectName?: string, poName?: string) => {
+export const fillCashBackDiscountConfig = (Module: string, PriceType: string, projectName?: string, poName?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`, poName || 'CashBackDiscount', Module, PriceType);
 
   fillField('input[formcontrolname="duration"]', pickRandom([1, 3, 6, 12, 24, 36]).toString());
@@ -90,7 +91,7 @@ const fillCashBackDiscountConfig = (Module: string, PriceType: string, projectNa
   cy.get('button.btn.btn-primary').contains('Add').click();
 };
 
-const setPriceVAT = (): void => {
+export const setPriceVAT = (): void => {
   const getRandomCharge = (min = 100, max = 2000) => (Math.random() * (max - min) + min).toFixed(2);
   const randomCharge = getRandomCharge();
   const priceIncludingVAT = (parseFloat(randomCharge) * 1.07).toFixed(2);

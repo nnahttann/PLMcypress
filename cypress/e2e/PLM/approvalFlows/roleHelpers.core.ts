@@ -7,7 +7,7 @@ import { loginAndWaitReady } from '../helpers/auth.core';
 import { getStandardProjectName } from '../projectWorkflows/projectNameManagement.core';
 import { ApproveFunction } from '../helpers/types.core';
 
-const assignTaskViaTracking = (projectName: string, assignee: string, billingSystem: string = ''): void => {
+export const assignTaskViaTracking = (projectName: string, assignee: string, billingSystem: string = ''): void => {
   cy.contains('span', 'Menu', { timeout: 100000 }).click();
   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
   cy.get('a[href="#/new-report/home/tracking"]').click();
@@ -21,7 +21,7 @@ const assignTaskViaTracking = (projectName: string, assignee: string, billingSys
   assignTeamTask(projectName, assignee, billingSystem);
 };
 
-const navigateToWorkspace = (): void => {
+export const navigateToWorkspace = (): void => {
   // cy.wait(10000)
   cy.contains('span', 'Menu', { timeout: 100000 }).click();
   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
@@ -29,7 +29,7 @@ const navigateToWorkspace = (): void => {
   cy.url().should('include', '/workspace-home/workspace', { timeout: 1000000 });
 };
 
-const performRoleTaskWithAssignment = (
+export const performRoleTaskWithAssignment = (
   user: string,
   pass: string,
   assignee: string,
@@ -51,9 +51,17 @@ const performRoleTaskWithAssignment = (
   approveFunction(projectNamePONAME);
 };
 
-const performSimpleApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
+export const performSimpleApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
   loginAndWaitReady(user, pass);
   const projectNamePONAME: string = getStandardProjectName();
   cy.log('Project Name: ' + projectNamePONAME);
+  approveFunction(projectNamePONAME);
+};
+
+export const performSimpleClaimAndApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
+  loginAndWaitReady(user, pass);
+  const projectNamePONAME: string = getStandardProjectName();
+  cy.log('Project Name: ' + projectNamePONAME);
+  ClaimProject(projectNamePONAME);
   approveFunction(projectNamePONAME);
 };
