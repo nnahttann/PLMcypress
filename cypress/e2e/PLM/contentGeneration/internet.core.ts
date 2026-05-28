@@ -5,6 +5,7 @@ import { loginAndWaitReady } from '../helpers/auth.core';
 import { getStandardProjectName } from '../projectWorkflows/projectNameManagement.core';
 import { ClaimProject } from '../projectWorkflows/claimProject.core';
 import { ApproveFunction } from '../helpers/types.core';
+import { performSimpleClaimAndApprovalRole } from '../approvalFlows/roleHelpers.core';
 
 const COMPONENT = 'app-mass-enh-vertical-app';
 function checkAndFillContentType(): void {
@@ -509,14 +510,6 @@ const checkAndUpdatePriority = (): void => {
     cy.wait(500);
     processRows(0);
   });
-};
-const performSimpleClaimAndApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
-  loginAndWaitReady(user, pass);
-  const projectNamePONAME: string = getStandardProjectName();
-  cy.log('Project Name: ' + projectNamePONAME);
-  ClaimProject(projectNamePONAME);
-  cy.wait(1500);
-  approveFunction(projectNamePONAME);
 };
 
 const checkAndUpdateVerticalAppPriority = (): void => {
