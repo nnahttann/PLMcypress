@@ -16,7 +16,7 @@ import { RetryPattern } from '../productFeatures/retryPattern.core';
 import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
 import { backBacicInfo } from '../productFeatures/backBasicInfo.core';
 import { addFile } from '../productFeatures/addFile.core';
-import { PriceType, ProductClass, ProjectBasicOptions } from '../helpers/types.core';
+import type { PriceType, ProductClass, ProjectBasicOptions } from '../helpers/types.core';
 
 const now = new Date();
 const day = String(now.getDate()).padStart(2, '0');
@@ -24,8 +24,8 @@ const month = String(now.getMonth() + 1).padStart(2, '0');
 const hours = String(now.getHours()).padStart(2, '0');
 const minutes = String(now.getMinutes()).padStart(2, '0');
 
-export const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
-  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
+export const fillServicePOFields = (Module: string, priceType: string, projectName?: string, poName?: string, subModule?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${priceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, priceType, subModule);
 
   cy.get('select[formcontrolname="promotionLevel"]').select(pickRandom(['Mobile', 'Account', 'Non-Mobile']));
   fillBilingual('textarea[formcontrolname="wordingInStatementEn"]', 'textarea[formcontrolname="wordingInStatementTh"]', pools.wordingInStatement.EN, pools.wordingInStatement.TH, 250, 250);
@@ -46,8 +46,8 @@ export const fillServicePOFields = (Module: string, PriceType: string, projectNa
   fillField('textarea[formcontrolname="memoDescription"]', limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
-export const fillCashBackPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
-  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'CashBackPO', Module, PriceType, subModule);
+export const fillCashBackPOFields = (Module: string, priceType: string, projectName?: string, poName?: string, subModule?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${priceType}${day}${month} ${hours}${minutes}`, poName || 'CashBackPO', Module, priceType, subModule);
 
   fillBilingual('textarea[formcontrolname="shortPromotionNameEn"]', 'textarea[formcontrolname="shortPromotionNameTh"]', pools.shortPromotionName.EN, pools.shortPromotionName.TH, 100, 100);
   fillBilingual('textarea[formcontrolname="promotionDescriptionEn"]', 'textarea[formcontrolname="promotionDescriptionTh"]', pools.promotionDescription.EN, pools.promotionDescription.TH, 500, 500);
@@ -56,8 +56,8 @@ export const fillCashBackPOFields = (Module: string, PriceType: string, projectN
   selectMultipleFromDualList('availableListBox', randInt(1, 3));
 };
 
-export const fillStandardPOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
-  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'StandardPO', Module, PriceType, subModule);
+export const fillStandardPOFields = (Module: string, priceType: string, projectName?: string, poName?: string, subModule?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${priceType}${day}${month} ${hours}${minutes}`, poName || 'StandardPO', Module, priceType, subModule);
 
   cy.get('select[formcontrolname="productType"]').select(pickRandom(['FBB', 'Fixline', 'Mobile', 'Non Mobile']));
   fillBilingual('textarea[formcontrolname="wordingInStatementEn"]', 'textarea[formcontrolname="wordingInStatementTh"]', pools.wordingInStatement.EN, pools.wordingInStatement.TH, 250, 250);
@@ -69,8 +69,8 @@ export const fillStandardPOFields = (Module: string, PriceType: string, projectN
   fillField('textarea[formcontrolname="memoDescription"]', limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
-export const fillCashBackDiscountConfig = (Module: string, PriceType: string, projectName?: string, poName?: string) => {
-  const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`, poName || 'CashBackDiscount', Module, PriceType);
+export const fillCashBackDiscountConfig = (Module: string, priceType: string, projectName?: string, poName?: string) => {
+  const pools = createPOWordingPools(projectName || `${Module} ${priceType}${day}${month}${hours}${minutes}`, poName || 'CashBackDiscount', Module, priceType);
 
   fillField('input[formcontrolname="duration"]', pickRandom([1, 3, 6, 12, 24, 36]).toString());
   cy.get('button[class*="btn-primary"][type="button"]').first().click();
@@ -118,8 +118,8 @@ export const setPriceVAT = (): void => {
   cy.get('input[formcontrolname="priceIncludingVAT"]').clear().type(priceIncludingVAT);
 };
 export const ProjectBasicInformationComplete = (
-  PriceType: PriceType,
-  ProductClass: ProductClass,
+  priceType: PriceType,
+  productClass: ProductClass,
   options: ProjectBasicOptions
 ): void => {
   const { ProductClass1, Module, subModule, autoSetDuration = false, Plugin } = options;
@@ -127,7 +127,7 @@ export const ProjectBasicInformationComplete = (
   const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
   // ✅ 1. สร้างชื่อ Project & PO ครั้งเดียว
-  const { projectName, poName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
+  const { projectName, poName } = generateProjectNames(prefix, Module, subModule, priceType, productClass, undefined, Plugin);
 
   // ✅ 2. สร้าง Project Base (1 ครั้ง)
   createProjectBase(credentials, projectName, Module, subModule);
@@ -153,17 +153,17 @@ export const ProjectBasicInformationComplete = (
 
     // 🔹 กรอกฟอร์ม PO (เริ่มตั้งแต่เลือก PriceType ถึง smsWording)
     const priceTypeMap: Record<PriceType, string> = { onetime: '1: One-Time', recurring: '2: Recurring', usage: '3: Usage' };
-    cy.get('select[formcontrolname="priceType"]').should('be.visible').and('not.be.disabled').select(priceTypeMap[PriceType]);
+    cy.get('select[formcontrolname="priceType"]').should('be.visible').and('not.be.disabled').select(priceTypeMap[priceType]);
 
     const productClassMapMobile: Record<ProductClass, string> = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
     const productClassMapEnterMusic: Record<'ontop' | 'ontopextra', string> = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
     const productValue = (Module === 'ENTER' || Module === 'MUSIC')
-      ? productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra']
-      : productClassMapMobile[ProductClass];
+      ? productClassMapEnterMusic[productClass as 'ontop' | 'ontopextra']
+      : productClassMapMobile[productClass];
 
     cy.get('select[formcontrolname="productClass"]').should('be.visible').and('not.be.disabled').select(productValue);
 
-    if (ProductClass === 'main') {
+    if (productClass === 'main') {
       const defaultItems = ['Internet', 'MMS', 'SMS', 'Voice'];
       const retrySelectProductClass = (attemptsLeft: number) => {
         cy.contains('.panel-heading', '*Product Specification').scrollIntoView().closest('.panel').within(() => {
@@ -183,7 +183,7 @@ export const ProjectBasicInformationComplete = (
             cy.wait(500);
             cy.get('select[formcontrolname="productClass"]').select(productValue);
             cy.wait(500);
-            cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[PriceType]);
+            cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[priceType]);
             cy.wait(800);
             retrySelectProductClass(attemptsLeft - 1);
           } else {
@@ -217,21 +217,21 @@ export const ProjectBasicInformationComplete = (
     PriceExcluding();
     selectTargetGroup('random');
     dropdownPromotionGroup();
-    RandomProductSpecification(ProductClass, subModule, Module);
+    RandomProductSpecification(productClass, subModule, Module);
 
-    if (Module === 'PRE' && (ProductClass === 'ontop' || ProductClass === 'ontopextra')) {
+    if (Module === 'PRE' && (productClass === 'ontop' || productClass === 'ontopextra')) {
       cy.get('input[formcontrolname="allowMvpn"]').should('exist').then(($radios) => {
         cy.wrap($radios).eq(Math.floor(Math.random() * $radios.length)).check();
       });
     }
 
-    RandomRemark(projectName, currentPoName, PriceType, ProductClass, subModule);
+    RandomRemark(projectName, currentPoName, priceType, productClass, subModule);
 
-    if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {
+    if ((Module !== 'POST') && subModule === 'PRE' && priceType === 'recurring') {
       RetryPattern();
     }
 
-    if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
+    if (Module === 'PRE' && priceType === 'recurring' && productClass === 'main') {
       CopyDeductFail();
     }
 

@@ -2,6 +2,11 @@
 // PROJECT BASIC INFORMATION HELPERS
 // ========================
 
+import { getTimeSuffix, getTruncatedName, getRandomPhone } from '../helpers/utils';
+import { login } from '../helpers/auth.core';
+import { RandomProjectDescription } from '../contentGeneration/randomProjectDescription.core';
+import type { Module } from '../helpers/types.core';
+
 const generateProjectNames = (
   prefix: string,
   Module: Module,

@@ -2,6 +2,8 @@
 // SMS CKS 
 // ========================
 
+import { closeSuccessModal } from './smsMms';
+
 export const smsCKSPRE = (): void => {
   cy.get('body').then(($body) => {
     const normalizeText = (text: string | null | undefined): string =>
