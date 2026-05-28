@@ -2,8 +2,8 @@
 // CKS ROLE EXECUTION
 // ========================
 
-import type { GetProjectNameFn } from '../types';
-import { getStandardProjectName, getOntopProjectName } from '../helpers/config';
+import type { GetProjectNameFn } from '../helpers/types.core';
+import { getStandardProjectName, getOntopProjectName } from '../projectWorkflows/projectNameManagement.core';
 import { standardCksPoEnhancementFlow } from './cksPoEnhancement.core';
 import { beforeapproveCKS, beforeapproveCKSontop } from './beforeApproveCks.core';
 

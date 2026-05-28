@@ -1,18 +1,18 @@
 // ========================
 // TYPE DEFINITIONS
 // ========================
-type Module = 'POST' | 'PRE' | 'ENTER' | 'MUSIC';
-type PriceType = 'onetime' | 'recurring' | 'usage';
-type ProductClass = 'main' | 'ontop' | 'ontopextra';
-type ProductClass1 = 'Main' | 'Ontop' | 'OntopExtra';
-type TaskListHeader = 'To Do List' | 'Unassigned Task';
-type FinalAction = 'AlertAndLogout' | 'ComplexLogout' | 'StopAfterCore';
-type CoreTaskCallback = () => void;
-type ApproveFunction = (projectName: string) => void;
-type GetProjectNameFn = () => string;
-type EnhanceStepsCallback = () => void;
+export type Module = 'POST' | 'PRE' | 'ENTER' | 'MUSIC';
+export type PriceType = 'onetime' | 'recurring' | 'usage';
+export type ProductClass = 'main' | 'ontop' | 'ontopextra';
+export type ProductClass1 = 'Main' | 'Ontop' | 'OntopExtra';
+export type TaskListHeader = 'To Do List' | 'Unassigned Task';
+export type FinalAction = 'AlertAndLogout' | 'ComplexLogout' | 'StopAfterCore';
+export type CoreTaskCallback = () => void;
+export type ApproveFunction = (projectName: string) => void;
+export type GetProjectNameFn = () => string;
+export type EnhanceStepsCallback = () => void;
 
-interface ProjectBasicOptions {
+export interface ProjectBasicOptions {
   ProductClass1: ProductClass1;
   Module: Module;
   subModule?: 'POST' | 'PRE';

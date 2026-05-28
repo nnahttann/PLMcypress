@@ -7,6 +7,9 @@ import { generateProjectNames, createProjectBase, createPOBase } from '../helper
 import { getCredentials } from '../helpers/utils';
 import { registerProjectName } from './projectNameManagement.core';
 import { PriceExcluding } from '../productFeatures/priceExcluding.core';
+import { selectTargetGroup } from '../productFeatures/targetGroup.core';
+import { dropdownPromotionGroup } from '../productFeatures/dropdownPromotionGroup.core';
+import { RandomProductSpecification } from '../contentGeneration/randomProductSpecification.core';
 
 export const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);

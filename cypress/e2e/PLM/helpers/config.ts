@@ -63,3 +63,11 @@ export const getDateFormattingInfo = (): {
   hours,
   minutes
 });
+
+export const getStandardProjectName = (): string => {
+  return formattedDateMain;
+};
+
+export const getOntopProjectName = (): string => {
+  return formattedDateOntop;
+};
