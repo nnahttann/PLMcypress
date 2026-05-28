@@ -71,7 +71,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   const fillTextarea = (sel: string, en: string, th: string, maxEn: number, maxTh: number) => {
     cy.get(sel).each(($el: any, idx: number) => {
       const cleaned = idx === 0 ? capEN(en, maxEn) : capTH(th, maxTh);
-      cy.wrap($el).focus().clear({ force: true }).type(cleaned, { delay: 0, force: true }).blur({ force: true });
+      cy.wrap($el).focus({ force: true }).clear({ force: true }).type(cleaned, { delay: 0, force: true }).blur({ force: true });
     });
     cy.wait(300);
   };
@@ -188,9 +188,9 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         if (!$b.find(sel).length) return;
         cy.get(sel).then(($els: any) => {
           if (!String($els.eq(0).val() ?? '').trim())
-            cy.wrap($els.eq(0)).focus().type(capEN(en, maxEn), { delay: 0, force: true }).blur({ force: true });
+            cy.wrap($els.eq(0)).focus({ force: true }).type(capEN(en, maxEn), { delay: 0, force: true }).blur({ force: true });
           if ($els.length > 1 && !String($els.eq(1).val() ?? '').trim())
-            cy.wrap($els.eq(1)).focus().type(capTH(th, maxTh), { delay: 0, force: true }).blur({ force: true });
+            cy.wrap($els.eq(1)).focus({ force: true }).type(capTH(th, maxTh), { delay: 0, force: true }).blur({ force: true });
         });
         cy.wait(300);
       });
@@ -323,7 +323,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     // SECTION 15: POST-only fields (Manual only)
     if (type === 'POST' && !useGenerate) {
       withSection('textarea[formcontrolname="marketingName"]', 'Marketing Name', () =>
-        cy.get('textarea[formcontrolname="marketingName"]').focus()
+        cy.get('textarea[formcontrolname="marketingName"]').focus({ force: true })
           .clear({ force: true })
           .type(capEN(pools.marketingName(), 40), { delay: 0, force: true })
           .blur({ force: true }));
