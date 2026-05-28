@@ -1,7 +1,7 @@
 // ==========================================
 // 🔹 CYPRESS FILL FUNCTIONS (Logic กระชับ)
 // ==========================================
-import { createPOWordingPools } from '../helpers/poWordingPools.core';
+import { createPOWordingPools } from '../poWordingPools.core';
 import { pickRandom, fillBilingual, selectMultipleFromDualList, limitAndCleanEN, randInt, randomInt } from '../helpers/poUtilities.core';
 import { generateProjectNames, createProjectBase, createPOBase } from '../helpers/projectNameManager.core';
 
