@@ -111,6 +111,11 @@ export {
   getOntopProjectName
 } from './projectWorkflows/projectNameManagement';
 
+// Project Basic Information Complete
+export {
+  ProjectBasicInformationComplete
+} from './projectWorkflows/fillPoFields.core';
+
 // ========================================
 // APPROVAL FLOWS MODULE EXPORTS
 // ========================================
