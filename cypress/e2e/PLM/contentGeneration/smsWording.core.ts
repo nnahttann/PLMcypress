@@ -11,7 +11,7 @@ const closeSuccessModal = (): void => {
     .click();
 };
 
-import { POWordingPoolsData } from './poWordingPoolsData';
+import { POWordingPoolsData } from '../poWordingPoolsData';
 
 const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
