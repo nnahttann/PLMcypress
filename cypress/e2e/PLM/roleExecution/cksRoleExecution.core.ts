@@ -7,7 +7,7 @@ import { getStandardProjectName, getOntopProjectName } from '../helpers/config';
 import { standardCksPoEnhancementFlow } from './cksPoEnhancement.core';
 import { beforeapproveCKS, beforeapproveCKSontop } from './beforeApproveCks.core';
 
-const executeCKSRole = (
+export const executeCKSRole = (
   projectNameStrategy: 'standard' | 'ontop',
   approvalType: 'main' | 'ontop',
   customSteps: () => void
