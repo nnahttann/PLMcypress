@@ -6,8 +6,10 @@ import { executeCKSRole } from './cksRoleExecution.core';
 import { afterCKSPOST } from './afterCksPost.core';
 import { 
   checkAndFillContentType, checkAndUpdatePriority,
-  checkAndUpdateVerticalAppPriority, smsCKSPOST, Tariff 
-} from '../projectWorkflows/postSubmission.core';
+  checkAndUpdateVerticalAppPriority
+} from '../helpers/uiHelpers.core';
+import { smsCKSPOST } from '../contentGeneration/smsCks.core';
+import { Tariff } from '../productFeatures/tariff.core';
 
 export const afterMKTMAINPOST = (): void => {
   executeCKSRole('standard', 'main', () => {
