@@ -2,59 +2,21 @@
 # Dependencies
 node_modules/
 
-# Test files
-cypress/downloads/
-cypress/screenshots/
-cypress/videos/
+# Build artifacts
+dist/
+build/
+target/
+
+# Logs and temp files
+*.log
+*.tmp
 
 # Environment
 .env
 .env.local
-.env.*
+*.env.*
 
-# Logs
-*.log
-
-# Temporary files
-*.tmp
-*.swp
-
-# OS generated files
-.DS_Store
-Thumbs.db
-
-# Coverage reports
-coverage/
-htmlcov/
-.coverage
-
-# IDE files
+# Editors
 .vscode/
 .idea/
-
-# Python specific
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-*.so
-*.egg-info/
-.eggs/
-
-# Build outputs
-dist/
-build/
-*.out
-*.exe
-*.dll
-*.so
-*.a
-*.obj
-
-# Cache directories
-.mypy_cache/
-.pytest_cache/
-.nyc_output/
-coverage/
 ```
