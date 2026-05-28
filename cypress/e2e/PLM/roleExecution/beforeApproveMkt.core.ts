@@ -37,7 +37,7 @@ export const beforeapproveMKT = (): void => {
   cy.log(`📎 Attachment Description: ${attachmentDesc}`);
   cy.get('textarea[formcontrolname="fileDescription"]', { timeout: 10000 })
     .should('be.visible')
-    .focus()
+    .focus({ force: true })
     .type(attachmentDesc, { delay: 50 });
 
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
