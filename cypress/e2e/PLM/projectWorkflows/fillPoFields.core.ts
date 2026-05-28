@@ -215,7 +215,7 @@ export const ProjectBasicInformationComplete = (
     }
 
     PriceExcluding();
-    selectTargetGroup('random');
+    selectTargetGroup();
     dropdownPromotionGroup();
     RandomProductSpecification(productClass, subModule, Module);
 
