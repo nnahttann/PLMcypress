@@ -16,9 +16,15 @@ import {
   approveProjectSPADTester, approveProjectSPADdeploy,
   approveProjectACTM, approveProjectAPO 
 } from './beforeApproveMkt.core';
+import { approveProjectSPADSupCGMDPlugin } from '../approvalFlows/spadApprovals.core';
+import { approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin } from '../approvalFlows/cgmdApprovals.core';
 import { smsCKSPRE } from '../contentGeneration/smsCks.core';
 import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
 import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
+import { unregister } from './unregister.core';
+import { performMusicRoles } from './musicRoles.core';
+import { addauto5gCKS } from './unregister.core';
+import { diyflagCKS } from './diyFlagCks.core';
 
 type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
 

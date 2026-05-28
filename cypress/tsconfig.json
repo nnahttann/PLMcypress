@@ -7,7 +7,8 @@
     "lib": [
       "es2017",
       "dom",
-      "es5"
+      "es5",
+      "DOM"
     ],
     "types": [
       "cypress", "node"

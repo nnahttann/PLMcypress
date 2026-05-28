@@ -1,6 +1,7 @@
 // ========================
 // RANDOM PRODUCT SPECIFICATION
 // ========================
+import { InternetRandom } from './vrbt.core';
 
 export const RandomProductSpecification = (
   productClass: string,

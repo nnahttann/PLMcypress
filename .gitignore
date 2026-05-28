@@ -1,1 +1,42 @@
-Nothing needs to be added to the .gitignore file based on the provided file changes, as they are all TypeScript source files (.ts) which should not be ignored.
+```
+# Dependencies
+node_modules/
+
+# Cypress specific
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+
+# TypeScript/JavaScript build output
+*.js.map
+*.tsbuildinfo
+dist/
+build/
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+*.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+coverage/
+htmlcov/
+*.coverage
+
+# Temporary files
+*.tmp
+*.temp
+```
