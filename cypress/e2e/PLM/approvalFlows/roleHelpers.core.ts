@@ -6,6 +6,8 @@ import { assignTeamTask } from '../projectWorkflows/assignTeamTask.core';
 import { loginAndWaitReady } from '../helpers/auth.core';
 import { getStandardProjectName } from '../projectWorkflows/projectNameManagement.core';
 import { ApproveFunction } from '../helpers/types.core';
+import { ClaimProject } from '../projectWorkflows/claimProject.core';
+import { ClaimProject } from '../projectWorkflows/claimProject.core';
 
 export const assignTaskViaTracking = (projectName: string, assignee: string, billingSystem: string = ''): void => {
   cy.contains('span', 'Menu', { timeout: 100000 }).click();

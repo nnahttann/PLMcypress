@@ -5,6 +5,7 @@ import { createPOWordingPools } from '../poWordingPools.core';
 import { pickRandom, fillBilingual, selectMultipleFromDualList, limitAndCleanEN, randInt, randomInt } from '../helpers/poUtilities.core';
 import { generateProjectNames, createProjectBase, createPOBase } from '../helpers/projectNameManager.core';
 import { getCredentials } from '../helpers/utils';
+import { registerProjectName } from './projectNameManagement.core';
 
 export const fillServicePOFields = (Module: string, PriceType: string, projectName?: string, poName?: string, subModule?: string) => {
   const pools = createPOWordingPools(projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`, poName || 'ServicePO', Module, PriceType, subModule);
