@@ -14,8 +14,10 @@ import {
   apo, apopass
 } from '../helpers/config';
 import { approveProjectCGMD, approveProjectCGMDtester, approveProjectACTM, approveProjectOPER } from './beforeApproveCks.core';
-import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE, approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectAPO } from './beforeApproveMkt.core';
-import { loginAndWaitReady, ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
+import { approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy } from '../approvalFlows/spadApprovals';
+import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE } from '../approvalFlows/cgmdApprovals';
+import { approveProjectAPO } from '../approvalFlows/simpleApprovals.core';
+import { loginAndWaitReady, ClaimProject, approveProject } from '../helpers/auth';
 import { getStandardProjectName } from '../projectWorkflows/projectNameManagement';
 
 export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void => {
