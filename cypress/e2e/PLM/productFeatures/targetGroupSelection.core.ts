@@ -3,12 +3,13 @@
 // ========================
 
 export const targetgroup = (): void => {
+  // Note: Update this list based on actual available options in your application
   const optionsToSelect = [
     'Change Charge Type (Convert)',
     'Existing',
     'New',
-    'Port In (Mobile Number Port)',
-    'Renew / Recall from Terminate'
+    'Port In (Mobile Number Port)'
+    // 'Renew / Recall from Terminate' - Remove if not available in your UI
   ];
 
   const randomOption = optionsToSelect[Math.floor(Math.random() * optionsToSelect.length)];
