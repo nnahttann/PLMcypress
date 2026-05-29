@@ -37,7 +37,7 @@ interface PrepaidTestConfig {
 
 // Test Configuration for all PRE-PAID combinations
 const prepaidTestConfigs: PrepaidTestConfig[] = [
-  // Main - Onetime
+  // Main - Onetime (PRE only - no ENTER/MUSIC)
   {
     name: 'Main Onetime',
     billingType: 'onetime',
@@ -46,11 +46,9 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
     productClass1: 'Main',
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
-      { scenario: 'ENTER', afterHook: 'afterMKTMainPREENTERPlugin' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTMainPREMusicPlugin' },
     ],
   },
-  // Main - Recurring
+  // Main - Recurring (PRE only - no ENTER/MUSIC)
   {
     name: 'Main Recurring',
     billingType: 'recurring',
@@ -59,11 +57,9 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
     productClass1: 'Main',
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
-      { scenario: 'ENTER', afterHook: 'afterMKTMainPREENTERPlugin' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTMainPREMusicPlugin' },
     ],
   },
-  // Main - Usage
+  // Main - Usage (PRE only - no ENTER/MUSIC)
   {
     name: 'Main Usage',
     billingType: 'usage',
@@ -72,11 +68,9 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
     productClass1: 'Main',
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
-      { scenario: 'ENTER', afterHook: 'afterMKTMainPREENTERPlugin' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTMainPREMusicPlugin' },
     ],
   },
-  // Ontop - Onetime
+  // Ontop - Onetime (PRE, ENTER, MUSIC)
   {
     name: 'Ontop Onetime',
     billingType: 'onetime',
@@ -88,7 +82,7 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'MUSIC', afterHook: 'afterMKTontopOnetimePREMUSIC' },
     ],
   },
-  // Ontop - Recurring
+  // Ontop - Recurring (PRE, ENTER, MUSIC)
   {
     name: 'Ontop Recurring',
     billingType: 'recurring',
@@ -100,7 +94,7 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
     ],
   },
-  // Ontop - Usage
+  // Ontop - Usage (PRE, ENTER, MUSIC)
   {
     name: 'Ontop Usage',
     billingType: 'usage',
@@ -112,7 +106,7 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
     ],
   },
-  // OntopEx - Onetime
+  // OntopEx - Onetime (PRE, ENTER, MUSIC)
   {
     name: 'OntopEx Onetime',
     billingType: 'onetime',
@@ -124,7 +118,7 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
     ],
   },
-  // OntopEx - Recurring
+  // OntopEx - Recurring (PRE, ENTER, MUSIC)
   {
     name: 'OntopEx Recurring',
     billingType: 'recurring',
@@ -136,7 +130,7 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
     ],
   },
-  // OntopEx - Usage
+  // OntopEx - Usage (PRE, ENTER, MUSIC)
   {
     name: 'OntopEx Usage',
     billingType: 'usage',
