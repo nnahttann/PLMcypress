@@ -211,6 +211,24 @@ export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModu
 export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
 export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
 
+// ========================
+// ONTOP EXTRA FUNCTIONS (for MUSIC/ENTER scenarios)
+// ========================
+
+const _afterMKTontopExtraPREWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
+  executeCKSRole('ontopextra', 'ontopextra', stepsOntopPRE);
+  afterFn(module);
+};
+
+export const afterMKTontopExtraPRE = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopExtraPREENTER = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopExtraPREENTERPlugin = (): void => _afterMKTontopExtraPREWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopExtraPREMusicPlugin = (): void => _afterMKTontopExtraPREWithModule(afterCKSPREPlugin, 'MUSIC');
+export const afterMKTontopExtraPREMUSIC = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'MUSIC');
+
 export const afterMKTontopPREUsage = (): void => {
   executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
   afterCKSCommonPRE('PRE');
