@@ -179,6 +179,19 @@ export {
   CKSroleRJ,
   performMusicRoles,
   performSimpleClaimAndApprovalRole,
+  // PRE-PAID ONTOP functions
+  afterMKTontopPRE,
+  afterMKTontopPREENTER,
+  afterMKTontopPREMUSIC,
+  afterMKTontopPREUsage,
+  afterMKTontopPREUsageEnter,
+  afterMKTontopPREUsageMusic,
+  // POST-PAID ONTOP functions
+  afterMKTontopPOST,
+  afterMKTontopPOSTENTER,
+  afterMKTontopPOSTENTERPlugin,
+  afterMKTontopPOSTMusicPlugin,
+  afterMKTontopPOSTMUSIC,
   // Additional role execution functions
   Randomdropdown,
   dropdownRecurringCKS,
