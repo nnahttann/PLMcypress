@@ -17,7 +17,9 @@ import { approveProjectCGMD, approveProjectCGMDtester, approveProjectACTM, appro
 import { approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy } from '../approvalFlows/spadApprovals';
 import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE } from '../approvalFlows/cgmdApprovals';
 import { approveProjectAPO } from '../approvalFlows/simpleApprovals.core';
-import { loginAndWaitReady, ClaimProject, approveProject } from '../helpers/auth';
+import { loginAndWaitReady } from '../helpers/auth';
+import { ClaimProject } from '../projectWorkflows/claimProject.core';
+import { approveProject } from '../projectWorkflows/projectManagement';
 import { getStandardProjectName } from '../projectWorkflows/projectNameManagement';
 
 export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void => {
