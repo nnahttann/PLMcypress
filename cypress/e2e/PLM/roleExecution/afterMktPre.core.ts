@@ -12,13 +12,16 @@ import {
 } from '../helpers/config';
 import { 
   approveProjectCGMDPRE, approveProjectCGMDtesterPRE,
+  approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin 
+} from '../approvalFlows/cgmdApprovals.core';
+import { 
   approveProjectSPADSup, approveProjectSPADDOER,
   approveProjectSPADTester, approveProjectSPADdeploy,
-  approveProjectACTM, approveProjectAPO 
-} from './beforeApproveMkt.core';
-import { approveProjectSPADSupCGMDPlugin } from '../approvalFlows/spadApprovals.core';
-import { approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin } from '../approvalFlows/cgmdApprovals.core';
+  approveProjectSPADSupCGMDPlugin 
+} from '../approvalFlows/spadApprovals.core';
+import { approveProjectACTM, approveProjectAPO } from '../approvalFlows/otherApprovals.core';
 import { smsCKSPRE, smsCKSPOST } from '../contentGeneration/smsCks.core';
+import { afterCKSPOST, afterCKSPOSTPlugin } from './afterCksPost.core';
 import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
 import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
 import { unregister } from './unregister.core';
@@ -156,13 +159,6 @@ export const afterCKSPREPlugin = (Module: string): void => {
   }
 };
 
-export const afterCKSPOSTPlugin = (Module: string): void => {
-  declarePluginRoleTests();
-  if (Module === 'MUSIC') {
-    performMusicRoles();
-  }
-};
-
 export const afterMKTOntop_NotComplex = (): void => {
   executeCKSRole('standard', 'ontop', () => {
     addauto5gCKS(); dropdownRecurringCKS(); diyflagCKS(); unregister();
@@ -187,36 +183,6 @@ export const afterMKTMainPRE_NotComplex = (): void => {
   });
   declarePluginRoleTests();
 };
-
-// ========================
-// ONTOP PRE FUNCTIONS (from Master-legacy)
-// ========================
-
-const _afterMKTontopPREWithModule = (
-  afterFn: (module: string) => void,
-  module: string
-): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPRE);
-  afterFn(module);
-};
-
-const stepsOntopPRE = (): void => {
-  cy.wait(15000);
-  addauto5gCKS();
-  dropdownRecurringCKS();
-  diyflagCKS();
-  checkAndFillContentType();
-  checkAndUpdatePriority();
-  checkAndUpdateVerticalAppPriority();
-  cy.scrollTo('bottom');
-  smsCKSPRE();
-};
-
-export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
-export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
-export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
 
 // ========================
 // ONTOP POST FUNCTIONS (for POST, ENTER, MUSIC scenarios)
@@ -252,82 +218,7 @@ export const afterMKTontopPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(a
 // ONTOP EXTRA FUNCTIONS (for MUSIC/ENTER scenarios)
 // ========================
 
-const _afterMKTontopExtraPREWithModule = (
-  afterFn: (module: string) => void,
-  module: string
-): void => {
-  executeCKSRole('ontopextra', 'ontopextra', stepsOntopPRE);
-  afterFn(module);
-};
-
-export const afterMKTontopExtraPRE = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'PRE');
-export const afterMKTontopExtraPREENTER = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'ENTER');
-export const afterMKTontopExtraPREENTERPlugin = (): void => _afterMKTontopExtraPREWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopExtraPREMusicPlugin = (): void => _afterMKTontopExtraPREWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopExtraPREMUSIC = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'MUSIC');
-
-// ========================
-// ONTOP EXTRA POST FUNCTIONS (for POST, ENTER, MUSIC scenarios)
-// ========================
-
-const _afterMKTontopExtraPOSTWithModule = (
-  afterFn: (module: string) => void,
-  module: string
-): void => {
-  executeCKSRole('ontopextra', 'ontopextra', stepsOntopPOST);
-  afterFn(module);
-};
-
-export const afterMKTontopExtraPOST = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'POST');
-export const afterMKTontopExtraPOSTENTER = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'ENTER');
-export const afterMKTontopExtraPOSTENTERPlugin = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOSTPlugin, 'ENTER');
-export const afterMKTontopExtraPOSTMusicPlugin = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOSTPlugin, 'MUSIC');
 export const afterMKTontopExtraPOSTMUSIC = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'MUSIC');
-
-// ========================
-// ONTOP ONETIME FUNCTIONS (for MUSIC/ENTER scenarios)
-// ========================
-
-const _afterMKTontopOnetimePREWithModule = (
-  afterFn: (module: string) => void,
-  module: string
-): void => {
-  executeCKSRole('ontoponetime', 'ontoponetime', stepsOntopPRE);
-  afterFn(module);
-};
-
-export const afterMKTontopOnetimePRE = (): void => _afterMKTontopOnetimePREWithModule(afterCKSCommonPRE, 'PRE');
-export const afterMKTontopOnetimePREENTER = (): void => _afterMKTontopOnetimePREWithModule(afterCKSCommonPRE, 'ENTER');
-export const afterMKTontopOnetimePREENTERPlugin = (): void => _afterMKTontopOnetimePREWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopOnetimePREMusicPlugin = (): void => _afterMKTontopOnetimePREWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopOnetimePREMUSIC = (): void => _afterMKTontopOnetimePREWithModule(afterCKSCommonPRE, 'MUSIC');
-
-export const afterMKTontopPREUsage = (): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
-  afterCKSCommonPRE('PRE');
-};
-
-export const afterMKTontopPREUsageEnter = (): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
-  afterCKSCommonPRE('Enter');
-};
-
-export const afterMKTontopPREUsageMusic = (): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
-  afterCKSCommonPRE('MUSIC');
-};
-
-const stepsOntopPREUsage = (): void => {
-  cy.wait(15000);
-  addauto5gCKS();
-  dropdownRecurringCKS();
-  diyflagCKS();
-  checkAndFillContentType();
-  checkAndUpdatePriority();
-  checkAndUpdateVerticalAppPriority();
-  cy.scrollTo('bottom');
-  smsCKSPRE();
-};
 
 // =======================
 
