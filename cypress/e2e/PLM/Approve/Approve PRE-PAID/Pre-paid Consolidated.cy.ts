@@ -4,7 +4,7 @@ import * as Master from '../../Master';
 // PRE-PAID CONSOLIDATED TEST SUITE
 // ========================================
 // ✨ QUICK TIPS:
-// 1. Run specific test: npx cypress run --spec="**/Pre-paid Consolidated.cy.ts" --grep "Main Onetime"
+// 1. Run specific test: npx cypress run --spec="**/Pre-paid Consolidated.cy.ts" --grep "Main Usage - ENTER"
 // 2. Run only one case: Add .only after describe (e.g., describe.only(`Main Onetime`, () => {
 // 3. Skip tests: Change it() to it.skip()
 // 4. Debug mode: Add cy.debug() or cy.pause() in test
@@ -20,42 +20,68 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
+interface ScenarioConfig {
+  scenario: string;
+  afterHook: string;
+}
+
+interface PrepaidTestConfig {
+  name: string;
+  billingType: 'onetime' | 'recurring' | 'usage';
+  productClass: 'main' | 'ontop' | 'ontopextra';
+  module: 'PRE';
+  productClass1?: string;
+  scenarios?: ScenarioConfig[];
+  afterHook?: string;
+}
+
 // Test Configuration for all PRE-PAID combinations
-const prepaidTestConfigs = [
+const prepaidTestConfigs: PrepaidTestConfig[] = [
   // Main - Onetime
   {
     name: 'Main Onetime',
-    billingType: 'onetime' as const,
-    productClass: 'main' as const,
+    billingType: 'onetime',
+    productClass: 'main',
     module: 'PRE',
     productClass1: 'Main',
-    afterHook: 'afterMKTMainPRE_FullSpadFlow' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
+      { scenario: 'ENTER', afterHook: 'afterMKTMainPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTMainPREMusicPlugin' },
+    ],
   },
   // Main - Recurring
   {
     name: 'Main Recurring',
-    billingType: 'recurring' as const,
-    productClass: 'main' as const,
+    billingType: 'recurring',
+    productClass: 'main',
     module: 'PRE',
     productClass1: 'Main',
-    afterHook: 'afterMKTMainPRE_FullSpadFlow' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
+      { scenario: 'ENTER', afterHook: 'afterMKTMainPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTMainPREMusicPlugin' },
+    ],
   },
   // Main - Usage
   {
     name: 'Main Usage',
-    billingType: 'usage' as const,
-    productClass: 'main' as const,
+    billingType: 'usage',
+    productClass: 'main',
     module: 'PRE',
     productClass1: 'Main',
-    afterHook: 'afterMKTMainPRE_FullSpadFlow' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
+      { scenario: 'ENTER', afterHook: 'afterMKTMainPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTMainPREMusicPlugin' },
+    ],
   },
   // Ontop - Onetime
   {
     name: 'Ontop Onetime',
-    billingType: 'onetime' as const,
-    productClass: 'ontop' as const,
+    billingType: 'onetime',
+    productClass: 'ontop',
     module: 'PRE',
-    afterHook: 'afterMKTontopOnetimePRE' as const,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTontopOnetimePRE' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopOnetimePREENTER' },
@@ -65,10 +91,9 @@ const prepaidTestConfigs = [
   // Ontop - Recurring
   {
     name: 'Ontop Recurring',
-    billingType: 'recurring' as const,
-    productClass: 'ontop' as const,
+    billingType: 'recurring',
+    productClass: 'ontop',
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
@@ -78,10 +103,9 @@ const prepaidTestConfigs = [
   // Ontop - Usage
   {
     name: 'Ontop Usage',
-    billingType: 'usage' as const,
-    productClass: 'ontop' as const,
+    billingType: 'usage',
+    productClass: 'ontop',
     module: 'PRE',
-    afterHook: 'afterMKTontopPREUsage' as const,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTontopPREUsage' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopPREUsageEnter' },
@@ -91,10 +115,9 @@ const prepaidTestConfigs = [
   // OntopEx - Onetime
   {
     name: 'OntopEx Onetime',
-    billingType: 'onetime' as const,
-    productClass: 'ontopextra' as const,
+    billingType: 'onetime',
+    productClass: 'ontopextra',
     module: 'PRE',
-    afterHook: 'afterMKTontopExtraPRE' as const,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
@@ -104,10 +127,9 @@ const prepaidTestConfigs = [
   // OntopEx - Recurring
   {
     name: 'OntopEx Recurring',
-    billingType: 'recurring' as const,
-    productClass: 'ontopextra' as const,
+    billingType: 'recurring',
+    productClass: 'ontopextra',
     module: 'PRE',
-    afterHook: 'afterMKTontopExtraPRE' as const,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
@@ -117,10 +139,9 @@ const prepaidTestConfigs = [
   // OntopEx - Usage
   {
     name: 'OntopEx Usage',
-    billingType: 'usage' as const,
-    productClass: 'ontopextra' as const,
+    billingType: 'usage',
+    productClass: 'ontopextra',
     module: 'PRE',
-    afterHook: 'afterMKTontopExtraPRE' as const,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
@@ -130,58 +151,32 @@ const prepaidTestConfigs = [
 ];
 
 // ⭐ กำหนด case ที่ต้องการรันตรงนี้ที่เดียว
-// ใส่ชื่อ config.name ที่ต้องการ หรือ [] เพื่อรันทั้งหมด
-const ACTIVE_CASES: string[] = []; // ← รันทั้ง 9 เคส
-// const ACTIVE_CASES: string[] = ['Ontop Recurring']; // ← ตัวอย่าง: รันแค่ case เดียว
+// รูปแบบ: 'ชื่อผลิตภัณฑ์ - ชื่อScenario' (เช่น 'Main Usage - ENTER') 
+// หรือใส่แค่ 'ชื่อผลิตภัณฑ์' เพื่อรันทุก Scenario ของผลิตภัณฑ์นั้น
+const ACTIVE_CASES: string[] = []; 
+// const ACTIVE_CASES: string[] = ['Main Usage - ENTER']; // ← ตัวอย่าง: รันแค่เคสเดียว
+// const ACTIVE_CASES: string[] = ['Ontop Recurring']; // ← ตัวอย่าง: รันทุก Scenario ของ Ontop Recurring
 
 // Test Suite Runner
 describe('PRE-PAID Product Approvals', () => {
   prepaidTestConfigs.forEach(config => {
-    const isActive = ACTIVE_CASES.length === 0 || ACTIVE_CASES.includes(config.name);
+    if (!config.scenarios || config.scenarios.length === 0) {
+      return;
+    }
 
-    // ถ้ามี scenarios array ให้สร้าง test case แยกสำหรับแต่ละ scenario
-    if (config.scenarios && Array.isArray(config.scenarios)) {
-      config.scenarios.forEach(scenarioConfig => {
-        const scenarioName = scenarioConfig.scenario;
-        const fullTestName = `${config.name} > Scenario: ${scenarioName}`;
-        const isScenarioActive = isActive && (ACTIVE_CASES.length === 0 || ACTIVE_CASES.includes(fullTestName));
-        
-        describe(`${fullTestName}`, () => {
-          const testIt = isScenarioActive ? it : it.skip;
+    config.scenarios.forEach(scen => {
+      const fullTestCaseName = `${config.name} - ${scen.scenario}`;
+      
+      // ตรวจสอบว่าเคสนี้ควรถูกรันหรือไม่
+      // รันถ้า: 1. ACTIVE_CASES ว่าง (รันหมด) หรือ 2. ตรงกับชื่อเต็ม หรือ 3. ตรงกับชื่อผลิตภัณฑ์ (รันทุก scenario ของตัวนั้น)
+      const isActive = ACTIVE_CASES.length === 0 || 
+                       ACTIVE_CASES.includes(fullTestCaseName) || 
+                       ACTIVE_CASES.includes(config.name);
 
-          testIt('MKT PRE-PAID role', () => {
-            const testConfig: any = {
-              Module: config.module,
-              subModule: config.module,
-              autoSetDuration: true,
-              scenario: scenarioConfig.scenario,
-            };
-
-            if (config.productClass1) {
-              testConfig.ProductClass1 = config.productClass1;
-            }
-
-            Master.ProjectBasicInformationComplete(
-              config.billingType,
-              config.productClass,
-              testConfig
-            );
-          });
-
-          if (isScenarioActive) {
-            const hookFunction = (Master as any)[scenarioConfig.afterHook];
-            if (typeof hookFunction === 'function') {
-              hookFunction();
-            }
-          }
-        });
-      });
-    } else {
-      // กรณีไม่มี scenarios array (ใช้ default behavior เดิม)
       describe(`${config.name}`, () => {
         const testIt = isActive ? it : it.skip;
 
-        testIt('MKT PRE-PAID role', () => {
+        testIt(`${scen.scenario}`, () => {
           const testConfig: any = {
             Module: config.module,
             subModule: config.module,
@@ -197,15 +192,16 @@ describe('PRE-PAID Product Approvals', () => {
             config.productClass,
             testConfig
           );
-        });
 
-        if (isActive) {
-          const hookFunction = (Master as any)[config.afterHook];
+          // เรียกใช้ Hook ที่ตรงกับ Scenario นั้นๆ
+          const hookFunction = (Master as any)[scen.afterHook];
           if (typeof hookFunction === 'function') {
             hookFunction();
+          } else {
+            cy.log(`⚠️ Warning: Hook function '${scen.afterHook}' not found.`);
           }
-        }
+        });
       });
-    }
+    });
   });
 });

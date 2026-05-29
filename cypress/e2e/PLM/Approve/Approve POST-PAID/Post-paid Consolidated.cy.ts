@@ -56,6 +56,11 @@ const postpaidTestConfigs = [
     productClass: 'ontop' as const,
     module: 'POST',
     afterHook: 'afterMKTontopPOST' as const,
+    scenarios: [
+      { scenario: 'POST', afterHook: 'afterMKTontopPOST' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPOSTENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPOSTMusicPlugin' },
+    ],
   },
   // Ontop - Recurring
   {
@@ -64,6 +69,11 @@ const postpaidTestConfigs = [
     productClass: 'ontop' as const,
     module: 'POST',
     afterHook: 'afterMKTontopPOST' as const,
+    scenarios: [
+      { scenario: 'POST', afterHook: 'afterMKTontopPOST' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPOSTENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPOSTMusicPlugin' },
+    ],
   },
   // Ontop - Usage
   {
@@ -72,6 +82,11 @@ const postpaidTestConfigs = [
     productClass: 'ontop' as const,
     module: 'POST',
     afterHook: 'afterMKTontopPOST' as const,
+    scenarios: [
+      { scenario: 'POST', afterHook: 'afterMKTontopPOST' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPOSTENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPOSTMusicPlugin' },
+    ],
   },
   // OntopEx - Onetime
   {
@@ -79,7 +94,12 @@ const postpaidTestConfigs = [
     billingType: 'onetime' as const,
     productClass: 'ontopextra' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopPOST' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'POST', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
+    ],
   },
   // OntopEx - Recurring
   {
@@ -87,42 +107,78 @@ const postpaidTestConfigs = [
     billingType: 'recurring' as const,
     productClass: 'ontopextra' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopPOST' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'POST', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
+    ],
   },
 ];
 
 // Test Suite Runner
 describe('POST-PAID Product Approvals', () => {
   postpaidTestConfigs.forEach(config => {
-    // ⭐ ตัวอย่าง: รัน Main Onetime เท่านั้น
-    // const testDescribe = config.name === 'Main Onetime' ? describe.only : describe;
-    // ปกติ (รันทั้ง 8 เคส): ปล่อยไว้ตามนี้
-    const testDescribe = describe;
+    // ถ้ามี scenarios array ให้สร้าง test case แยกสำหรับแต่ละ scenario
+    if (config.scenarios && Array.isArray(config.scenarios)) {
+      config.scenarios.forEach(scenarioConfig => {
+        const scenarioName = scenarioConfig.scenario;
+        const fullTestName = `${config.name} > Scenario: ${scenarioName}`;
+        
+        describe(`${fullTestName}`, () => {
+          it('MKT POSTPAID role', () => {
+            const testConfig: any = {
+              Module: config.module,
+              subModule: config.module,
+              autoSetDuration: true,
+              scenario: scenarioConfig.scenario,
+            };
 
-    testDescribe(`${config.name}`, () => {
-      it('MKT POSTPAID role', () => {
-        const testConfig: any = {
-          Module: config.module,
-          subModule: config.module,
-          autoSetDuration: true,
-        };
+            if (config.productClass1) {
+              testConfig.ProductClass1 = config.productClass1;
+            }
 
-        if (config.productClass1) {
-          testConfig.ProductClass1 = config.productClass1;
-        }
+            Master.ProjectBasicInformationComplete(
+              config.billingType,
+              config.productClass,
+              testConfig
+            );
+          });
 
-        Master.ProjectBasicInformationComplete(
-          config.billingType,
-          config.productClass,
-          testConfig
-        );
+          // ✅ เรียกตรงๆ ใน describe scope
+          const hookFunction = (Master as any)[scenarioConfig.afterHook];
+          if (typeof hookFunction === 'function') {
+            hookFunction();
+          }
+        });
       });
+    } else {
+      // กรณีไม่มี scenarios array (ใช้ default behavior เดิม)
+      testDescribe(`${config.name}`, () => {
+        it('MKT POSTPAID role', () => {
+          const testConfig: any = {
+            Module: config.module,
+            subModule: config.module,
+            autoSetDuration: true,
+          };
 
-      // ✅ เรียกตรงๆ ใน describe scope
-      const hookFunction = (Master as any)[config.afterHook];
-      if (typeof hookFunction === 'function') {
-        hookFunction();
-      }
-    });
+          if (config.productClass1) {
+            testConfig.ProductClass1 = config.productClass1;
+          }
+
+          Master.ProjectBasicInformationComplete(
+            config.billingType,
+            config.productClass,
+            testConfig
+          );
+        });
+
+        // ✅ เรียกตรงๆ ใน describe scope
+        const hookFunction = (Master as any)[config.afterHook];
+        if (typeof hookFunction === 'function') {
+          hookFunction();
+        }
+      });
+    }
   });
 });
