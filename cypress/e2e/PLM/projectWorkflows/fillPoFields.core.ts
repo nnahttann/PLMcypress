@@ -155,10 +155,10 @@ export const ProjectBasicInformationComplete = (
     const priceTypeMap: Record<PriceType, string> = { onetime: '1: One-Time', recurring: '2: Recurring', usage: '3: Usage' };
     cy.get('select[formcontrolname="priceType"]').should('be.visible').and('not.be.disabled').select(priceTypeMap[priceType]);
 
-    const productClassMapMobile: Record<ProductClass, string> = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
-    const productClassMapEnterMusic: Record<'ontop' | 'ontopextra', string> = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
+    const productClassMapMobile: Record<ProductClass, string> = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra', ontoponetime: '4: On-Top OneTime' };
+    const productClassMapEnterMusic: Record<'ontop' | 'ontopextra' | 'ontoponetime', string> = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra', ontoponetime: '3: On-Top OneTime' };
     const productValue = (Module === 'ENTER' || Module === 'MUSIC')
-      ? productClassMapEnterMusic[productClass as 'ontop' | 'ontopextra']
+      ? productClassMapEnterMusic[productClass as 'ontop' | 'ontopextra' | 'ontoponetime']
       : productClassMapMobile[productClass];
 
     cy.get('select[formcontrolname="productClass"]').should('be.visible').and('not.be.disabled').select(productValue);
@@ -219,7 +219,7 @@ export const ProjectBasicInformationComplete = (
     dropdownPromotionGroup();
     RandomProductSpecification(productClass, subModule, Module);
 
-    if (Module === 'PRE' && (productClass === 'ontop' || productClass === 'ontopextra')) {
+    if (Module === 'PRE' && (productClass === 'ontop' || productClass === 'ontopextra' || productClass === 'ontoponetime')) {
       cy.get('input[formcontrolname="allowMvpn"]').should('exist').then(($radios) => {
         cy.wrap($radios).eq(Math.floor(Math.random() * $radios.length)).check();
       });

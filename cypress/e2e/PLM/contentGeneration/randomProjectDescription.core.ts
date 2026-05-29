@@ -80,7 +80,7 @@ export const RandomProjectDescription = (
 
   const getContractTerms = (subMod: string, pClass: string): number[] => {
     if (subMod === 'PRE') return [1];
-    if (pClass === 'ontop' || pClass === 'ontopextra') return [1, 3, 6];
+    if (pClass === 'ontop' || pClass === 'ontopextra' || pClass === 'ontoponetime') return [1, 3, 6];
     return [1, 3, 6, 12, 24];
   };
 
@@ -111,7 +111,8 @@ export const RandomProjectDescription = (
         const productClassDisplay: Record<string, { EN: string; TH: string }> = {
           'main': { EN: 'Main Package', TH: 'แพ็กเกจหลัก' },
           'ontop': { EN: 'On-Top Add-on', TH: 'แพ็กเกจเสริม' },
-          'ontopextra': { EN: 'On-Top Extra', TH: 'แพ็กเกจเสริมพิเศษ' }
+          'ontopextra': { EN: 'On-Top Extra', TH: 'แพ็กเกจเสริมพิเศษ' },
+          'ontoponetime': { EN: 'On-Top OneTime', TH: 'แพ็กเกจเสริมครั้งเดียว' }
         };
         const pcDisplay = productClassDisplay[pClass] || { EN: pClass, TH: pClass };
 

@@ -3,8 +3,8 @@
 // ========================
 export type Module = 'POST' | 'PRE' | 'ENTER' | 'MUSIC';
 export type PriceType = 'onetime' | 'recurring' | 'usage';
-export type ProductClass = 'main' | 'ontop' | 'ontopextra';
-export type ProductClass1 = 'Main' | 'Ontop' | 'OntopExtra';
+export type ProductClass = 'main' | 'ontop' | 'ontopextra' | 'ontoponetime';
+export type ProductClass1 = 'Main' | 'Ontop' | 'OntopExtra' | 'OntopOnetime';
 export type TaskListHeader = 'To Do List' | 'Unassigned Task';
 export type FinalAction = 'AlertAndLogout' | 'ComplexLogout' | 'StopAfterCore';
 export type CoreTaskCallback = () => void;
