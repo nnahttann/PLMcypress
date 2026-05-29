@@ -1,1 +1,29 @@
-Nothing should be ignored based on the provided file changes. The modified file 'cypress/e2e/PLM/roleExecution/afterMktPre.core.ts' is a TypeScript source file that should be tracked in version control. No build artifacts, dependencies, or temporary files are present in the changes.
+```
+# Cypress specific ignores
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+
+# Test artifacts
+*.log
+*.tmp
+
+# Dependencies (if any Cypress-specific dependencies exist)
+node_modules/
+
+# Environment files (if any exist in test context)
+.env
+.env.local
+*.env.*
+
+# Editor/IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage and test reports
+coverage/
+htmlcov/
+.nyc_output/
+```
