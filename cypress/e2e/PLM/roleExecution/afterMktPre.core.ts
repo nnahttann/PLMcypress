@@ -245,16 +245,6 @@ export const afterMKTontopPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithMo
 export const afterMKTontopPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'MUSIC');
 export const afterMKTontopPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
 
-// ========================
-// ONTOP EXTRA FUNCTIONS (for MUSIC/ENTER scenarios)
-// ========================
-
-export const afterMKTontopExtraPOST = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'POST');
-export const afterMKTontopExtraPOSTENTER = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'ENTER');
-export const afterMKTontopExtraPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopExtraPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopExtraPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
-
 // =======================
 
 const selectRandomDropdownRecurring = (): void => {
