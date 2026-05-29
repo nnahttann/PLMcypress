@@ -212,6 +212,36 @@ export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModu
 export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
 
 // ========================
+// ONTOP POST FUNCTIONS (for POST, ENTER, MUSIC scenarios)
+// ========================
+
+const _afterMKTontopPOSTWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPOST);
+  afterFn(module);
+};
+
+const stepsOntopPOST = (): void => {
+  cy.wait(15000);
+  addauto5gCKS();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  checkAndFillContentType();
+  checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
+  cy.scrollTo('bottom');
+  smsCKSPOST();
+};
+
+export const afterMKTontopPOST = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'POST');
+export const afterMKTontopPOSTENTER = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'ENTER');
+export const afterMKTontopPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPOSTPlugin, 'ENTER');
+export const afterMKTontopPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPOSTPlugin, 'MUSIC');
+export const afterMKTontopPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
+
+// ========================
 // ONTOP EXTRA FUNCTIONS (for MUSIC/ENTER scenarios)
 // ========================
 
@@ -228,6 +258,24 @@ export const afterMKTontopExtraPREENTER = (): void => _afterMKTontopExtraPREWith
 export const afterMKTontopExtraPREENTERPlugin = (): void => _afterMKTontopExtraPREWithModule(afterCKSPREPlugin, 'ENTER');
 export const afterMKTontopExtraPREMusicPlugin = (): void => _afterMKTontopExtraPREWithModule(afterCKSPREPlugin, 'MUSIC');
 export const afterMKTontopExtraPREMUSIC = (): void => _afterMKTontopExtraPREWithModule(afterCKSCommonPRE, 'MUSIC');
+
+// ========================
+// ONTOP EXTRA POST FUNCTIONS (for POST, ENTER, MUSIC scenarios)
+// ========================
+
+const _afterMKTontopExtraPOSTWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
+  executeCKSRole('ontopextra', 'ontopextra', stepsOntopPOST);
+  afterFn(module);
+};
+
+export const afterMKTontopExtraPOST = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'POST');
+export const afterMKTontopExtraPOSTENTER = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'ENTER');
+export const afterMKTontopExtraPOSTENTERPlugin = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOSTPlugin, 'ENTER');
+export const afterMKTontopExtraPOSTMusicPlugin = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOSTPlugin, 'MUSIC');
+export const afterMKTontopExtraPOSTMUSIC = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'MUSIC');
 
 // ========================
 // ONTOP ONETIME FUNCTIONS (for MUSIC/ENTER scenarios)

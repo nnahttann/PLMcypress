@@ -22,7 +22,7 @@ beforeEach(() => {
 
 // Test Configuration for all POST-PAID combinations
 const postpaidTestConfigs = [
-  // Main - Onetime
+  // Main - Onetime (POST only)
   {
     name: 'Main Onetime',
     billingType: 'onetime' as const,
@@ -31,7 +31,7 @@ const postpaidTestConfigs = [
     productClass1: 'Main',
     afterHook: 'afterMKTMAINPOST' as const,
   },
-  // Main - Recurring
+  // Main - Recurring (POST only)
   {
     name: 'Main Recurring',
     billingType: 'recurring' as const,
@@ -40,7 +40,7 @@ const postpaidTestConfigs = [
     productClass1: 'Main',
     afterHook: 'afterMKTMAINPOST' as const,
   },
-  // Main - Usage
+  // Main - Usage (POST only)
   {
     name: 'Main Usage',
     billingType: 'usage' as const,
@@ -49,69 +49,64 @@ const postpaidTestConfigs = [
     productClass1: 'Main',
     afterHook: 'afterMKTMainUsagePOST' as const,
   },
-  // Ontop - Onetime
+  // Ontop - Onetime (POST, ENTER, MUSIC)
   {
     name: 'Ontop Onetime',
     billingType: 'onetime' as const,
     productClass: 'ontop' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopPOST' as const,
     scenarios: [
       { scenario: 'POST', afterHook: 'afterMKTontopPOST' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopPOSTENTERPlugin' },
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPOSTMusicPlugin' },
     ],
   },
-  // Ontop - Recurring
+  // Ontop - Recurring (POST, ENTER, MUSIC)
   {
     name: 'Ontop Recurring',
     billingType: 'recurring' as const,
     productClass: 'ontop' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopPOST' as const,
     scenarios: [
       { scenario: 'POST', afterHook: 'afterMKTontopPOST' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopPOSTENTERPlugin' },
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPOSTMusicPlugin' },
     ],
   },
-  // Ontop - Usage
+  // Ontop - Usage (POST, ENTER, MUSIC)
   {
     name: 'Ontop Usage',
     billingType: 'usage' as const,
     productClass: 'ontop' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopPOST' as const,
     scenarios: [
       { scenario: 'POST', afterHook: 'afterMKTontopPOST' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopPOSTENTERPlugin' },
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPOSTMusicPlugin' },
     ],
   },
-  // OntopEx - Onetime
+  // OntopEx - Onetime (POST, ENTER, MUSIC)
   {
     name: 'OntopEx Onetime',
     billingType: 'onetime' as const,
     productClass: 'ontopextra' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopExtraPRE' as const,
     scenarios: [
-      { scenario: 'POST', afterHook: 'afterMKTontopExtraPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
+      { scenario: 'POST', afterHook: 'afterMKTontopExtraPOST' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPOSTENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPOSTMusicPlugin' },
     ],
   },
-  // OntopEx - Recurring
+  // OntopEx - Recurring (POST, ENTER, MUSIC)
   {
     name: 'OntopEx Recurring',
     billingType: 'recurring' as const,
     productClass: 'ontopextra' as const,
     module: 'POST',
-    afterHook: 'afterMKTontopExtraPRE' as const,
     scenarios: [
-      { scenario: 'POST', afterHook: 'afterMKTontopExtraPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
+      { scenario: 'POST', afterHook: 'afterMKTontopExtraPOST' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPOSTENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPOSTMusicPlugin' },
     ],
   },
 ];
