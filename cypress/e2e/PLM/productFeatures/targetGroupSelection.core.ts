@@ -42,6 +42,22 @@ export const targetgroup = (): void => {
         cy.log(`✅ Successfully selected: ${randomOption}`);
         cy.log(`📝 New value after selection: "${$select.val()}"`);
         
+        // Double-click ที่ option เพื่อย้ายไปอีกลิสต์
+        cy.get('select[formcontrolname="availableListBox"]')
+          .contains('option', randomOption)
+          .should('exist')
+          .dblclick();
+        
+        cy.log(`🖱️ Double-clicked on option: ${randomOption}`);
+        
+        // หรือคลิกปุ่มลูกศรเพื่อย้ายค่า (ถ้ามี)
+        cy.get('.glyphicon-chevron-right')
+          .should('exist')
+          .and('be.visible')
+          .click();
+        
+        cy.log(`➡️ Clicked move button to transfer option`);
+        
         // ยืนยันผลโดยรอให้ค่าถูกเซ็ต
         cy.wrap($select)
           .should(($el) => {
