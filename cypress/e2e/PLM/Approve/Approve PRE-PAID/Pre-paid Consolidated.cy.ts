@@ -147,7 +147,7 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
 // ⭐ กำหนด case ที่ต้องการรันตรงนี้ที่เดียว
 // รูปแบบ: 'ชื่อผลิตภัณฑ์ - ชื่อScenario' (เช่น 'Main Usage - ENTER') 
 // หรือใส่แค่ 'ชื่อผลิตภัณฑ์' เพื่อรันทุก Scenario ของผลิตภัณฑ์นั้น
-const ACTIVE_CASES: string[] = []; 
+const ACTIVE_CASES: string[] = [];
 // const ACTIVE_CASES: string[] = ['Main Usage - ENTER']; // ← ตัวอย่าง: รันแค่เคสเดียว
 // const ACTIVE_CASES: string[] = ['Ontop Recurring']; // ← ตัวอย่าง: รันทุก Scenario ของ Ontop Recurring
 
@@ -160,12 +160,12 @@ describe('PRE-PAID Product Approvals', () => {
 
     config.scenarios.forEach(scen => {
       const fullTestCaseName = `${config.name} - ${scen.scenario}`;
-      
+
       // ตรวจสอบว่าเคสนี้ควรถูกรันหรือไม่
       // รันถ้า: 1. ACTIVE_CASES ว่าง (รันหมด) หรือ 2. ตรงกับชื่อเต็ม หรือ 3. ตรงกับชื่อผลิตภัณฑ์ (รันทุก scenario ของตัวนั้น)
-      const isActive = ACTIVE_CASES.length === 0 || 
-                       ACTIVE_CASES.includes(fullTestCaseName) || 
-                       ACTIVE_CASES.includes(config.name);
+      const isActive = ACTIVE_CASES.length === 0 ||
+        ACTIVE_CASES.includes(fullTestCaseName) ||
+        ACTIVE_CASES.includes(config.name);
 
       describe(`${config.name}`, () => {
         const testIt = isActive ? it : it.skip;
