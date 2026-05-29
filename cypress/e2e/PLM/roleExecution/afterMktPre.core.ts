@@ -184,6 +184,38 @@ export const afterMKTMainPRE_NotComplex = (): void => {
 };
 
 // ========================
+// ONTOP PRE FUNCTIONS (for PRE, ENTER, MUSIC scenarios)
+// ========================
+
+const _afterMKTontopPREWithModule = (
+  afterFn: (module: string) => void,
+  module: string
+): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPRE);
+  afterFn(module);
+};
+
+const stepsOntopPRE = (): void => {
+  cy.wait(15000);
+  addauto5gCKS();
+  dropdownRecurringCKS();
+  diyflagCKS();
+  checkAndFillContentType();
+  checkAndUpdatePriority();
+  checkAndUpdateVerticalAppPriority();
+  cy.scrollTo('bottom');
+  smsCKSPRE();
+};
+
+export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
+
+export const afterMKTontopPREUsage = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREUsageEnter = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREUsageMusic = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
+
+// ========================
 // ONTOP POST FUNCTIONS (for POST, ENTER, MUSIC scenarios)
 // ========================
 
@@ -217,6 +249,10 @@ export const afterMKTontopPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(a
 // ONTOP EXTRA FUNCTIONS (for MUSIC/ENTER scenarios)
 // ========================
 
+export const afterMKTontopExtraPOST = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'POST');
+export const afterMKTontopExtraPOSTENTER = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'ENTER');
+export const afterMKTontopExtraPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopExtraPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'MUSIC');
 export const afterMKTontopExtraPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
 
 // =======================
