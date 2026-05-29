@@ -1,7 +1,7 @@
 import { login, loginAndWaitReady } from '../helpers/auth';
 import { cks, ckspass, cgcirb, cgcirbpass, cgtirb, cgtirbpass, actm, actmpass, oper, operpass } from '../helpers/config';
 import { ClaimProject, approveProject } from '../projectWorkflows/projectManagement';
-import { getStandardProjectName, getOntopProjectName } from '../projectWorkflows/projectNameManagement';
+import { getStandardProjectName, getOntopProjectName, getOntopExtraProjectName } from '../projectWorkflows/projectNameManagement';
 import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
 import { smsCKSPOST } from '../contentGeneration/smsMms';
 import { performRoleTaskWithAssignment, performSimpleApprovalRole } from './roleHelpers';
@@ -96,13 +96,14 @@ export const diyflagCKS = (): void => {
  * Generic execution wrapper for CKS role
  */
 export const executeCKSRole = (
-  projectNameStrategy: 'standard' | 'ontop',
-  approvalType: 'main' | 'ontop',
+  projectNameStrategy: 'standard' | 'ontop' | 'ontopextra',
+  approvalType: 'main' | 'ontop' | 'ontopextra',
   customSteps: () => void
 ): void => {
-  const getProjectName: GetProjectNameFn = projectNameStrategy === 'standard'
-    ? getStandardProjectName
-    : getOntopProjectName;
+  const getProjectName: GetProjectNameFn = 
+    projectNameStrategy === 'standard' ? getStandardProjectName :
+    projectNameStrategy === 'ontopextra' ? getOntopExtraProjectName :
+    getOntopProjectName;
 
   standardCksPoEnhancementFlow(getProjectName, () => {
     customSteps();

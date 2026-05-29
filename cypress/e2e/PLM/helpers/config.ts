@@ -43,6 +43,7 @@ const minutes = String(now.getMinutes()).padStart(2, '0');
 
 export let formattedDateMain = '';
 export let formattedDateOntop = '';
+export let formattedDateOntopExtra = '';
 
 export const setFormattedDateMain = (value: string): void => {
   formattedDateMain = value;
@@ -50,6 +51,10 @@ export const setFormattedDateMain = (value: string): void => {
 
 export const setFormattedDateOntop = (value: string): void => {
   formattedDateOntop = value;
+};
+
+export const setFormattedDateOntopExtra = (value: string): void => {
+  formattedDateOntopExtra = value;
 };
 
 export const getDateFormattingInfo = (): {
@@ -70,4 +75,8 @@ export const getStandardProjectName = (): string => {
 
 export const getOntopProjectName = (): string => {
   return formattedDateOntop;
+};
+
+export const getOntopExtraProjectName = (): string => {
+  return formattedDateOntopExtra;
 };

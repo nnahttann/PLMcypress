@@ -3,13 +3,13 @@
 // ========================
 
 import type { GetProjectNameFn } from '../helpers/types.core';
-import { getStandardProjectName, getOntopProjectName } from '../projectWorkflows/projectNameManagement.core';
+import { getStandardProjectName, getOntopProjectName, getOntopExtraProjectName } from '../projectWorkflows/projectNameManagement.core';
 import { standardCksPoEnhancementFlow } from './cksPoEnhancement.core';
 import { beforeapproveCKS, beforeapproveCKSontop } from './beforeApproveCks.core';
 
 export const executeCKSRole = (
-  projectNameStrategy: 'standard' | 'ontop',
-  approvalType: 'main' | 'ontop',
+  projectNameStrategy: 'standard' | 'ontop' | 'ontopextra',
+  approvalType: 'main' | 'ontop' | 'ontopextra',
   customSteps: () => void
 ): void => {
   it('CKS role', () => {
@@ -18,9 +18,10 @@ export const executeCKSRole = (
     // const getProjectName: GetProjectNameFn = () => HARDCODE_PROJECT_NAME;
     // ================================
 
-    const getProjectName: GetProjectNameFn = projectNameStrategy === 'standard'
-      ? getStandardProjectName
-      : getOntopProjectName;
+    const getProjectName: GetProjectNameFn = 
+      projectNameStrategy === 'standard' ? getStandardProjectName :
+      projectNameStrategy === 'ontopextra' ? getOntopExtraProjectName :
+      getOntopProjectName;
 
     standardCksPoEnhancementFlow(getProjectName, () => {
       customSteps();

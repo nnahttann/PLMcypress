@@ -2,7 +2,7 @@
 // PROJECT NAME GETTERS
 // ========================
 
-import { formattedDateOntop } from '../helpers/config.core';
+import { formattedDateOntop, formattedDateOntopExtra } from '../helpers/config.core';
 import { projectManager } from './projectManager.core';
 
 export const registerProjectName = (name: string, index: number = 0): void => {
@@ -22,3 +22,5 @@ export const getStandardProjectName = (): string => {
 };
 
 export const getOntopProjectName = (): string => formattedDateOntop as string;
+
+export const getOntopExtraProjectName = (): string => formattedDateOntopExtra as string;

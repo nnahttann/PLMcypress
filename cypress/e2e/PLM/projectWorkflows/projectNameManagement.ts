@@ -1,5 +1,5 @@
 import { projectManager } from '../helpers/projectManager';
-import { formattedDateOntop } from '../helpers/config';
+import { formattedDateOntop, formattedDateOntopExtra } from '../helpers/config';
 
 // ========================================
 // PROJECT NAME GETTERS & SETTERS
@@ -37,3 +37,8 @@ export const getStandardProjectName = (): string => {
  * Get ontop product project name
  */
 export const getOntopProjectName = (): string => formattedDateOntop as string;
+
+/**
+ * Get ontop extra product project name
+ */
+export const getOntopExtraProjectName = (): string => formattedDateOntopExtra as string;
