@@ -21,12 +21,11 @@ import {
 } from '../approvalFlows/spadApprovals';
 import { approveProjectACTM, approveProjectAPO } from '../approvalFlows/simpleApprovals.core';
 import { smsCKSPRE, smsCKSPOST } from '../contentGeneration/smsCks.core';
-import { afterCKSPOST, afterCKSPOSTPlugin } from './afterCksPost.core';
+import { afterCKSPOST } from './afterCksPost.core';
 import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
 import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
-import { unregister } from './unregister.core';
+import { unregister, addauto5gCKS } from '../productFeatures/unregister.core';
 import { performMusicRoles } from './musicRoles.core';
-import { addauto5gCKS } from './unregister.core';
 import { diyflagCKS } from '../productFeatures/diyFlagCks.core';
 
 type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
@@ -210,15 +209,15 @@ const stepsOntopPOST = (): void => {
 
 export const afterMKTontopPOST = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'POST');
 export const afterMKTontopPOSTENTER = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'ENTER');
-export const afterMKTontopPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPOSTPlugin, 'ENTER');
-export const afterMKTontopPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPOSTPlugin, 'MUSIC');
+export const afterMKTontopPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'MUSIC');
 export const afterMKTontopPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
 
 // ========================
 // ONTOP EXTRA FUNCTIONS (for MUSIC/ENTER scenarios)
 // ========================
 
-export const afterMKTontopExtraPOSTMUSIC = (): void => _afterMKTontopExtraPOSTWithModule(afterCKSPOST, 'MUSIC');
+export const afterMKTontopExtraPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
 
 // =======================
 

@@ -11,9 +11,9 @@ export * from './beforeApproveMkt.core';
 export * from './cksPoEnhancement.core';
 export * from './cksRoleExecution.core';
 export * from '../productFeatures/diyFlagCks.core';
+export * from '../productFeatures/unregister.core';
 export * from './musicRoles.core';
 export * from './rejectNote.core';
-export * from './unregister.core';
 
 // Import from approvalFlows for role helpers
 export { performSimpleClaimAndApprovalRole } from '../approvalFlows/roleHelpers.core';
