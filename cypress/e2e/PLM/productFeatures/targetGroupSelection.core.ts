@@ -27,9 +27,10 @@ export const targetgroup = (): void => {
       // วนลูปหา option ที่มี text ตรงกับที่ต้องการ
       let selectedValue: string | null = null;
       $select.find('option').each((_, option) => {
-        if (option.text === randomOption) {
-          selectedValue = option.value;
-          cy.log(`📌 Found option: "${option.text}" with value: "${selectedValue}"`);
+        const optionElement = option as HTMLOptionElement;
+        if (optionElement.text === randomOption) {
+          selectedValue = optionElement.value;
+          cy.log(`📌 Found option: "${optionElement.text}" with value: "${selectedValue}"`);
         }
       });
 
