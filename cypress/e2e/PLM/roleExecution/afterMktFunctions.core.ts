@@ -7,7 +7,7 @@ import { afterCKSPOST } from './afterCksPost.core';
 import { 
   checkAndFillContentType, checkAndUpdatePriority,
   checkAndUpdateVerticalAppPriority
-} from '../helpers/uiHelpers.core';
+} from '../helpers/uiHelpers';
 import { smsCKSPOST } from '../contentGeneration/smsCks.core';
 import { Tariff } from '../productFeatures/tariff.core';
 

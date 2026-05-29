@@ -13,13 +13,13 @@ import {
 import { 
   approveProjectCGMDPRE, approveProjectCGMDtesterPRE,
   approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin 
-} from '../approvalFlows/cgmdApprovals.core';
+} from '../approvalFlows/cgmdApprovals';
 import { 
   approveProjectSPADSup, approveProjectSPADDOER,
   approveProjectSPADTester, approveProjectSPADdeploy,
   approveProjectSPADSupCGMDPlugin 
-} from '../approvalFlows/spadApprovals.core';
-import { approveProjectACTM, approveProjectAPO } from '../approvalFlows/otherApprovals.core';
+} from '../approvalFlows/spadApprovals';
+import { approveProjectACTM, approveProjectAPO } from '../approvalFlows/simpleApprovals.core';
 import { smsCKSPRE, smsCKSPOST } from '../contentGeneration/smsCks.core';
 import { afterCKSPOST, afterCKSPOSTPlugin } from './afterCksPost.core';
 import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
