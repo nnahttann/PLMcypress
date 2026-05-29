@@ -1,7 +1,1 @@
-# Examples
-```ts
-cypress/fixtures/example.json
-cypress/downloads/
-cypress/screenshots/
-cypress/videos/
-```
+Nothing should be ignored based on the provided file changes. The modified file 'cypress/e2e/PLM/roleExecution/afterMktPre.core.ts' is a TypeScript source file that should be tracked in version control. No build artifacts, dependencies, or temporary files are present in the changes.
