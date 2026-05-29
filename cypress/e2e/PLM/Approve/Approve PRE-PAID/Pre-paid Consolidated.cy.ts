@@ -70,16 +70,16 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
     ],
   },
-  // Ontop - Onetime (PRE, ENTER, MUSIC)
+  // Ontop - Onetime (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPRE แทน
   {
     name: 'Ontop Onetime',
     billingType: 'onetime',
     productClass: 'ontop',
     module: 'PRE',
     scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopOnetimePRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopOnetimePREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopOnetimePREMUSIC' },
+      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
     ],
   },
   // Ontop - Recurring (PRE, ENTER, MUSIC)
@@ -106,40 +106,40 @@ const prepaidTestConfigs: PrepaidTestConfig[] = [
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
     ],
   },
-  // OntopEx - Onetime (PRE, ENTER, MUSIC)
+  // OntopEx - Onetime (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPRE แทน
   {
     name: 'OntopEx Onetime',
     billingType: 'onetime',
     productClass: 'ontopextra',
     module: 'PRE',
     scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
     ],
   },
-  // OntopEx - Recurring (PRE, ENTER, MUSIC)
+  // OntopEx - Recurring (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPRE แทน
   {
     name: 'OntopEx Recurring',
     billingType: 'recurring',
     productClass: 'ontopextra',
     module: 'PRE',
     scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
     ],
   },
-  // OntopEx - Usage (PRE, ENTER, MUSIC)
+  // OntopEx - Usage (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPREUsage แทน
   {
     name: 'OntopEx Usage',
     billingType: 'usage',
     productClass: 'ontopextra',
     module: 'PRE',
     scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+      { scenario: 'PRE', afterHook: 'afterMKTontopPREUsage' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREUsageEnter' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
     ],
   },
 ];
