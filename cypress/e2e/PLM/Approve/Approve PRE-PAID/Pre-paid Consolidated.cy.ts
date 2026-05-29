@@ -55,7 +55,12 @@ const prepaidTestConfigs = [
     billingType: 'onetime' as const,
     productClass: 'ontop' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopOnetimePRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopOnetimePRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopOnetimePREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopOnetimePREMUSIC' },
+    ],
   },
   // Ontop - Recurring
   {
@@ -64,6 +69,11 @@ const prepaidTestConfigs = [
     productClass: 'ontop' as const,
     module: 'PRE',
     afterHook: 'afterMKTontopPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
+    ],
   },
   // Ontop - Usage
   {
@@ -71,7 +81,12 @@ const prepaidTestConfigs = [
     billingType: 'usage' as const,
     productClass: 'ontop' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopPREUsage' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopPREUsage' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREUsageEnter' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
+    ],
   },
   // OntopEx - Onetime
   {
@@ -79,7 +94,12 @@ const prepaidTestConfigs = [
     billingType: 'onetime' as const,
     productClass: 'ontopextra' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+    ],
   },
   // OntopEx - Recurring
   {
@@ -87,7 +107,12 @@ const prepaidTestConfigs = [
     billingType: 'recurring' as const,
     productClass: 'ontopextra' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+    ],
   },
   // OntopEx - Usage
   {
@@ -95,7 +120,12 @@ const prepaidTestConfigs = [
     billingType: 'usage' as const,
     productClass: 'ontopextra' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+    ],
   },
 ];
 
@@ -109,38 +139,73 @@ describe('PRE-PAID Product Approvals', () => {
   prepaidTestConfigs.forEach(config => {
     const isActive = ACTIVE_CASES.length === 0 || ACTIVE_CASES.includes(config.name);
 
-    // ✅ ใช้ it.skip แทน describe.skip
-    // เพราะ describe.skip ยังคง execute callback (รวม hookFunction) ทุก config
-    // ทำให้ hooks ถูก register ซ้ำผิด context
-    describe(`${config.name}`, () => {
-      const testIt = isActive ? it : it.skip;
+    // ถ้ามี scenarios array ให้สร้าง test case แยกสำหรับแต่ละ scenario
+    if (config.scenarios && Array.isArray(config.scenarios)) {
+      config.scenarios.forEach(scenarioConfig => {
+        const scenarioName = scenarioConfig.scenario;
+        const fullTestName = `${config.name} > Scenario: ${scenarioName}`;
+        const isScenarioActive = isActive && (ACTIVE_CASES.length === 0 || ACTIVE_CASES.includes(fullTestName));
+        
+        describe(`${fullTestName}`, () => {
+          const testIt = isScenarioActive ? it : it.skip;
 
-      testIt('MKT PRE-PAID role', () => {
-        const testConfig: any = {
-          Module: config.module,
-          subModule: config.module,
-          autoSetDuration: true,
-        };
+          testIt('MKT PRE-PAID role', () => {
+            const testConfig: any = {
+              Module: config.module,
+              subModule: config.module,
+              autoSetDuration: true,
+              scenario: scenarioConfig.scenario,
+            };
 
-        if (config.productClass1) {
-          testConfig.ProductClass1 = config.productClass1;
-        }
+            if (config.productClass1) {
+              testConfig.ProductClass1 = config.productClass1;
+            }
 
-        Master.ProjectBasicInformationComplete(
-          config.billingType,
-          config.productClass,
-          testConfig
-        );
+            Master.ProjectBasicInformationComplete(
+              config.billingType,
+              config.productClass,
+              testConfig
+            );
+          });
+
+          if (isScenarioActive) {
+            const hookFunction = (Master as any)[scenarioConfig.afterHook];
+            if (typeof hookFunction === 'function') {
+              hookFunction();
+            }
+          }
+        });
       });
+    } else {
+      // กรณีไม่มี scenarios array (ใช้ default behavior เดิม)
+      describe(`${config.name}`, () => {
+        const testIt = isActive ? it : it.skip;
 
-      // ✅ Guard hookFunction ให้ register เฉพาะ case ที่ active เท่านั้น
-      // ป้องกัน afterEach/after hooks จาก skipped cases ไหลมา execute ใน active case
-      if (isActive) {
-        const hookFunction = (Master as any)[config.afterHook];
-        if (typeof hookFunction === 'function') {
-          hookFunction();
+        testIt('MKT PRE-PAID role', () => {
+          const testConfig: any = {
+            Module: config.module,
+            subModule: config.module,
+            autoSetDuration: true,
+          };
+
+          if (config.productClass1) {
+            testConfig.ProductClass1 = config.productClass1;
+          }
+
+          Master.ProjectBasicInformationComplete(
+            config.billingType,
+            config.productClass,
+            testConfig
+          );
+        });
+
+        if (isActive) {
+          const hookFunction = (Master as any)[config.afterHook];
+          if (typeof hookFunction === 'function') {
+            hookFunction();
+          }
         }
-      }
-    });
+      });
+    }
   });
 });

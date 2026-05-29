@@ -57,7 +57,8 @@ const pluginCgmdTestConfigs = [
     isMainProduct: false,
     scenarios: [
       { scenario: 'PRE', afterHook: 'afterMKTOntop_NotComplex' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTERPlugin' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopOnetimePREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopOnetimePREMusicPlugin' },
     ],
   },
   // Ontop - Recurring
@@ -84,6 +85,45 @@ const pluginCgmdTestConfigs = [
       { scenario: 'PRE', afterHook: 'afterMKTOntop_NotComplex' },
       { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTERPlugin' },
       { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMusicPlugin' },
+    ],
+  },
+  // OntopEx - Onetime
+  {
+    name: 'OntopEx Onetime',
+    billingType: 'onetime' as const,
+    productClass: 'ontopextra' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    isMainProduct: false,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
+    ],
+  },
+  // OntopEx - Recurring
+  {
+    name: 'OntopEx Recurring',
+    billingType: 'recurring' as const,
+    productClass: 'ontopextra' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    isMainProduct: false,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
+    ],
+  },
+  // OntopEx - Usage
+  {
+    name: 'OntopEx Usage',
+    billingType: 'usage' as const,
+    productClass: 'ontopextra' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    isMainProduct: false,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTERPlugin' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMusicPlugin' },
     ],
   },
 ];
