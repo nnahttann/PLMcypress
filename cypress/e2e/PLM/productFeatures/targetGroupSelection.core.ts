@@ -16,32 +16,43 @@ export const targetgroup = (): void => {
   cy.log(`🎯 Selecting Target Group: ${randomOption}`);
   cy.log(`📋 Options available: ${optionsToSelect.join(', ')}`);
 
-  // เนื่องจากมี select หลายตัวในหน้า (availableListBox และ selectedListBox)
-  // ให้ใช้ cy.contains('option', ...) เพื่อหา option ที่ต้องการก่อน แล้วค่อยเลือก
-  cy.contains('option', randomOption)
+  // หา select element ที่มี formcontrolname="availableListBox" โดยเฉพาะ
+  cy.get('select[formcontrolname="availableListBox"]')
     .should('exist')
-    .then(($option) => {
-      const $select = $option.parent('select');
-      
-      cy.log(`✅ Found option in select: ${$select.attr('formcontrolname')}`);
-      
-      // ตรวจสอบว่าเป็น availableListBox จริงๆ
-      if ($select.attr('formcontrolname') === 'availableListBox') {
-        cy.log(`📝 Current value before select: "${$select.val()}"`);
-        
-        // ใช้ jQuery val() เพื่อเลือกค่า แล้ว trigger change event สำหรับ Angular
-        // เนื่องจาก dual-list-box บางครั้งไม่ตอบสนองต่อ cy.select() มาตรฐาน
-        $select.val(randomOption).trigger('change');
+    .and('be.visible')
+    .then(($select) => {
+      cy.log(`✅ Found select element with formcontrolname="availableListBox"`);
+      cy.log(`📝 Current value: "${$select.val()}"`);
+
+      // วนลูปหา option ที่มี text ตรงกับที่ต้องการ
+      let selectedValue: string | null = null;
+      $select.find('option').each((_, option) => {
+        if (option.text === randomOption) {
+          selectedValue = option.value;
+          cy.log(`📌 Found option: "${option.text}" with value: "${selectedValue}"`);
+        }
+      });
+
+      if (selectedValue) {
+        // ใช้ jQuery เพื่อเลือกค่าและ trigger event สำหรับ Angular
+        $select.val(selectedValue).trigger('change');
         
         cy.log(`✅ Successfully selected: ${randomOption}`);
-        cy.log(`📝 New value: "${$select.val()}"`);
+        cy.log(`📝 New value after selection: "${$select.val()}"`);
         
-        // ยืนยันผล
-        cy.wrap($select).should('have.value', randomOption);
-        cy.log(`🎉 Target Group selection verified!`);
+        // ยืนยันผลโดยรอให้ค่าถูกเซ็ต
+        cy.wrap($select)
+          .should(($el) => {
+            const val = $el.val();
+            expect(val).to.not.be.empty;
+            expect(val).to.include(randomOption);
+          })
+          .then(() => {
+            cy.log(`🎉 Target Group selection verified!`);
+          });
       } else {
-        cy.log(`❌ Found option in wrong select box: ${$select.attr('formcontrolname')}`);
-        throw new Error(`Found option in wrong list box: ${$select.attr('formcontrolname')}`);
+        cy.log(`❌ Option not found: ${randomOption}`);
+        throw new Error(`Option "${randomOption}" not found in the list box`);
       }
     });
 };
