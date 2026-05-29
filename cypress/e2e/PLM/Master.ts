@@ -182,6 +182,8 @@ export {
   // PRE-PAID ONTOP functions
   afterMKTontopPRE,
   afterMKTontopPREENTER,
+  afterMKTontopPREENTERPlugin,
+  afterMKTontopPREMusicPlugin,
   afterMKTontopPREMUSIC,
   afterMKTontopPREUsage,
   afterMKTontopPREUsageEnter,
