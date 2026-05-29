@@ -27,7 +27,7 @@ import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
 import { unregister } from './unregister.core';
 import { performMusicRoles } from './musicRoles.core';
 import { addauto5gCKS } from './unregister.core';
-import { diyflagCKS } from './diyFlagCks.core';
+import { diyflagCKS } from '../productFeatures/diyFlagCks.core';
 
 type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
 

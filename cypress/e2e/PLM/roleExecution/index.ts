@@ -10,7 +10,7 @@ export * from './beforeApproveCks.core';
 export * from './beforeApproveMkt.core';
 export * from './cksPoEnhancement.core';
 export * from './cksRoleExecution.core';
-export * from './diyFlagCks.core';
+export * from '../productFeatures/diyFlagCks.core';
 export * from './musicRoles.core';
 export * from './rejectNote.core';
 export * from './unregister.core';
