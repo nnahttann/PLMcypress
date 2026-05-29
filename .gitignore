@@ -1,29 +1,3 @@
 ```
-# Cypress specific ignores
-cypress/screenshots/
-cypress/videos/
-cypress/downloads/
-
-# Test artifacts
-*.log
-*.tmp
-
-# Dependencies (if any Cypress-specific dependencies exist)
-node_modules/
-
-# Environment files (if any exist in test context)
-.env
-.env.local
-*.env.*
-
-# Editor/IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Coverage and test reports
-coverage/
-htmlcov/
-.nyc_output/
+"cypress/e2e/PLM/Approve/Approve
 ```

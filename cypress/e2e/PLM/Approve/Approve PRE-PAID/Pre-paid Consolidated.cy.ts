@@ -55,7 +55,12 @@ const prepaidTestConfigs = [
     billingType: 'onetime' as const,
     productClass: 'ontop' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopOnetimePRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopOnetimePRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopOnetimePREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopOnetimePREMUSIC' },
+    ],
   },
   // Ontop - Recurring
   {
@@ -64,6 +69,11 @@ const prepaidTestConfigs = [
     productClass: 'ontop' as const,
     module: 'PRE',
     afterHook: 'afterMKTontopPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
+    ],
   },
   // Ontop - Usage
   {
@@ -71,7 +81,12 @@ const prepaidTestConfigs = [
     billingType: 'usage' as const,
     productClass: 'ontop' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopPREUsage' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopPREUsage' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopPREUsageEnter' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
+    ],
   },
   // OntopEx - Onetime
   {
@@ -79,7 +94,12 @@ const prepaidTestConfigs = [
     billingType: 'onetime' as const,
     productClass: 'ontopextra' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+    ],
   },
   // OntopEx - Recurring
   {
@@ -87,7 +107,12 @@ const prepaidTestConfigs = [
     billingType: 'recurring' as const,
     productClass: 'ontopextra' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+    ],
   },
   // OntopEx - Usage
   {
@@ -95,7 +120,12 @@ const prepaidTestConfigs = [
     billingType: 'usage' as const,
     productClass: 'ontopextra' as const,
     module: 'PRE',
-    afterHook: 'afterMKTontopPRE' as const,
+    afterHook: 'afterMKTontopExtraPRE' as const,
+    scenarios: [
+      { scenario: 'PRE', afterHook: 'afterMKTontopExtraPRE' },
+      { scenario: 'ENTER', afterHook: 'afterMKTontopExtraPREENTER' },
+      { scenario: 'MUSIC', afterHook: 'afterMKTontopExtraPREMUSIC' },
+    ],
   },
 ];
 
