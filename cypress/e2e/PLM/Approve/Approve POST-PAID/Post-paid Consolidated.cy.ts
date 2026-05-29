@@ -123,14 +123,14 @@ describe('POST-PAID Product Approvals', () => {
         describe(`${fullTestName}`, () => {
           it('MKT POSTPAID role', () => {
             const testConfig: any = {
-              Module: config.module,
-              subModule: config.module,
+              Module: (config as any).module,
+              subModule: (config as any).module,
               autoSetDuration: true,
               scenario: scenarioConfig.scenario,
             };
 
-            if (config.productClass1) {
-              testConfig.ProductClass1 = config.productClass1;
+            if ((config as any).productClass1) {
+              testConfig.ProductClass1 = (config as any).productClass1;
             }
 
             Master.ProjectBasicInformationComplete(
@@ -149,27 +149,27 @@ describe('POST-PAID Product Approvals', () => {
       });
     } else {
       // กรณีไม่มี scenarios array (ใช้ default behavior เดิม)
-      testDescribe(`${config.name}`, () => {
+      describe(`${config.name}`, () => {
         it('MKT POSTPAID role', () => {
           const testConfig: any = {
-            Module: config.module,
-            subModule: config.module,
+            Module: (config as any).module,
+            subModule: (config as any).module,
             autoSetDuration: true,
           };
 
-          if (config.productClass1) {
-            testConfig.ProductClass1 = config.productClass1;
+          if ((config as any).productClass1) {
+            testConfig.ProductClass1 = (config as any).productClass1;
           }
 
           Master.ProjectBasicInformationComplete(
-            config.billingType,
-            config.productClass,
+            (config as any).billingType,
+            (config as any).productClass,
             testConfig
           );
         });
 
         // ✅ เรียกตรงๆ ใน describe scope
-        const hookFunction = (Master as any)[config.afterHook];
+        const hookFunction = (Master as any)[(config as any).afterHook];
         if (typeof hookFunction === 'function') {
           hookFunction();
         }

@@ -1,101 +1,68 @@
 ```
+# Cypress test files
+cypress/videos/
+cypress/screenshots/
+*.log
+
 # Dependencies
 node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Environment
+.env
+.env.local
+*.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Build artifacts
 dist/
 build/
 target/
-
-# Python
-__pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.py.class
-.Python
-env/
-venv/
-.venv/
-.ENV
-.python-version
-pip-log.txt
-pip-delete-this-directory.txt
-.tox/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-*.cover
-*.log
-.pytest_cache/
-.mypy_cache/
-
-# Logs
-*.log
-
-# Environment specific
-.env
-.env.local
-.env.dev
-.env.production
-.env.test
-.env.staging
-.env.backup
-.env.example
-.env.sample
-.env.template
-.env.default
-*.env
-.env*
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-desktop.ini
-
-# Temporary files
-*.tmp
-*.temp
-*.bak
-*.backup
-
-# Testing
-coverage/
-htmlcov/
-.nyc_output/
-coverage-final.json
-
-# Node
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Compiled Binary files
+__pycache__/
+*.class
+*.o
+*.obj
 *.exe
 *.dll
 *.so
-*.dylib
-*.class
-*.o
 *.a
-*.obj
 *.out
-*.app
-*.bin
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Python specific
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # Compressed files
 *.zip
@@ -120,7 +87,4 @@ yarn-error.log*
 *.tar.bz2
 *.tar.xz
 *.tar.zst
-
-# Documentation
-docs/_build/
 ```
