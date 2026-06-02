@@ -14,7 +14,7 @@ cypress/videos/
 .env.local
 .env.*
 
-# IDE
+# IDE / Editors
 .vscode/
 .idea/
 
