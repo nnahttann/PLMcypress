@@ -1,4 +1,4 @@
-import * as Master from '../../../Master';
+import * as Master from '../../../PLM/Master';
 
 // ========================================
 // POST-PAID PO SUB GROUP - OTHER SUBGROUP CONSOLIDATED TEST SUITE

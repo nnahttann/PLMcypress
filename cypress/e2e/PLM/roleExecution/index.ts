@@ -14,6 +14,7 @@ export * from '../productFeatures/diyFlagCks.core';
 export * from '../productFeatures/unregister.core';
 export * from './musicRoles.core';
 export * from './rejectNote.core';
+export * from './randomDropdown.core';
 
 // Import from approvalFlows for role helpers
 export { performSimpleClaimAndApprovalRole } from '../approvalFlows/roleHelpers.core';
