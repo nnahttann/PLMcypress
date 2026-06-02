@@ -1,14 +1,100 @@
-```
 # Dependencies
 node_modules/
 
-# Logs and temp files
-*.log
-*.tmp
+# Test frameworks
+cypress/downloads/
+cypress/screenshots/
+cypress/videos/
 
-# Editors
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+.env.*
+
+# IDE
 .vscode/
+.idea/
 
-# Original rules preserved
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
 *.log
-```
+.git/refs/original/
+**/.pytest_cache/
+**/.mypy_cache/
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*~*
+**/.DS_Store
+**/Thumbs.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Node.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+**/node_modules/
+**/.npm/
+**/.yarn/
+**/package-lock.json
+**/yarn.lock
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+iTunes_Control/
+Thumbs.db
+VolumeIcon.icns
+*.nib
+*~.nib
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+htmlcov/
+.nyc_output/
+coverage-final.json
+**/.nyc_output/
+**/coverage/
+
+# Cypress specific
+cypress/results/
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+cypress/fixtures/
+cypress/integration/
+cypress/plugins/
+cypress/support/
