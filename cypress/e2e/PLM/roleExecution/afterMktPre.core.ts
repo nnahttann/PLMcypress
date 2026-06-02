@@ -9,9 +9,14 @@ import {
   spadtest, spadtestpass, spaddp, spaddppass,
   actm, actmpass, apo, apopass
 } from '../helpers/config.core';
-import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE, approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectACTM, approveProjectAPO, approveProjectSPADSupCGMDPlugin, approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin } from './beforeApproveMkt.core';
+import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE, approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin } from '../approvalFlows/cgmdApprovals.core';
+import { approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectSPADSupCGMDPlugin } from '../approvalFlows/spadApprovals.core';
+import { approveProjectACTM, approveProjectAPO } from '../approvalFlows/simpleApprovals.core';
 import { performMusicRoles } from './musicRoles.core';
-import { executeCKSRole, addauto5gCKS, dropdownRecurringCKS, diyflagCKS, unregister, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority, checkAndFillContentType, smsCKSPRE, CopyDeductFail, dropdownRecurringCKSMain } from '../cksRoleExecution/cksRoleFunctions.core';
+import { executeCKSRole, addauto5gCKS, diyflagCKS, unregister, dropdownRecurringCKS, dropdownRecurringCKSMain } from '../approvalFlows/cksApprovals';
+import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
+import { smsCKSPRE } from '../contentGeneration/smsCks.core';
+import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
 
 type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
 
@@ -438,23 +443,4 @@ export const Randomdropdown = () => {
   });
 
 }
-
-export const dropdownRecurringCKS = (): void => {
-  selectRandomDropdownRecurring();
-};
-
-export const dropdownRecurringCKSMain = (): void => {
-  cy.get('.mat-select-value').eq(1).click({ force: true });
-
-  cy.get('mat-option .mat-option-text').then($options => {
-    const randomIndex = Math.floor(Math.random() * $options.length);
-    const selectedText = $options.eq(randomIndex).text().trim();
-    cy.wrap($options.eq(randomIndex)).click({ force: true });
-    cy.get('.mat-select-value').eq(1).should('contain.text', selectedText);
-  });
-};
-
-export const dropdownRecurringPreMainCKS = (): void => {
-  selectRandomDropdownRecurring();
-};
 
