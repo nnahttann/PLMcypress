@@ -1,1 +1,1 @@
-Nothing needs to be added to the .gitignore file since the only modified file is a TypeScript test file (`cypress/e2e/PLM/roleExecution/afterMktPre.core.ts`) which is source code and should not be ignored.
+Nothing should be ignored based on the provided file changes, as they only include TypeScript test files (.ts) which are source code files and not build artifacts, dependencies, or temporary files.

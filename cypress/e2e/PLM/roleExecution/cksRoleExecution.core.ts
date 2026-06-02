@@ -10,7 +10,8 @@ import { beforeapproveCKS, beforeapproveCKSontop } from './beforeApproveCks.core
 export const executeCKSRole = (
   projectNameStrategy: 'standard' | 'ontop' | 'ontopextra' | 'ontoponetime',
   approvalType: 'main' | 'ontop' | 'ontopextra' | 'ontoponetime',
-  customSteps: () => void
+  customSteps: () => void,
+  postApprovalSteps?: () => void
 ): void => {
   it('CKS role', () => {
     // ===== HARDCODE สำหรับทดสอบ =====
@@ -31,6 +32,11 @@ export const executeCKSRole = (
         beforeapproveCKS();
       } else {
         beforeapproveCKSontop();
+      }
+
+      // รันขั้นตอนหลัง approval ถ้ามี
+      if (postApprovalSteps) {
+        postApprovalSteps();
       }
     });
   });
