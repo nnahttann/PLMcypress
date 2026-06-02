@@ -22,6 +22,6 @@ export default defineConfig({
     },
     specPattern: "cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
     supportFile: "cypress/support/e2e.ts",
-    baseUrl: "http://localhost:4200", // ✅ แก้ให้ตรงกับแอปคุณ
+    baseUrl: "https://test-plm.intra.ais/#/login",
   },
 });

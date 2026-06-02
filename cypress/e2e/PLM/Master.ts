@@ -1,6 +1,6 @@
 const env = Cypress.env();
 export const {
-  urlsit,
+  urlsit='https://test-plm.intra.ais/#/login',
   MKTpre, MKTpre1, MKTpost, MKTpost1,
   cks, ckspass,
   cgcirb, cgcirbpass,
@@ -6104,7 +6104,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
 
         const selectedType = availableOptions[Math.floor(Math.random() * availableOptions.length)] as InternetQuotaType;
         cy.wrap($select).select(selectedType);
-        cy.wait(2000);
+        cy.wait(1500);
         cy.log(`📌 Selected Quota Type: ${selectedType}`);
 
         // Route to appropriate handler
@@ -6120,7 +6120,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
         handlers[selectedType]?.();
       });
     });
-
+  cy.wait(2000)
   // Submit form
   cy.get('app-mass-mkt-internet button.btn-primary')
     .filter(':visible')
