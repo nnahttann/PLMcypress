@@ -148,10 +148,7 @@ const executePluginRoleTests = (): void => {
       ordered = tests;
   }
 
-  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
-  
   // รันทีละตัวแบบ Sequential
-  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
 
   let chain = cy.wrap(null);
   
