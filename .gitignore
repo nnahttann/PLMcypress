@@ -1,1 +1,14 @@
-Nothing needs to be added to the .gitignore file based on the provided file changes. The modified file 'cypress/e2e/PLM/roleExecution/afterMktPre.core.ts' is a source code file and should not be ignored.
+```
+# Dependencies
+node_modules/
+
+# Logs and temp files
+*.log
+*.tmp
+
+# Editors
+.vscode/
+
+# Original rules preserved
+*.log
+```
