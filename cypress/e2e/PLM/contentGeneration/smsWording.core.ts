@@ -71,7 +71,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   const fillTextarea = (sel: string, en: string, th: string, maxEn: number, maxTh: number) => {
     cy.get(sel).each(($el: any, idx: number) => {
       const cleaned = idx === 0 ? capEN(en, maxEn) : capTH(th, maxTh);
-      cy.wrap($el).focus().clear().type(cleaned, { delay: 0 }).blur();
+      cy.wrap($el)
+        .invoke('removeAttr', 'disabled')
+        .invoke('removeAttr', 'readonly')
+        .focus()
+        .clear()
+        .type(cleaned, { delay: 0 })
+        .blur();
     });
     cy.wait(300);
   };
