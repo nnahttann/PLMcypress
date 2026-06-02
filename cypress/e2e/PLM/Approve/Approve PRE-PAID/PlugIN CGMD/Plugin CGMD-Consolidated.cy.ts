@@ -1,4 +1,4 @@
-import * as Master from '../../../Master';
+import * as Master from '../../../PLM/Master';
 
 // ========================================
 // PRE-PAID PlugIN CGMD CONSOLIDATED TEST SUITE
