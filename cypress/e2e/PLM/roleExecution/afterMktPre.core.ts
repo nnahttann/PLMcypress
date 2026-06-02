@@ -92,10 +92,30 @@ const executeStandardRoleTests = (): void => {
     default:
       ordered = tests;
   }
-  ordered.forEach(t => {
-    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${t.name}`);
-    t.fn();
-  });
+  
+  // ✅ รันทีละตัวแบบ Sequential
+  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting role execution sequence with ${ordered.length} roles`);
+  
+  function runNextRole(index: number): void {
+    if (index >= ordered.length) {
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] All roles completed`);
+      return;
+    }
+    
+    const currentTest = ordered[index];
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running role ${index + 1}/${ordered.length}: ${currentTest.name}`);
+    
+    // ใช้ cy.then เพื่อให้แน่ใจว่า role ก่อนหน้าทำงานเสร็จก่อน
+    cy.then(() => {
+      currentTest.fn();
+    }).then(() => {
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed: ${currentTest.name}`);
+      // เรียก role ถัดไป
+      runNextRole(index + 1);
+    });
+  }
+  
+  runNextRole(0);
 };
 const executePluginRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
@@ -133,10 +153,27 @@ const executePluginRoleTests = (): void => {
       ordered = tests;
   }
 
-  ordered.forEach(t => {
-    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${t.name}`);
-    t.fn();
-  });
+  // ✅ รันทีละตัวแบบ Sequential
+  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
+  
+  function runNextRole(index: number): void {
+    if (index >= ordered.length) {
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] All plugin roles completed`);
+      return;
+    }
+    
+    const currentTest = ordered[index];
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running plugin role ${index + 1}/${ordered.length}: ${currentTest.name}`);
+    
+    cy.then(() => {
+      currentTest.fn();
+    }).then(() => {
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed plugin role: ${currentTest.name}`);
+      runNextRole(index + 1);
+    });
+  }
+  
+  runNextRole(0);
 };
 
 export const afterCKSCommonPRE_Internal = (): void => {
