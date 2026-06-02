@@ -1,3 +1,49 @@
+// ========================
+// AFTER MKT PRE CORE FUNCTIONS
+// ========================
+
+import { performRoleTaskWithAssignment, performSimpleApprovalRole, performSimpleClaimAndApprovalRole } from '../approvalFlows/roleHelpers.core';
+import {
+  cgccbs, cgccbspass, cgtcbs, cgtcbspass,
+  spadsup, spadsuppass, spaddoer, spaddoerpass,
+  spadtest, spadtestpass, spaddp, spaddppass,
+  actm, actmpass, apo, apopass
+} from '../helpers/config.core';
+import { approveProjectCGMDPRE, approveProjectCGMDtesterPRE, approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectACTM, approveProjectAPO, approveProjectSPADSupCGMDPlugin, approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin } from './beforeApproveMkt.core';
+import { performMusicRoles } from './musicRoles.core';
+import { executeCKSRole, addauto5gCKS, dropdownRecurringCKS, diyflagCKS, unregister, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority, checkAndFillContentType, smsCKSPRE, CopyDeductFail, dropdownRecurringCKSMain } from '../cksRoleExecution/cksRoleFunctions.core';
+
+type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
+
+const shuffleArray = <T>(array: T[]): T[] => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
+// ✅ สุ่ม Pattern ครั้งเดียวตอนเริ่มไฟล์ (ปลอดภัยกับ Cypress)
+const FLOW_PATTERN: FlowPattern = (() => {
+  try {
+    const env = (globalThis as any).Cypress?.env?.('FLOW_PATTERN');
+    if (env && ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'].includes(env)) {
+      return env as FlowPattern;
+    }
+  } catch { }
+  const opts: FlowPattern[] = ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'];
+  return opts[Math.floor(Math.random() * opts.length)];
+})();
+
+
+const declareTest = (name: string, fn: () => void): void => {
+  it(name, () => {
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${name}`);
+    fn();
+  });
+};
+
 const declareStandardRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
