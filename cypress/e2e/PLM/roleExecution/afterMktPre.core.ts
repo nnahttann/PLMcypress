@@ -219,7 +219,6 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
     CopyDeductFail();
   });
-  declareStandardRoleTests();
 };
 
 export const afterMKTMainPRE_NotComplex = (): void => {
