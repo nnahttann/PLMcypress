@@ -196,7 +196,6 @@ const _afterMKTontopPREWithModule = (
 };
 
 const stepsOntopPRE = (): void => {
-  cy.wait(15000);
   addauto5gCKS();
   dropdownRecurringCKS();
   diyflagCKS();
@@ -230,7 +229,7 @@ const _afterMKTontopPOSTWithModule = (
 };
 
 const stepsOntopPOST = (): void => {
-  cy.wait(15000);
+  
   addauto5gCKS();
   dropdownRecurringCKS();
   diyflagCKS();

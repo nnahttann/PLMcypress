@@ -1,15 +1,5 @@
 import * as Master from '../../Master';
 
-// ========================================
-// PRE-PAID CONSOLIDATED TEST SUITE
-// ========================================
-// ✨ QUICK TIPS:
-// 1. Run specific test: npx cypress run --spec="**/Pre-paid Consolidated.cy.ts" --grep "Main Usage - ENTER"
-// 2. Run only one case: Add .only after describe (e.g., describe.only(`Main Onetime`, () => {
-// 3. Skip tests: Change it() to it.skip()
-// 4. Debug mode: Add cy.debug() or cy.pause() in test
-// ========================================
-
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -20,182 +10,158 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
-interface ScenarioConfig {
-  scenario: string;
-  afterHook: string;
-}
+// Helper function เพื่อลด duplication
+const runPrepaidTest = (
+  billingType: 'onetime' | 'recurring' | 'usage',
+  productClass: 'main' | 'ontop' | 'ontopextra',
+  afterHook: string,
+  productClass1?: string
+) => {
+  const testConfig: any = {
+    Module: 'PRE',
+    subModule: 'PRE',
+    autoSetDuration: true,
+  };
 
-interface PrepaidTestConfig {
-  name: string;
-  billingType: 'onetime' | 'recurring' | 'usage';
-  productClass: 'main' | 'ontop' | 'ontopextra';
-  module: 'PRE';
-  productClass1?: string;
-  scenarios?: ScenarioConfig[];
-  afterHook?: string;
-}
+  if (productClass1) {
+    testConfig.ProductClass1 = productClass1;
+  }
 
-// Test Configuration for all PRE-PAID combinations
-const prepaidTestConfigs: PrepaidTestConfig[] = [
-  // Main - Onetime (PRE only - no ENTER/MUSIC)
-  {
-    name: 'Main Onetime',
-    billingType: 'onetime',
-    productClass: 'main',
-    module: 'PRE',
-    productClass1: 'Main',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
-    ],
-  },
-  // Main - Recurring (PRE only - no ENTER/MUSIC)
-  {
-    name: 'Main Recurring',
-    billingType: 'recurring',
-    productClass: 'main',
-    module: 'PRE',
-    productClass1: 'Main',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
-    ],
-  },
-  // Main - Usage (PRE only - no ENTER/MUSIC)
-  {
-    name: 'Main Usage',
-    billingType: 'usage',
-    productClass: 'main',
-    module: 'PRE',
-    productClass1: 'Main',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTMainPRE_FullSpadFlow' },
-    ],
-  },
-  // Ontop - Onetime (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPRE แทน
-  {
-    name: 'Ontop Onetime',
-    billingType: 'onetime',
-    productClass: 'ontop',
-    module: 'PRE',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
-    ],
-  },
-  // Ontop - Recurring (PRE, ENTER, MUSIC)
-  {
-    name: 'Ontop Recurring',
-    billingType: 'recurring',
-    productClass: 'ontop',
-    module: 'PRE',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
-    ],
-  },
-  // Ontop - Usage (PRE, ENTER, MUSIC)
-  {
-    name: 'Ontop Usage',
-    billingType: 'usage',
-    productClass: 'ontop',
-    module: 'PRE',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopPREUsage' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREUsageEnter' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
-    ],
-  },
-  // OntopEx - Onetime (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPRE แทน
-  {
-    name: 'OntopEx Onetime',
-    billingType: 'onetime',
-    productClass: 'ontopextra',
-    module: 'PRE',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
-    ],
-  },
-  // OntopEx - Recurring (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPRE แทน
-  {
-    name: 'OntopEx Recurring',
-    billingType: 'recurring',
-    productClass: 'ontopextra',
-    module: 'PRE',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopPRE' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREENTER' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREMUSIC' },
-    ],
-  },
-  // OntopEx - Usage (PRE, ENTER, MUSIC) - ใช้ afterMKTontopPREUsage แทน
-  {
-    name: 'OntopEx Usage',
-    billingType: 'usage',
-    productClass: 'ontopextra',
-    module: 'PRE',
-    scenarios: [
-      { scenario: 'PRE', afterHook: 'afterMKTontopPREUsage' },
-      { scenario: 'ENTER', afterHook: 'afterMKTontopPREUsageEnter' },
-      { scenario: 'MUSIC', afterHook: 'afterMKTontopPREUsageMusic' },
-    ],
-  },
-];
+  Master.ProjectBasicInformationComplete(billingType, productClass, testConfig);
 
-// ⭐ กำหนด case ที่ต้องการรันตรงนี้ที่เดียว
-// รูปแบบ: 'ชื่อผลิตภัณฑ์ - ชื่อScenario' (เช่น 'Main Usage - ENTER') 
-// หรือใส่แค่ 'ชื่อผลิตภัณฑ์' เพื่อรันทุก Scenario ของผลิตภัณฑ์นั้น
-const ACTIVE_CASES: string[] = [];
-// const ACTIVE_CASES: string[] = ['Main Usage - ENTER']; // ← ตัวอย่าง: รันแค่เคสเดียว
-// const ACTIVE_CASES: string[] = ['Ontop Recurring']; // ← ตัวอย่าง: รันทุก Scenario ของ Ontop Recurring
+  const hookFunction = (Master as any)[afterHook];
+  if (typeof hookFunction === 'function') {
+    hookFunction();
+  } else {
+    cy.log(`⚠️ Warning: Hook function '${afterHook}' not found.`);
+  }
+};
 
-// Test Suite Runner
-describe('PRE-PAID Product Approvals', () => {
-  prepaidTestConfigs.forEach(config => {
-    if (!config.scenarios || config.scenarios.length === 0) {
-      return;
-    }
+// ========================================
+// ⭐ MAIN ONETIME
+// ========================================
+describe('Main Onetime', () => {
+  it.only('PRE', () => {
+    runPrepaidTest('onetime', 'main', 'afterMKTMainPRE_FullSpadFlow', 'Main');
+  });
+});
 
-    config.scenarios.forEach(scen => {
-      const fullTestCaseName = `${config.name} - ${scen.scenario}`;
+// ========================================
+// ⭐ MAIN RECURRING
+// ========================================
+describe('Main Recurring', () => {
+  it('PRE', () => {
+    runPrepaidTest('recurring', 'main', 'afterMKTMainPRE_FullSpadFlow', 'Main');
+  });
+});
 
-      // ตรวจสอบว่าเคสนี้ควรถูกรันหรือไม่
-      // รันถ้า: 1. ACTIVE_CASES ว่าง (รันหมด) หรือ 2. ตรงกับชื่อเต็ม หรือ 3. ตรงกับชื่อผลิตภัณฑ์ (รันทุก scenario ของตัวนั้น)
-      const isActive = ACTIVE_CASES.length === 0 ||
-        ACTIVE_CASES.includes(fullTestCaseName) ||
-        ACTIVE_CASES.includes(config.name);
+// ========================================
+// ⭐ MAIN USAGE
+// ========================================
+describe('Main Usage', () => {
+  it('PRE', () => {
+    runPrepaidTest('usage', 'main', 'afterMKTMainPRE_FullSpadFlow', 'Main');
+  });
+});
 
-      describe(`${config.name}`, () => {
-        const testIt = isActive ? it : it.skip;
+// ========================================
+// ⭐ ONTOP ONETIME
+// ========================================
+describe('Ontop Onetime', () => {
+  it.only('PRE', () => {
+    runPrepaidTest('onetime', 'ontop', 'afterMKTontopPRE');
+  });
 
-        testIt(`${scen.scenario}`, () => {
-          const testConfig: any = {
-            Module: config.module,
-            subModule: config.module,
-            autoSetDuration: true,
-          };
+  it('ENTER', () => {
+    runPrepaidTest('onetime', 'ontop', 'afterMKTontopPREENTER');
+  });
 
-          if (config.productClass1) {
-            testConfig.ProductClass1 = config.productClass1;
-          }
+  it('MUSIC', () => {
+    runPrepaidTest('onetime', 'ontop', 'afterMKTontopPREMUSIC');
+  });
+});
 
-          Master.ProjectBasicInformationComplete(
-            config.billingType,
-            config.productClass,
-            testConfig
-          );
+// ========================================
+// ⭐ ONTOP RECURRING
+// ========================================
+describe('Ontop Recurring', () => {
+  it('PRE', () => {
+    runPrepaidTest('recurring', 'ontop', 'afterMKTontopPRE');
+  });
 
-          // เรียกใช้ Hook ที่ตรงกับ Scenario นั้นๆ
-          const hookFunction = (Master as any)[scen.afterHook];
-          if (typeof hookFunction === 'function') {
-            hookFunction();
-          } else {
-            cy.log(`⚠️ Warning: Hook function '${scen.afterHook}' not found.`);
-          }
-        });
-      });
-    });
+  it('ENTER', () => {
+    runPrepaidTest('recurring', 'ontop', 'afterMKTontopPREENTER');
+  });
+
+  it('MUSIC', () => {
+    runPrepaidTest('recurring', 'ontop', 'afterMKTontopPREMUSIC');
+  });
+});
+
+// ========================================
+// ⭐ ONTOP USAGE
+// ========================================
+describe('Ontop Usage', () => {
+  it('PRE', () => {
+    runPrepaidTest('usage', 'ontop', 'afterMKTontopPREUsage');
+  });
+
+  it('ENTER', () => {
+    runPrepaidTest('usage', 'ontop', 'afterMKTontopPREUsageEnter');
+  });
+
+  it('MUSIC', () => {
+    runPrepaidTest('usage', 'ontop', 'afterMKTontopPREUsageMusic');
+  });
+});
+
+// ========================================
+// ⭐ ONTOPEX ONETIME
+// ========================================
+describe('OntopEx Onetime', () => {
+  it('PRE', () => {
+    runPrepaidTest('onetime', 'ontopextra', 'afterMKTontopPRE');
+  });
+
+  it('ENTER', () => {
+    runPrepaidTest('onetime', 'ontopextra', 'afterMKTontopPREENTER');
+  });
+
+  it('MUSIC', () => {
+    runPrepaidTest('onetime', 'ontopextra', 'afterMKTontopPREMUSIC');
+  });
+});
+
+// ========================================
+// ⭐ ONTOPEX RECURRING
+// ========================================
+describe('OntopEx Recurring', () => {
+  it('PRE', () => {
+    runPrepaidTest('recurring', 'ontopextra', 'afterMKTontopPRE');
+  });
+
+  it('ENTER', () => {
+    runPrepaidTest('recurring', 'ontopextra', 'afterMKTontopPREENTER');
+  });
+
+  it('MUSIC', () => {
+    runPrepaidTest('recurring', 'ontopextra', 'afterMKTontopPREMUSIC');
+  });
+});
+
+// ========================================
+// ⭐ ONTOPEX USAGE
+// ========================================
+describe('OntopEx Usage', () => {
+  it('PRE', () => {
+    runPrepaidTest('usage', 'ontopextra', 'afterMKTontopPREUsage');
+  });
+
+  it('ENTER', () => {
+    runPrepaidTest('usage', 'ontopextra', 'afterMKTontopPREUsageEnter');
+  });
+
+  it('MUSIC', () => {
+    runPrepaidTest('usage', 'ontopextra', 'afterMKTontopPREUsageMusic');
   });
 });
