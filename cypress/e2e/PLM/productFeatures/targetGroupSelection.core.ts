@@ -42,29 +42,18 @@ export const targetgroup = (): void => {
         cy.log(`✅ Successfully selected: ${randomOption}`);
         cy.log(`📝 New value after selection: "${$select.val()}"`);
         
-        // Double-click ที่ option เพื่อย้ายไปอีกลิสต์
-        cy.get('select[formcontrolname="availableListBox"]')
-          .contains('option', randomOption)
-          .should('exist')
-          .dblclick();
-        
-        cy.log(`🖱️ Double-clicked on option: ${randomOption}`);
-        
-        // หรือคลิกปุ่มลูกศรเพื่อย้ายค่า (ถ้ามี)
+        // คลิกปุ่มลูกศรเพื่อย้ายค่าไปอีกลิสต์ (วิธีที่เสถียรสำหรับ Angular)
         cy.get('.glyphicon-chevron-right')
           .should('exist')
           .and('be.visible')
+          .first()
           .click();
         
         cy.log(`➡️ Clicked move button to transfer option`);
         
-        // ยืนยันผลโดยรอให้ค่าถูกเซ็ต
-        cy.wrap($select)
-          .should(($el) => {
-            const val = $el.val();
-            expect(val).to.not.be.empty;
-            expect(val).to.include(randomOption);
-          })
+        // ยืนยันผลโดยรอให้ค่าปรากฏใน selected list
+        cy.get('select[formcontrolname="selectedListBox"]')
+          .should('contain', randomOption)
           .then(() => {
             cy.log(`🎉 Target Group selection verified!`);
           });
