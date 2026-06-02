@@ -93,29 +93,24 @@ const executeStandardRoleTests = (): void => {
       ordered = tests;
   }
   
-  // ✅ รันทีละตัวแบบ Sequential
   cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting role execution sequence with ${ordered.length} roles`);
   
-  function runNextRole(index: number): void {
-    if (index >= ordered.length) {
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] All roles completed`);
-      return;
-    }
-    
-    const currentTest = ordered[index];
-    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running role ${index + 1}/${ordered.length}: ${currentTest.name}`);
-    
-    // ใช้ cy.then เพื่อให้แน่ใจว่า role ก่อนหน้าทำงานเสร็จก่อน
-    cy.then(() => {
-      currentTest.fn();
-    }).then(() => {
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed: ${currentTest.name}`);
-      // เรียก role ถัดไป
-      runNextRole(index + 1);
-    });
-  }
+  // รันทีละตัวแบบ Sequential
+
+  let chain = cy.wrap(null);
   
-  runNextRole(0);
+  ordered.forEach((currentTest, index) => {
+    chain = chain.then(() => {
+      cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running role ${index + 1}/${ordered.length}: ${currentTest.name}`);
+      currentTest.fn();
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed: ${currentTest.name}`);
+    });
+  });
+  
+  chain.then(() => {
+    cy.log(`✅ [FLOW:${FLOW_PATTERN}] All roles completed`);
+  });
+
 };
 const executePluginRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
@@ -153,27 +148,25 @@ const executePluginRoleTests = (): void => {
       ordered = tests;
   }
 
-  // ✅ รันทีละตัวแบบ Sequential
   cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
   
-  function runNextRole(index: number): void {
-    if (index >= ordered.length) {
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] All plugin roles completed`);
-      return;
-    }
-    
-    const currentTest = ordered[index];
-    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running plugin role ${index + 1}/${ordered.length}: ${currentTest.name}`);
-    
-    cy.then(() => {
-      currentTest.fn();
-    }).then(() => {
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed plugin role: ${currentTest.name}`);
-      runNextRole(index + 1);
-    });
-  }
+  // รันทีละตัวแบบ Sequential
+  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
+
+  let chain = cy.wrap(null);
   
-  runNextRole(0);
+  ordered.forEach((currentTest, index) => {
+    chain = chain.then(() => {
+      cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running plugin role ${index + 1}/${ordered.length}: ${currentTest.name}`);
+      currentTest.fn();
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed plugin role: ${currentTest.name}`);
+    });
+  });
+  
+  chain.then(() => {
+    cy.log(`✅ [FLOW:${FLOW_PATTERN}] All plugin roles completed`);
+  });
+
 };
 
 export const afterCKSCommonPRE_Internal = (): void => {
@@ -207,16 +200,18 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
     CopyDeductFail();
+  }, () => {
+    executeStandardRoleTests();
   });
-  executeStandardRoleTests();
 };
 
 export const afterMKTMainPRE_NotComplex = (): void => {
   executeCKSRole('standard', 'main', () => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
+  }, () => {
+    executePluginRoleTests();
   });
-  executePluginRoleTests();
 };
 
 // ========================
