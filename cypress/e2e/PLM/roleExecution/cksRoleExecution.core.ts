@@ -13,32 +13,36 @@ export const executeCKSRole = (
   customSteps: () => void,
   postApprovalSteps?: () => void
 ): void => {
-  it('CKS role', () => {
-    // ===== HARDCODE สำหรับทดสอบ =====
-    // const HARDCODE_PROJECT_NAME = 'MOB PRE usage main 1905 1352';
-    // const getProjectName: GetProjectNameFn = () => HARDCODE_PROJECT_NAME;
-    // ================================
+  // ===== HARDCODE สำหรับทดสอบ =====
+  // const HARDCODE_PROJECT_NAME = 'MOB PRE usage main 1905 1352';
+  // const getProjectName: GetProjectNameFn = () => HARDCODE_PROJECT_NAME;
+  // ================================
 
-    const getProjectName: GetProjectNameFn = 
-      projectNameStrategy === 'standard' ? getStandardProjectName :
-      projectNameStrategy === 'ontopextra' ? getOntopExtraProjectName :
-      projectNameStrategy === 'ontoponetime' ? getOntopOnetimeProjectName :
-      getOntopProjectName;
+  const getProjectName: GetProjectNameFn = 
+    projectNameStrategy === 'standard' ? getStandardProjectName :
+    projectNameStrategy === 'ontopextra' ? getOntopExtraProjectName :
+    projectNameStrategy === 'ontoponetime' ? getOntopOnetimeProjectName :
+    getOntopProjectName;
 
-    standardCksPoEnhancementFlow(getProjectName, () => {
-      customSteps();
+  cy.log(`🎯 Starting CKS Role execution (${projectNameStrategy}/${approvalType})`);
+  
+  standardCksPoEnhancementFlow(getProjectName, () => {
+    customSteps();
 
-      if (approvalType === 'main') {
-        beforeapproveCKS();
-      } else {
-        beforeapproveCKSontop();
-      }
+    if (approvalType === 'main') {
+      beforeapproveCKS();
+    } else {
+      beforeapproveCKSontop();
+    }
 
-      // รันขั้นตอนหลัง approval ถ้ามี
-      if (postApprovalSteps) {
-        postApprovalSteps();
-      }
-    });
+    // รันขั้นตอนหลัง approval ถ้ามี
+    if (postApprovalSteps) {
+      cy.log(`🚀 Executing post-approval steps...`);
+      postApprovalSteps();
+      cy.log(`✅ Post-approval steps completed`);
+    }
   });
+  
+  cy.log(`✅ CKS Role execution completed`);
 };
 

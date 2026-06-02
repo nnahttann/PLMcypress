@@ -95,21 +95,28 @@ const executeStandardRoleTests = (): void => {
   
   cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting role execution sequence with ${ordered.length} roles`);
   
-  // รันทีละตัวแบบ Sequential
-
-  let chain = cy.wrap(null);
-  
-  ordered.forEach((currentTest, index) => {
-    chain = chain.then(() => {
-      cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running role ${index + 1}/${ordered.length}: ${currentTest.name}`);
-      currentTest.fn();
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed: ${currentTest.name}`);
+  // รันทีละตัวแบบ Sequential ด้วย recursion
+  const runNextRole = (index: number): void => {
+    if (index >= ordered.length) {
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] All roles completed`);
+      return;
+    }
+    
+    const currentTest = ordered[index];
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running role ${index + 1}/${ordered.length}: ${currentTest.name}`);
+    
+    // เรียก fn() แล้วรอให้เสร็จก่อนค่อยไปตัวถัดไป
+    currentTest.fn();
+    
+    cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed: ${currentTest.name}`);
+    
+    // ใช้ cy.then() เพื่อรอให้ทุกอย่างใน fn() เสร็จก่อน แล้วค่อยเรียกตัวถัดไป
+    cy.then(() => {
+      runNextRole(index + 1);
     });
-  });
+  };
   
-  chain.then(() => {
-    cy.log(`✅ [FLOW:${FLOW_PATTERN}] All roles completed`);
-  });
+  runNextRole(0);
 
 };
 const executePluginRoleTests = (): void => {
@@ -150,22 +157,26 @@ const executePluginRoleTests = (): void => {
 
   cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
   
-  // รันทีละตัวแบบ Sequential
-  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting plugin role execution sequence with ${ordered.length} roles`);
-
-  let chain = cy.wrap(null);
-  
-  ordered.forEach((currentTest, index) => {
-    chain = chain.then(() => {
-      cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running plugin role ${index + 1}/${ordered.length}: ${currentTest.name}`);
-      currentTest.fn();
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed plugin role: ${currentTest.name}`);
+  // รันทีละตัวแบบ Sequential ด้วย recursion
+  const runNextPluginRole = (index: number): void => {
+    if (index >= ordered.length) {
+      cy.log(`✅ [FLOW:${FLOW_PATTERN}] All plugin roles completed`);
+      return;
+    }
+    
+    const currentTest = ordered[index];
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running plugin role ${index + 1}/${ordered.length}: ${currentTest.name}`);
+    
+    currentTest.fn();
+    
+    cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed plugin role: ${currentTest.name}`);
+    
+    cy.then(() => {
+      runNextPluginRole(index + 1);
     });
-  });
+  };
   
-  chain.then(() => {
-    cy.log(`✅ [FLOW:${FLOW_PATTERN}] All plugin roles completed`);
-  });
+  runNextPluginRole(0);
 
 };
 

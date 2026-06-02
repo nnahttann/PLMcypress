@@ -37,32 +37,45 @@ export const performRoleTaskWithAssignment = (
   approveFunction: ApproveFunction,
   BillingSystem: string = ''
 ): void => {
+  cy.log(`🔐 Logging in as ${user}...`);
   loginAndWaitReady(user, pass);
-  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  // cy.visit('/#/workspace-home/workspace');
-  cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-  // const projectNamePONAME = 'MOB POST onetime main 1305 1615';
-  const projectNamePONAME: string = getStandardProjectName();
-  cy.log('Project Name: ' + projectNamePONAME);
+  
+  cy.then(() => {
+    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+    cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+    
+    const projectNamePONAME: string = getStandardProjectName();
+    cy.log('Project Name: ' + projectNamePONAME);
 
-  assignTaskViaTracking(projectNamePONAME, assignee, BillingSystem);
-  navigateToWorkspace();
+    assignTaskViaTracking(projectNamePONAME, assignee, BillingSystem);
+    navigateToWorkspace();
 
-  cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-  approveFunction(projectNamePONAME);
+    cy.then(() => {
+      cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+      approveFunction(projectNamePONAME);
+    });
+  });
 };
 
 export const performSimpleApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
+  cy.log(`🔐 Logging in as ${user}...`);
   loginAndWaitReady(user, pass);
-  const projectNamePONAME: string = getStandardProjectName();
-  cy.log('Project Name: ' + projectNamePONAME);
-  approveFunction(projectNamePONAME);
+  
+  cy.then(() => {
+    const projectNamePONAME: string = getStandardProjectName();
+    cy.log('Project Name: ' + projectNamePONAME);
+    approveFunction(projectNamePONAME);
+  });
 };
 
 export const performSimpleClaimAndApprovalRole = (user: string, pass: string, approveFunction: ApproveFunction): void => {
+  cy.log(`🔐 Logging in as ${user}...`);
   loginAndWaitReady(user, pass);
-  const projectNamePONAME: string = getStandardProjectName();
-  cy.log('Project Name: ' + projectNamePONAME);
-  ClaimProject(projectNamePONAME);
-  approveFunction(projectNamePONAME);
+  
+  cy.then(() => {
+    const projectNamePONAME: string = getStandardProjectName();
+    cy.log('Project Name: ' + projectNamePONAME);
+    ClaimProject(projectNamePONAME);
+    approveFunction(projectNamePONAME);
+  });
 };
