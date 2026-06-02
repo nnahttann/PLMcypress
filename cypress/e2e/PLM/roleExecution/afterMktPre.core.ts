@@ -52,14 +52,7 @@ const FLOW_PATTERN: FlowPattern = (() => {
 })();
 
 
-const declareTest = (name: string, fn: () => void): void => {
-  it(name, () => {
-    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${name}`);
-    fn();
-  });
-};
-
-const declareStandardRoleTests = (): void => {
+const executeStandardRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS') },
@@ -99,9 +92,12 @@ const declareStandardRoleTests = (): void => {
     default:
       ordered = tests;
   }
-  ordered.forEach(t => declareTest(t.name, t.fn));
+  ordered.forEach(t => {
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${t.name}`);
+    t.fn();
+  });
 };
-const declarePluginRoleTests = (): void => {
+const executePluginRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS') },
@@ -137,11 +133,14 @@ const declarePluginRoleTests = (): void => {
       ordered = tests;
   }
 
-  ordered.forEach(t => declareTest(t.name, t.fn));
+  ordered.forEach(t => {
+    cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${t.name}`);
+    t.fn();
+  });
 };
 
 export const afterCKSCommonPRE_Internal = (): void => {
-  declareStandardRoleTests();
+  executeStandardRoleTests();
 };
 
 export const afterCKSCommonPRE = (Module: string): void => {
@@ -152,7 +151,7 @@ export const afterCKSCommonPRE = (Module: string): void => {
 };
 
 export const afterCKSPREPlugin = (Module: string): void => {
-  declarePluginRoleTests();
+  executePluginRoleTests();
   if (Module === 'MUSIC') {
     performMusicRoles();
   }
@@ -163,7 +162,7 @@ export const afterMKTOntop_NotComplex = (): void => {
     addauto5gCKS(); dropdownRecurringCKS(); diyflagCKS(); unregister();
     addauto5gCKS(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
   });
-  declarePluginRoleTests();
+  executePluginRoleTests();
 };
 
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
@@ -172,7 +171,7 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
     CopyDeductFail();
   });
-  declareStandardRoleTests();
+  executeStandardRoleTests();
 };
 
 export const afterMKTMainPRE_NotComplex = (): void => {
@@ -180,7 +179,7 @@ export const afterMKTMainPRE_NotComplex = (): void => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
   });
-  declarePluginRoleTests();
+  executePluginRoleTests();
 };
 
 // ========================
