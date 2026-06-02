@@ -1,58 +1,4 @@
-// ========================
-// AFTER MKT PRE FUNCTIONS
-// ========================
-
-import { executeCKSRole } from './cksRoleExecution.core';
-import { performRoleTaskWithAssignment, performSimpleClaimAndApprovalRole, performSimpleApprovalRole } from '../approvalFlows/roleHelpers.core';
-import { 
-  cgccbs, cgccbspass, cgtcbs, cgtcbspass, 
-  spadsup, spadsuppass, spaddoer, spaddoerpass,
-  spadtest, spadtestpass, spaddp, spaddppass,
-  actm, actmpass, apo, apopass 
-} from '../helpers/config';
-import { 
-  approveProjectCGMDPRE, approveProjectCGMDtesterPRE,
-  approveProjectCGMDPREMainNotComplex, approveProjectCGMDtesterPREPlugin 
-} from '../approvalFlows/cgmdApprovals';
-import { 
-  approveProjectSPADSup, approveProjectSPADDOER,
-  approveProjectSPADTester, approveProjectSPADdeploy,
-  approveProjectSPADSupCGMDPlugin 
-} from '../approvalFlows/spadApprovals';
-import { approveProjectACTM, approveProjectAPO } from '../approvalFlows/simpleApprovals.core';
-import { smsCKSPRE, smsCKSPOST } from '../contentGeneration/smsCks.core';
-import { afterCKSPOST } from './afterCksPost.core';
-import { checkAndFillContentType, checkAndUpdatePriority, checkAndUpdateVerticalAppPriority } from '../helpers/uiHelpers';
-import { CopyDeductFail } from '../productFeatures/copyDeductFail.core';
-import { unregister, addauto5gCKS } from '../productFeatures/unregister.core';
-import { performMusicRoles } from './musicRoles.core';
-import { diyflagCKS } from '../productFeatures/diyFlagCks.core';
-
-type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
-
-const shuffleArray = <T>(array: T[]): T[] => {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-};
-
-// ✅ สุ่ม Pattern ครั้งเดียวตอนเริ่มไฟล์ (ปลอดภัยกับ Cypress)
-const FLOW_PATTERN: FlowPattern = (() => {
-  try {
-    const env = (globalThis as any).Cypress?.env?.('FLOW_PATTERN');
-    if (env && ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'].includes(env)) {
-      return env as FlowPattern;
-    }
-  } catch { }
-  const opts: FlowPattern[] = ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'];
-  return opts[Math.floor(Math.random() * opts.length)];
-})();
-
-
-const executeStandardRoleTests = (): void => {
+const declareStandardRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS') },
@@ -92,27 +38,9 @@ const executeStandardRoleTests = (): void => {
     default:
       ordered = tests;
   }
-  
-  cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Starting role execution sequence with ${ordered.length} roles`);
-  
-  // รันทีละตัวแบบ Sequential
-
-  let chain = cy.wrap(null);
-  
-  ordered.forEach((currentTest, index) => {
-    chain = chain.then(() => {
-      cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running role ${index + 1}/${ordered.length}: ${currentTest.name}`);
-      currentTest.fn();
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed: ${currentTest.name}`);
-    });
-  });
-  
-  chain.then(() => {
-    cy.log(`✅ [FLOW:${FLOW_PATTERN}] All roles completed`);
-  });
-
+  ordered.forEach(t => declareTest(t.name, t.fn));
 };
-const executePluginRoleTests = (): void => {
+const declarePluginRoleTests = (): void => {
   const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS') },
@@ -148,26 +76,11 @@ const executePluginRoleTests = (): void => {
       ordered = tests;
   }
 
-  // รันทีละตัวแบบ Sequential
-
-  let chain = cy.wrap(null);
-  
-  ordered.forEach((currentTest, index) => {
-    chain = chain.then(() => {
-      cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running plugin role ${index + 1}/${ordered.length}: ${currentTest.name}`);
-      currentTest.fn();
-      cy.log(`✅ [FLOW:${FLOW_PATTERN}] Completed plugin role: ${currentTest.name}`);
-    });
-  });
-  
-  chain.then(() => {
-    cy.log(`✅ [FLOW:${FLOW_PATTERN}] All plugin roles completed`);
-  });
-
+  ordered.forEach(t => declareTest(t.name, t.fn));
 };
 
 export const afterCKSCommonPRE_Internal = (): void => {
-  executeStandardRoleTests();
+  declareStandardRoleTests();
 };
 
 export const afterCKSCommonPRE = (Module: string): void => {
@@ -178,7 +91,7 @@ export const afterCKSCommonPRE = (Module: string): void => {
 };
 
 export const afterCKSPREPlugin = (Module: string): void => {
-  executePluginRoleTests();
+  declarePluginRoleTests();
   if (Module === 'MUSIC') {
     performMusicRoles();
   }
@@ -189,31 +102,18 @@ export const afterMKTOntop_NotComplex = (): void => {
     addauto5gCKS(); dropdownRecurringCKS(); diyflagCKS(); unregister();
     addauto5gCKS(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
   });
-  executePluginRoleTests();
-};
-
-export const afterMKTMainPRE_FullSpadFlow = (): void => {
-  executeCKSRole('standard', 'main', () => {
-    dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
-    checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
-    CopyDeductFail();
-  }, () => {
-    executeStandardRoleTests();
-  });
-};
-
-export const afterMKTMainPRE_NotComplex = (): void => {
-  executeCKSRole('standard', 'main', () => {
-    dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
-    checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
-  }, () => {
-    executePluginRoleTests();
-  });
+  declarePluginRoleTests();
 };
 
 // ========================
-// ONTOP PRE FUNCTIONS (for PRE, ENTER, MUSIC scenarios)
+// AFTER MKT ONTOP PRE FUNCTIONS
 // ========================
+
+export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
+export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
+export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
 
 const _afterMKTontopPREWithModule = (
   afterFn: (module: string) => void,
@@ -224,6 +124,7 @@ const _afterMKTontopPREWithModule = (
 };
 
 const stepsOntopPRE = (): void => {
+  cy.wait(15000);
   addauto5gCKS();
   dropdownRecurringCKS();
   diyflagCKS();
@@ -234,30 +135,23 @@ const stepsOntopPRE = (): void => {
   smsCKSPRE();
 };
 
-export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
-export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
-export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
-
-export const afterMKTontopPREUsage = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
-export const afterMKTontopPREUsageEnter = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
-export const afterMKTontopPREUsageMusic = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
-
-// ========================
-// ONTOP POST FUNCTIONS (for POST, ENTER, MUSIC scenarios)
-// ========================
-
-const _afterMKTontopPOSTWithModule = (
-  afterFn: (module: string) => void,
-  module: string
-): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPOST);
-  afterFn(module);
+export const afterMKTontopPREUsage = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('PRE');
 };
 
-const stepsOntopPOST = (): void => {
-  
+export const afterMKTontopPREUsageEnter = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('Enter');
+};
+
+export const afterMKTontopPREUsageMusic = (): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
+  afterCKSCommonPRE('MUSIC');
+};
+
+const stepsOntopPREUsage = (): void => {
+  cy.wait(15000);
   addauto5gCKS();
   dropdownRecurringCKS();
   diyflagCKS();
@@ -265,15 +159,25 @@ const stepsOntopPOST = (): void => {
   checkAndUpdatePriority();
   checkAndUpdateVerticalAppPriority();
   cy.scrollTo('bottom');
-  smsCKSPOST();
+  smsCKSPRE();
 };
 
-export const afterMKTontopPOST = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'POST');
-export const afterMKTontopPOSTENTER = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'ENTER');
-export const afterMKTontopPOSTENTERPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopPOSTMusicPlugin = (): void => _afterMKTontopPOSTWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopPOSTMUSIC = (): void => _afterMKTontopPOSTWithModule(afterCKSPOST, 'MUSIC');
+export const afterMKTMainPRE_FullSpadFlow = (): void => {
+  executeCKSRole('standard', 'main', () => {
+    dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
+    checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
+    CopyDeductFail();
+  });
+  declareStandardRoleTests();
+};
 
+export const afterMKTMainPRE_NotComplex = (): void => {
+  executeCKSRole('standard', 'main', () => {
+    dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
+    checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
+  });
+  declarePluginRoleTests();
+};
 // =======================
 
 const selectRandomDropdownRecurring = (): void => {
@@ -507,3 +411,4 @@ export const dropdownRecurringCKSMain = (): void => {
 export const dropdownRecurringPreMainCKS = (): void => {
   selectRandomDropdownRecurring();
 };
+
