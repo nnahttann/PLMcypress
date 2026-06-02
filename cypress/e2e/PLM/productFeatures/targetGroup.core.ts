@@ -41,4 +41,3 @@ export const selectTargetGroup = (type:
     .select(value)
     .should('have.value', value);
 };
-

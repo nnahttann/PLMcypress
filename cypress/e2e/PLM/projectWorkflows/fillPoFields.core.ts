@@ -7,7 +7,8 @@ import { generateProjectNames, createProjectBase, createPOBase } from '../helper
 import { getCredentials } from '../helpers/utils';
 import { registerProjectName } from './projectNameManagement.core';
 import { PriceExcluding } from '../productFeatures/priceExcluding.core';
-import { targetgroup } from '../productFeatures/targetGroupSelection.core';
+import { targetcustomer } from '../productFeatures/targetGroupSelection.core';
+import { selectTargetGroup } from '../productFeatures/targetGroup.core';
 import { dropdownPromotionGroup } from '../productFeatures/dropdownPromotionGroup.core';
 import { RandomProductSpecification } from '../contentGeneration/randomProductSpecification.core';
 import { RandomRemark } from '../contentGeneration/randomRemark.core';
@@ -213,9 +214,9 @@ export const ProjectBasicInformationComplete = (
         cy.get('select[formcontrolname="packageBillCycleUnit"]').select(($options[randomIndex] as HTMLOptionElement).value);
       });
     }
-
+selectTargetGroup('random');
     PriceExcluding();
-    targetgroup();
+    targetcustomer();   
     dropdownPromotionGroup();
     RandomProductSpecification(productClass, subModule, Module);
 

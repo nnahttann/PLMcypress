@@ -2,7 +2,7 @@
 // SELECT TARGET GROUP (NEW - Available List Box)
 // ========================
 
-export const targetgroup = (): void => {
+export const targetcustomer = (): void => {
   const optionsToSelect = [
     'Change Charge Type (Convert)',
     'Existing',
