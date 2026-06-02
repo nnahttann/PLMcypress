@@ -1,4 +1,4 @@
-import * as Master from '../../../PLM/Master';
+import * as Master from '../../Master';
 
 beforeEach(() => {
   cy.clearLocalStorage();
