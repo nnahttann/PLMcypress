@@ -919,31 +919,32 @@ export const approveProjectSPADdeploy = (projectName: string): void => {
 // ========================
 // AFTER MKT PRE FUNCTIONS
 // ========================
-
 type FlowPattern = 'CGMD_FIRST' | 'SPAD_FIRST' | 'INTERLEAVED' | 'RANDOM';
 
-const shuffleArray = <T>(array: T[]): T[] => {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
+// ─────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────
+const shuffleArray = <T>(arr: T[]): T[] => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  return shuffled;
+  return a;
 };
 
-// ✅ สุ่ม Pattern ครั้งเดียวตอนเริ่มไฟล์ (ปลอดภัยกับ Cypress)
+// ─────────────────────────────────────────────
+// FLOW_PATTERN — สุ่มครั้งเดียวตอน module load
+// ─────────────────────────────────────────────
 const FLOW_PATTERN: FlowPattern = (() => {
-  try {
-    const env = (globalThis as any).Cypress?.env?.('FLOW_PATTERN');
-    if (env && ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'].includes(env)) {
-      return env as FlowPattern;
-    }
-  } catch { }
-  const opts: FlowPattern[] = ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'];
-  return opts[Math.floor(Math.random() * opts.length)];
+  const env = (globalThis as any).Cypress?.env?.('FLOW_PATTERN');
+  const valid: FlowPattern[] = ['CGMD_FIRST', 'SPAD_FIRST', 'INTERLEAVED', 'RANDOM'];
+  return valid.includes(env) ? (env as FlowPattern) : valid[Math.floor(Math.random() * valid.length)];
 })();
 
-
+// ─────────────────────────────────────────────
+// Core helpers
+// ─────────────────────────────────────────────
 const declareTest = (name: string, fn: () => void): void => {
   it(name, () => {
     cy.log(`🎲 [FLOW:${FLOW_PATTERN}] Running: ${name}`);
@@ -951,24 +952,16 @@ const declareTest = (name: string, fn: () => void): void => {
   });
 };
 
-const declareStandardRoleTests = (): void => {
-  const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
-    { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
-    { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS') },
-    { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup) },
-    { name: 'Spaddoer role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER) },
-    { name: 'Spadtester role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester) },
-    { name: 'Spaddeploy role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy) },
-    { name: 'ACTM role', group: 'OTHER', fn: () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM) },
-    { name: 'APO role', group: 'OTHER', fn: () => performSimpleApprovalRole(apo, apopass, approveProjectAPO) },
-  ];
+type TestEntry = { name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void };
 
-  // ✅ จัดลำดับตาม Pattern
-  let ordered: typeof tests = [];
-  const cgmd = tests.filter(t => t.group === 'CGMD');
-  const spad = tests.filter(t => t.group === 'SPAD');
-  const other = tests.filter(t => t.group === 'OTHER');
+/** จัดลำดับ tests ตาม FLOW_PATTERN แล้ว declare ทีเดียว */
+const declareRoleTests = (tests: TestEntry[]): void => {
+  const byGroup = (g: TestEntry['group']) => tests.filter(t => t.group === g);
+  const cgmd = byGroup('CGMD');
+  const spad = byGroup('SPAD');
+  const other = byGroup('OTHER');
 
+  let ordered: TestEntry[];
   switch (FLOW_PATTERN) {
     case 'CGMD_FIRST':
       ordered = [...cgmd, ...spad, ...other];
@@ -977,94 +970,68 @@ const declareStandardRoleTests = (): void => {
       ordered = [...spad, ...cgmd, ...other];
       break;
     case 'INTERLEAVED': {
-      const res: typeof tests = [];
+      // s1, c1, c2, ..., s2, s3, ..., other
       const s = [...spad], c = [...cgmd];
-      if (s.length) res.push(s.shift()!);
-      while (c.length) res.push(c.shift()!);
-      while (s.length) res.push(s.shift()!);
-      ordered = [...res, ...other];
+      const interleaved: TestEntry[] = [];
+      if (s.length) interleaved.push(s.shift()!);
+      interleaved.push(...c);
+      interleaved.push(...s);
+      ordered = [...interleaved, ...other];
       break;
     }
     case 'RANDOM':
-      ordered = shuffleArray([...tests]);
+      ordered = shuffleArray(tests);
       break;
-    default:
-      ordered = tests;
-  }
-  ordered.forEach(t => declareTest(t.name, t.fn));
-};
-const declarePluginRoleTests = (): void => {
-  const tests: Array<{ name: string; group: 'CGMD' | 'SPAD' | 'OTHER'; fn: () => void }> = [
-    { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS') },
-    { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS') },
-    { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin) },
-    { name: 'CGMD Config cbs role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN') },
-    { name: 'CGMD Tester CBS role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN') },
-  ];
-
-  let ordered: typeof tests = [];
-  const cgmd = tests.filter(t => t.group === 'CGMD');
-  const spad = tests.filter(t => t.group === 'SPAD');
-
-  switch (FLOW_PATTERN) {
-    case 'CGMD_FIRST':
-      ordered = [...cgmd, ...spad];
-      break;
-    case 'SPAD_FIRST':
-      ordered = [...spad, ...cgmd];
-      break;
-    case 'INTERLEAVED': {
-      const res: typeof tests = [];
-      const s = [...spad], c = [...cgmd];
-      if (s.length) res.push(s.shift()!);
-      while (c.length) res.push(c.shift()!);
-      while (s.length) res.push(s.shift()!);
-      ordered = res;
-      break;
-    }
-    case 'RANDOM':
-      ordered = shuffleArray([...tests]);
-      break;
-    default:
-      ordered = tests;
   }
 
   ordered.forEach(t => declareTest(t.name, t.fn));
 };
 
-export const afterCKSCommonPRE_Internal = (): void => {
-  declareStandardRoleTests();
-};
+// ─────────────────────────────────────────────
+// Test definitions
+// ─────────────────────────────────────────────
+const STANDARD_TESTS: TestEntry[] = [
+  { name: 'CGMD Config cbs role',  group: 'CGMD',  fn: () => performRoleTaskWithAssignment(cgccbs,   cgccbspass,   'cgccbs', approveProjectCGMDPRE,         'CBS') },
+  { name: 'CGMD Tester CBS role',  group: 'CGMD',  fn: () => performRoleTaskWithAssignment(cgtcbs,   cgtcbspass,   'cgtcbs', approveProjectCGMDtesterPRE,   'CBS') },
+  { name: 'Spadsup role',          group: 'SPAD',  fn: () => performSimpleClaimAndApprovalRole(spadsup,   spadsuppass,  approveProjectSPADSup) },
+  { name: 'Spaddoer role',         group: 'SPAD',  fn: () => performSimpleClaimAndApprovalRole(spaddoer,  spaddoerpass, approveProjectSPADDOER) },
+  { name: 'Spadtester role',       group: 'SPAD',  fn: () => performSimpleClaimAndApprovalRole(spadtest,  spadtestpass, approveProjectSPADTester) },
+  { name: 'Spaddeploy role',       group: 'SPAD',  fn: () => performSimpleClaimAndApprovalRole(spaddp,    spaddppass,   approveProjectSPADdeploy) },
+  { name: 'ACTM role',             group: 'OTHER', fn: () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM) },
+  { name: 'APO role',              group: 'OTHER', fn: () => performSimpleApprovalRole(apo,  apopass,  approveProjectAPO) },
+];
 
+const PLUGIN_TESTS: TestEntry[] = [
+  { name: 'CGMD Config cbs role',          group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE,                 'CBS')   },
+  { name: 'CGMD Tester CBS role',          group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE,           'CBS')   },
+  { name: 'Spadsup role',                  group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin) },
+  { name: 'CGMD Config cbs role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex,   'PlugIN') },
+  { name: 'CGMD Tester CBS role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin,     'PlugIN') },
+];
+
+// ─────────────────────────────────────────────
+// CKS-level exports
+// ─────────────────────────────────────────────
 export const afterCKSCommonPRE = (Module: string): void => {
-  afterCKSCommonPRE_Internal();
-  if (Module === 'MUSIC') {
-    performMusicRoles();
-  }
+  declareRoleTests(STANDARD_TESTS);
+  if (Module === 'MUSIC') performMusicRoles();
 };
 
 export const afterCKSPREPlugin = (Module: string): void => {
-  declarePluginRoleTests();
-  if (Module === 'MUSIC') {
-    performMusicRoles();
-  }
+  declareRoleTests(PLUGIN_TESTS);
+  if (Module === 'MUSIC') performMusicRoles();
 };
 
-export const afterMKTOntop_NotComplex = (): void => {
-  executeCKSRole('standard', 'ontop', () => {     
-    addauto5gCKS(); dropdownRecurringCKS(); diyflagCKS(); unregister();
-    addauto5gCKS(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
-  });
-  declarePluginRoleTests();
-};
-
+// ─────────────────────────────────────────────
+// MKT Main exports
+// ─────────────────────────────────────────────
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
   executeCKSRole('standard', 'main', () => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
     CopyDeductFail();
   });
-  declareStandardRoleTests();
+  declareRoleTests(STANDARD_TESTS);
 };
 
 export const afterMKTMainPRE_NotComplex = (): void => {
@@ -1072,28 +1039,20 @@ export const afterMKTMainPRE_NotComplex = (): void => {
     dropdownRecurringCKSMain(); unregister(); addauto5gCKS();
     checkAndFillContentType(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
   });
-  declarePluginRoleTests();
-};
-// =======================
-
-// ========================
-// AFTER MKT ONTOP PRE FUNCTIONS
-// ========================
-
-export const afterMKTontopPRE = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'PRE');
-export const afterMKTontopPREENTER = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'ENTER');
-export const afterMKTontopPREENTERPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'ENTER');
-export const afterMKTontopPREMusicPlugin = (): void => _afterMKTontopPREWithModule(afterCKSPREPlugin, 'MUSIC');
-export const afterMKTontopPREMUSIC = (): void => _afterMKTontopPREWithModule(afterCKSCommonPRE, 'MUSIC');
-
-const _afterMKTontopPREWithModule = (
-  afterFn: (module: string) => void,
-  module: string
-): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPRE);
-  afterFn(module);
+  declareRoleTests(PLUGIN_TESTS);
 };
 
+export const afterMKTOntop_NotComplex = (): void => {
+  executeCKSRole('standard', 'ontop', () => {
+    addauto5gCKS(); dropdownRecurringCKS(); diyflagCKS(); unregister();
+    addauto5gCKS(); checkAndUpdatePriority(); checkAndUpdateVerticalAppPriority();
+  });
+  declareRoleTests(PLUGIN_TESTS);
+};
+
+// ─────────────────────────────────────────────
+// MKT Ontop steps (เดิม stepsOntopPRE และ stepsOntopPREUsage เหมือนกัน 100%)
+// ─────────────────────────────────────────────
 const stepsOntopPRE = (): void => {
   cy.wait(15000);
   addauto5gCKS();
@@ -1106,32 +1065,23 @@ const stepsOntopPRE = (): void => {
   smsCKSPRE();
 };
 
-export const afterMKTontopPREUsage = (): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
-  afterCKSCommonPRE('PRE');
+// ─────────────────────────────────────────────
+// MKT Ontop exports — ทุก variant ใช้ _runOntop เดียวกัน
+// ─────────────────────────────────────────────
+const _runOntop = (afterFn: (module: string) => void, module: string): void => {
+  executeCKSRole('ontop', 'ontop', stepsOntopPRE);
+  afterFn(module);
 };
 
-export const afterMKTontopPREUsageEnter = (): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
-  afterCKSCommonPRE('Enter');
-};
+export const afterMKTontopPRE             = (): void => _runOntop(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREENTER        = (): void => _runOntop(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREENTERPlugin  = (): void => _runOntop(afterCKSPREPlugin,  'ENTER');
+export const afterMKTontopPREMusicPlugin  = (): void => _runOntop(afterCKSPREPlugin,  'MUSIC');
+export const afterMKTontopPREMUSIC        = (): void => _runOntop(afterCKSCommonPRE, 'MUSIC');
 
-export const afterMKTontopPREUsageMusic = (): void => {
-  executeCKSRole('ontop', 'ontop', stepsOntopPREUsage);
-  afterCKSCommonPRE('MUSIC');
-};
-
-const stepsOntopPREUsage = (): void => {
-  cy.wait(15000);
-  addauto5gCKS();
-  dropdownRecurringCKS();
-  diyflagCKS();
-  checkAndFillContentType();
-  checkAndUpdatePriority();
-  checkAndUpdateVerticalAppPriority();
-  cy.scrollTo('bottom');
-  smsCKSPRE();
-};
+export const afterMKTontopPREUsage        = (): void => _runOntop(afterCKSCommonPRE, 'PRE');
+export const afterMKTontopPREUsageEnter   = (): void => _runOntop(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREUsageMusic   = (): void => _runOntop(afterCKSCommonPRE, 'MUSIC');
 
 const selectRandomDropdownRecurring = (): void => {
   cy.get('.mat-select-value')
