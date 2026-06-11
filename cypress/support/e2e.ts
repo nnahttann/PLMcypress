@@ -15,3 +15,8 @@
 
 // Import commands.js using ES2015 syntax:
 import './commands'
+
+beforeEach(() => {
+  cy.intercept('GET', 'https://fonts.googleapis.com/**', { statusCode: 200, body: '' })
+  cy.intercept('GET', 'https://cdnjs.cloudflare.com/**', { statusCode: 200, body: '' })
+})

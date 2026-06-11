@@ -13,8 +13,6 @@ const users = [
   "spadtest",
   "spaddp",
   "apo",
-  "enter",
-  "music",
   "tscenter",
   "aafsp",
   "csisp",
@@ -35,13 +33,16 @@ const userEnv = Object.fromEntries(
 export default defineConfig({
   viewportWidth: 1920,
   viewportHeight: 1080,
+
   defaultCommandTimeout: 10000,
-  pageLoadTimeout: 600000,
-  requestTimeout: 10000,
-  responseTimeout: 30000,
-  experimentalMemoryManagement: true,
-  numTestsKeptInMemory: 10,
+  pageLoadTimeout: 90000,
+  requestTimeout: 30000,
+  responseTimeout: 60000,
+
   chromeWebSecurity: false,
+
+  experimentalMemoryManagement: true,
+  numTestsKeptInMemory: 0,
 
   retries: {
     runMode: 1,
@@ -51,20 +52,39 @@ export default defineConfig({
   env: {
     urlsit: "https://test-plm.intra.ais/#/login",
 
-    // Exception
     MKTpre: "mobpre",
     MKTpre1: "mobpreaa",
     MKTpost: "mobpost",
     MKTpost1: "mobpostaa",
 
+    music: "musicmkt",
+    musicpass: "musicaaa",
+
+    enter: "entermkt",
+    enterpass: "enteraaa",
+
     ...userEnv,
   },
 
   e2e: {
-    setupNodeEvents(_on, _config) {},
+    baseUrl: "https://test-plm.intra.ais",
+
+    setupNodeEvents(on, config) {
+      on("before:browser:launch", (_browser, launchOptions) => {
+        launchOptions.args.push("--disable-dev-shm-usage");
+        launchOptions.args.push("--disable-gpu");
+        launchOptions.args.push("--no-sandbox");
+        launchOptions.args.push("--disable-background-networking");
+        // Block requests to external CDN that are unreachable from intranet
+        launchOptions.args.push("--host-rules=MAP fonts.googleapis.com 127.0.0.1, MAP cdnjs.cloudflare.com 127.0.0.1");
+
+        return launchOptions;
+      });
+
+      return config;
+    },
 
     specPattern: "cypress/e2e/**/*.cy.{js,jsx,ts,tsx}",
     supportFile: "cypress/support/e2e.ts",
-    baseUrl: "https://test-plm.intra.ais",
   },
 });
