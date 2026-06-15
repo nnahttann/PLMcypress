@@ -42,15 +42,14 @@ export let formattedDateOntop = '';
 type Module = 'POST' | 'PRE' | 'ENTER' | 'MUSIC';
 type PriceType = 'onetime' | 'recurring' | 'usage';
 type ProductClass = 'main' | 'ontop' | 'ontopextra';
-type ProductClass1 = 'Main' | 'Ontop' | 'OntopExtra';
 type TaskListHeader = 'To Do List' | 'Unassigned Task';
 type FinalAction = 'AlertAndLogout' | 'ComplexLogout' | 'StopAfterCore';
 type CoreTaskCallback = () => void;
 type ApproveFunction = (projectName: string) => void;
 type GetProjectNameFn = () => string;
 
+// อัปเดต Interface
 interface ProjectBasicOptions {
-  ProductClass1: ProductClass1;
   Module: Module;
   subModule?: 'POST' | 'PRE';
   autoSetDuration?: boolean;
@@ -6348,7 +6347,7 @@ export const ProjectBasicInformationComplete = (
   ProductClass: ProductClass,
   options: ProjectBasicOptions
 ): void => {
-  const { ProductClass1, Module, subModule, autoSetDuration = false, Plugin } = options;
+  const { Module, subModule, autoSetDuration = false, Plugin } = options;
   const credentials = getCredentials(Module);
   const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
@@ -6356,32 +6355,24 @@ export const ProjectBasicInformationComplete = (
 
   createProjectBase(credentials, projectName, Module, subModule);
 
-  const envKey = ProductClass1 === 'Main' ? 'formattedDateMain' : 'formattedDate';
+  // เปลี่ยนเงื่อนไขมาใช้เช็ค ProductClass === 'main' แทน
+  const envKey = ProductClass === 'main' ? 'formattedDateMain' : 'formattedDate';
   Cypress.env(envKey, projectName);
-  registerProjectName(projectName, ProductClass1 === 'Main' ? 0 : 1);
+  registerProjectName(projectName, ProductClass === 'main' ? 0 : 1);
 
   const poCount = 2;
-  const poEnvKey = ProductClass1 === 'Main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
+  // เปลี่ยนเงื่อนไขมาใช้เช็ค ProductClass === 'main' แทน
+  const poEnvKey = ProductClass === 'main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
   const poNames: string[] = [];
 
   cy.log(`🎲 Randomly selected to create ${poCount} PO(s)`);
 
   for (let i = 0; i < poCount; i++) {
-    // let currentPoName: string;
-
-    // if (i === 0) {
-    //   currentPoName = poName;
-    // } else {
-    //   const nextTimeId = generateUniqueId();
-    //   const poIdentifier = `PO${i + 1} ${nextTimeId}`;
-    //   currentPoName = buildUniqueName(prefixName, poIdentifier, 30);
     const nextTimeId = generateUniqueId();
-    // i=0 จะได้ PO1, i=1 จะได้ PO2
     const poIdentifier = `PO${i + 1} ${nextTimeId}`;
     const currentPoName = buildUniqueName(prefixName, poIdentifier, 30);
 
     poNames.push(currentPoName);
-    // }
     cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
 
     createPOBase(currentPoName, 'Product Offering');
@@ -6487,6 +6478,7 @@ export const ProjectBasicInformationComplete = (
   backBacicInfo();
   addFile();
 };
+
 
 // ========================
 // PROJECT BASIC INFORMATION OTHER PO SUB
