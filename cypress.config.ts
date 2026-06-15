@@ -67,7 +67,7 @@ export default defineConfig({
   },
 
   e2e: {
-    baseUrl: "https://test-plm.intra.ais",
+    baseUrl: "https://test-plm2.intra.ais",
 
     setupNodeEvents(on, config) {
       on("before:browser:launch", (_browser, launchOptions) => {

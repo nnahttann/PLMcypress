@@ -1986,11 +1986,106 @@ const assignTaskViaTracking = (projectName: string, assignee: string, billingSys
 };
 
 const navigateToWorkspace = (): void => {
-  // cy.wait(10000)
   cy.contains('span', 'Menu', { timeout: 100000 }).click();
   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
   cy.get('a[href="#/workspace-home/workspace"]').click();
   cy.url().should('include', '/workspace-home/workspace', { timeout: 1000000 });
+};
+
+const performApprovalRole = (
+  user: string,
+  pass: string,
+  approveFunction: ApproveFunction,
+  options?: {
+    searchBy?: 'project' | 'po';
+    assignee?: string;
+    billingSystem?: string;
+  }
+): void => {
+  loginAndWaitReady(user, pass);
+
+  if (options?.assignee) {
+    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+    cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+  }
+
+  const projectNamePONAME: string = getStandardProjectName();
+  const poCount: number = Cypress.env('poCount') ?? 1;
+  const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
+  const searchBy = options?.searchBy ?? 'po';
+
+  cy.log(`📋 Project: ${projectNamePONAME}`);
+  cy.log(`🔁 Total PO to process: ${poCount}`);
+  cy.log(`🔍 Search mode: ${searchBy}`);
+
+  const approveNextPO = (index: number): void => {
+    if (index >= poCount) {
+      cy.log('✅ All POs approved');
+      return;
+    }
+
+    const currentUniqueKeyword: string =
+      searchBy === 'project'
+        ? projectNamePONAME
+        : allPoNames[index] ?? `${projectNamePONAME}_PO${index + 1}`;
+
+    cy.log(`📦 [${index + 1}/${poCount}] Processing: "${currentUniqueKeyword}"`);
+
+    if (options?.assignee) {
+      assignTaskViaTracking(projectNamePONAME, options.assignee, currentUniqueKeyword);
+      navigateToWorkspace();
+      cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
+    } else {
+      cy.get('h3:contains("To Do List")', { timeout: 15000 })
+        .parent()
+        .find('tbody tr')
+        .should(($rows) => {
+          expect($rows.text()).not.to.contain('Fetching data');
+        });
+
+      searchInTableWithPagination(
+        'To Do List',
+        currentUniqueKeyword,
+        () => {
+          cy.get('h3:contains("To Do List")')
+            .parent()
+            .find('tbody tr.cursor-point')
+            .filter((_i, el) => Cypress.$(el).text().includes(currentUniqueKeyword))
+            .first()
+            .as('targetRow');
+
+          cy.get('@targetRow').should('be.visible').click();
+          cy.log(`✅ [${index + 1}/${poCount}] Entered PO approval page`);
+        },
+        {
+          waitAfterNext: 2000,
+          filterCallback: ($row) => {
+            const rowText = $row.text().trim();
+            return rowText.includes(currentUniqueKeyword) && !rowText.includes('Fetching data');
+          }
+        }
+      );
+    }
+
+    approveFunction(projectNamePONAME);
+
+    if (index < poCount - 1) {
+      if (options?.assignee) cy.wait(2000);
+      navigateToWorkspace();
+
+      cy.get('h3:contains("To Do List")', { timeout: 15000 })
+        .parent()
+        .find('tbody tr')
+        .should(($rows) => {
+          expect($rows.text()).not.to.contain('Fetching data');
+          expect($rows.length).to.be.greaterThan(0);
+        });
+
+      approveNextPO(index + 1);
+    }
+  };
+
+  approveNextPO(0);
 };
 
 const performRoleTaskWithAssignment = (
@@ -1999,146 +2094,25 @@ const performRoleTaskWithAssignment = (
   assignee: string,
   approveFunction: ApproveFunction,
   billingSystem: string = '',
-  options?: {
-    searchBy?: 'project' | 'po'; // default: 'po'
-  }
+  options?: { searchBy?: 'project' | 'po' }
 ): void => {
-  loginAndWaitReady(user, pass);
-
-  cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-
-  const projectNamePONAME: string = getStandardProjectName();
-  const poCount: number = Cypress.env('poCount') ?? 1;
-  const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
-  const searchBy = options?.searchBy ?? 'po';
-
-  cy.log(`📋 Project: ${projectNamePONAME}`);
-  cy.log(`🔁 Total PO to process: ${poCount}`);
-  cy.log(`🔍 Search mode: ${searchBy}`);
-
-  const approveNextPO = (index: number): void => {
-    if (index >= poCount) {
-      cy.log('✅ All POs approved');
-      return;
-    }
-
-    const currentUniqueKeyword: string =
-      searchBy === 'project'
-        ? projectNamePONAME
-        : allPoNames[index] ?? `${projectNamePONAME}_PO${index + 1}`;
-
-    cy.log(`📦 [${index + 1}/${poCount}] Assigning & Approving: "${currentUniqueKeyword}"`);
-
-    assignTeamTask(projectNamePONAME, assignee, currentUniqueKeyword);
-
-    navigateToWorkspace();
-
-    cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
-
-    approveFunction(projectNamePONAME);
-
-    if (index < poCount - 1) {
-      cy.wait(2000);
-      navigateToWorkspace();
-
-      cy.get('h3:contains("To Do List")', { timeout: 15000 })
-        .parent()
-        .find('tbody tr')
-        .should(($rows) => {
-          expect($rows.text()).not.to.contain('Fetching data');
-          expect($rows.length).to.be.greaterThan(0);
-        });
-
-      approveNextPO(index + 1);
-    }
-  };
-
-  approveNextPO(0);
+  performApprovalRole(user, pass, approveFunction, {
+    assignee,
+    billingSystem,
+    searchBy: options?.searchBy,
+  });
 };
 
 const performSimpleApprovalRole = (
   user: string,
   pass: string,
   approveFunction: ApproveFunction,
-  options?: {
-    searchBy?: 'project' | 'po'; // default: 'po'
-  }
+  options?: { searchBy?: 'project' | 'po' }
 ): void => {
-  loginAndWaitReady(user, pass);
-
-  const projectNamePONAME: string = getStandardProjectName();
-  const poCount: number = Cypress.env('poCount') ?? 1;
-  const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
-  const searchBy = options?.searchBy ?? 'po';
-
-  cy.log(`📋 Project: ${projectNamePONAME}`);
-  cy.log(`🔁 Total PO to process: ${poCount}`);
-  cy.log(`🔍 Search mode: ${searchBy}`);
-
-  const approveNextPO = (index: number): void => {
-    if (index >= poCount) {
-      cy.log('✅ All POs approved');
-      return;
-    }
-
-    const currentUniqueKeyword: string =
-      searchBy === 'project'
-        ? projectNamePONAME
-        : allPoNames[index] ?? `${projectNamePONAME}_PO${index + 1}`;
-
-    cy.log(`📦 [${index + 1}/${poCount}] Searching by "${searchBy}": "${currentUniqueKeyword}"`);
-
-    cy.get('h3:contains("To Do List")', { timeout: 15000 })
-      .parent()
-      .find('tbody tr')
-      .should(($rows) => {
-        expect($rows.text()).not.to.contain('Fetching data');
-      });
-
-    searchInTableWithPagination(
-      'To Do List',
-      currentUniqueKeyword,
-      () => {
-        cy.get('h3:contains("To Do List")')
-          .parent()
-          .find('tbody tr.cursor-point')
-          .filter((_i, el) => Cypress.$(el).text().includes(currentUniqueKeyword))
-          .first()
-          .as('targetRow');
-
-        cy.get('@targetRow').should('be.visible').click();
-        cy.log(`✅ [${index + 1}/${poCount}] Entered PO approval page`);
-      },
-      {
-        waitAfterNext: 2000,
-        filterCallback: ($row) => {
-          const rowText = $row.text().trim();
-          return rowText.includes(currentUniqueKeyword) && !rowText.includes('Fetching data');
-        }
-      }
-    );
-
-    approveFunction(projectNamePONAME);
-
-    if (index < poCount - 1) {
-      navigateToWorkspace();
-
-      cy.get('h3:contains("To Do List")', { timeout: 15000 })
-        .parent()
-        .find('tbody tr')
-        .should(($rows) => {
-          expect($rows.text()).not.to.contain('Fetching data');
-          expect($rows.length).to.be.greaterThan(0);
-        });
-
-      approveNextPO(index + 1);
-    }
-  };
-
-  approveNextPO(0);
+  performApprovalRole(user, pass, approveFunction, {
+    searchBy: options?.searchBy,
+  });
 };
-
 
 // ========================
 // HELPERS
@@ -2170,12 +2144,6 @@ const getTomorrowDateString = (): string => {
   const yyyy = tomorrow.getFullYear();
   return `${dd}/${mm}/${yyyy}`;
 };
-
-// ========================
-// TYPES
-// ========================
-
-type ProjectStrategy = 'standard' | 'ontop';
 
 // ========================
 // CKS ROLE EXECUTION
@@ -2571,7 +2539,7 @@ const stepsOntopNotComplex = (): void => {
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
   executeCKSRole(
     'standard',
-    () => { stepsCKSMain(); CopyDeductFail(); },
+    () => { stepsCKSMain(); CopyDeductFail('enhancement'); },
     () => declareRoleTests(STANDARD_TESTS)
   );
 };
@@ -2579,7 +2547,7 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
 export const afterMKTMainPRE_NotComplex = (): void => {
   executeCKSRole(
     'standard',
-    () => { stepsCKSMain(); CopyDeductFail(); },
+    () => { stepsCKSMain(); CopyDeductFail('enhancement'); },
     () => declareRoleTests(PLUGIN_TESTS)
   );
 };
@@ -2907,7 +2875,6 @@ const closeSuccessModal = (): void => {
 };
 
 const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
-
   // ── String helpers ────────────────────────────────────────────────────────
   const cleanEN = (s: string) => s ? s.replace(/[^\x00-\x7F\s]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim() : '';
   const cleanTH = (s: string) => s ? s.replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '').replace(/\s+/g, ' ').trim() : '';
@@ -2924,50 +2891,128 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
   const capEN = (s: string, max: number) => limit(cleanEN(s), max);
   const capTH = (s: string, max: number) => limit(cleanTH(s), max);
-  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] || '' as unknown as T;
   const flag = () => Math.random() < 0.8 ? 'Send' : "Don't Send";
 
-  // ── Timing ────────────────────────────────────────────────────────────────
   const WAIT = 1000;
   const SCROLL = 500;
+
+  // ── Centralized Selectors ─────────────────────────────────────────────────
+  const SEL = {
+    shortPromo: 'textarea[formcontrolname="shortPromotionName"]',
+    cmsDisplay: 'textarea[formcontrolname="cmsDisplay"]',
+    promoDesc: 'textarea[formcontrolname="promotionDescription"]',
+    checkCurrent: 'textarea[formcontrolname="smsCheckCurrent"]',
+
+    greetingFlag: 'select[formcontrolname="smsGreetingSendFlag"]',
+    greetingText: 'textarea[formcontrolname="smsGreeting"]',
+    confirmSubFlag: 'select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]',
+
+    deleteFlag: 'select[formcontrolname="smsDeleteSendFlag"]',
+    deleteText: 'textarea[formcontrolname="smsDelete"]',
+    deleteDefaultRadio: 'input[formcontrolname="SmsDeletedefaultWordingFlag"]',
+
+    promoteFlag: 'select[formcontrolname="smsPromotePackSendFlag"]',
+    promoteText: 'textarea[formcontrolname="smsPromotePack"]',
+
+    lastMinuteFlag: 'select[formcontrolname="lastMinuteAlertSendFlag"]',
+    lastMinuteRadio: 'input[formcontrolname="lastMinuteAlertDefaultWordingFlag"]',
+    lastMinuteText: 'textarea[formcontrolname="smsNotificationLastMinuteAlert"]',
+
+    beforeFeeFlag: 'select[formcontrolname="smsBeforeFeeDeductSendFlag"]',
+    beforeFeeRadio: 'input[formcontrolname="defaultWordingFlag"]',
+    beforeFeeText: 'textarea[formcontrolname="smsNotificationBeforeFeeDeduction"]',
+
+    recSuccessFlag: 'select[formcontrolname="recurringDeductSuccessAlertSendFlag"]',
+    recSuccessRadio: 'input[formcontrolname="recurringDeductSuccessAlertDefaultWordingFlag"]',
+    recSuccessText: 'textarea[formcontrolname="recurringFeeDeductSuccessAlert"]',
+
+    recFailFlag: 'select[formcontrolname="recurringDeductFailAlertSendFlag"]',
+    recFailRadio: 'input[formcontrolname="recurringDeductFailAlertDefaultWordingFlag"]',
+    recFailText: 'textarea[formcontrolname="recurringFeeDeductFailAlert"]',
+
+    beforePromoFlag: 'select[formcontrolname="beforePromotionExpAlertSendFlag"]',
+    beforePromoDeduct: 'input[formcontrolname="beforePromotionExpAlertDeduction"]',
+    beforePromoUnit: 'select[formcontrolname="beforePromotionExpAlertDeductionUnit"]',
+    beforePromoDefaultRadio: 'input[formcontrolname="beforePromotionExpAlertDefaultWordingFlag"]',
+    beforePromoText: 'textarea[formcontrolname="beforePromotionExpAlert"]',
+
+    promoExpFlag: 'select[formcontrolname="promotionExpAlertSendFlag"]',
+    promoExpRadio: 'input[formcontrolname="promotionExpAlertDefaultWordingFlag"]',
+    promoExpText: 'textarea[formcontrolname="promotionExpAlert"]',
+
+    marketingName: 'textarea[formcontrolname="marketingName"]',
+    yourPackage: 'textarea[formcontrolname="yourPackage"]',
+    greetingLetter: 'textarea[formcontrolname="greetingLetter"]',
+    saveBtn: '.container-fluid > :nth-child(3) > .btn'
+  };
 
   // ── Cypress helpers ───────────────────────────────────────────────────────
   const scrollTo = (sel: string, label: string) => {
     cy.log(`📌 Scrolling to: ${label}`);
     cy.get(sel).first().scrollIntoView({ duration: SCROLL, offset: { top: -100, left: 0 } });
-    cy.wait(1000);
+    cy.wait(WAIT);
   };
 
-  const withSection = (sel: string, label: string, fn: () => void) => {
-    cy.get('body').then(($b: any) => {
-      if (!$b.find(sel).length) return;
+  const withSection = (sel: string, label: string, fn: ($el: JQuery<HTMLElement>) => void) => {
+    cy.get('body').then(($b) => {
+      const $target = $b.find(sel);
+      if (!$target.length) return;
       scrollTo(sel, label);
-      fn();
+      fn($target);
       cy.wait(WAIT);
     });
   };
 
-  const commitField = ($el: any) => {
-    if (!String($el.val() ?? '').trim()) return;
-    cy.wrap($el)
-      .trigger('input', { bubbles: true, force: true })
-      .trigger('change', { bubbles: true, force: true })
-      .blur({ force: true });
+  const fillTextareaMulti = ($el: JQuery<HTMLElement>, en: string, th: string, maxEn: number, maxTh: number) => {
+    $el.each((idx, el) => {
+      const $textarea = Cypress.$(el);
+      if ($textarea.is(':disabled')) return;
+      const cleaned = (idx % 2 === 0) ? capEN(en, maxEn) : capTH(th, maxTh);
+      cy.wrap($textarea).focus().clear({ force: true }).type(cleaned, { delay: 0, force: true })
+        .trigger('input', { bubbles: true, force: true }).trigger('change', { bubbles: true, force: true }).blur({ force: true });
+    });
+    cy.wait(1000);
   };
 
-  const fillTextarea = (sel: string, en: string, th: string, maxEn: number, maxTh: number) => {
-    cy.get(sel).each(($el: any, idx: number) => {
-      if ($el.is(':disabled')) return;
-      const cleaned = idx === 0 ? capEN(en, maxEn) : capTH(th, maxTh);
-      cy.wrap($el)
-        .focus()
-        .clear({ force: true })
-        .type(cleaned, { delay: 0, force: true })
-        .trigger('input', { bubbles: true, force: true })
-        .trigger('change', { bubbles: true, force: true })
-        .blur({ force: true });
+  const fillIfEmpty = ($el: JQuery<HTMLElement>, en: string, th: string, maxEn: number, maxTh: number): void => {
+    $el.each((idx, el) => {
+      const $textarea = Cypress.$(el);
+      if ($textarea.is(':disabled')) return;
+      if (String($textarea.val() ?? '').trim()) return;
+      const cleaned = (idx % 2 === 0) ? capEN(en, maxEn) : capTH(th, maxTh);
+      cy.wrap($textarea).focus().type(cleaned, { delay: 0, force: true })
+        .trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
     });
-    cy.wait(2000);
+  };
+
+  const selectFlag = ($el: JQuery<HTMLElement>, label: string): 'Send' | "Don't Send" => {
+    const v = flag();
+    cy.log(`🎲 ${label} = ${v}`);
+    cy.wrap($el).select(v, { force: true });
+    return v;
+  };
+
+  const trimOverflow = (): void => {
+    cy.log('✂️ Trimming overflowed generated fields...');
+    cy.get('app-mass-mkt-sms-wording-detail textarea').each(($el) => {
+      if ($el.is(':disabled')) return;
+      const max = parseInt($el.attr('maxlength') || '9999', 10);
+      const val = String($el.val() ?? '');
+      if (val.length <= max) return;
+      let trimmed = val.substring(0, max).trimEnd();
+      if (trimmed.includes(' ')) {
+        const ls = trimmed.lastIndexOf(' ');
+        if (ls > max * 0.7) trimmed = trimmed.substring(0, ls);
+      }
+      cy.wrap($el).then(($native) => {
+        const nativeEl = $native[0] as HTMLTextAreaElement;
+        nativeEl.value = trimmed;
+        nativeEl.dispatchEvent(new Event('input', { bubbles: true }));
+        nativeEl.dispatchEvent(new Event('change', { bubbles: true }));
+      }).blur({ force: true });
+    });
+    cy.wait(1000);
   };
 
   // ── Init ─────────────────────────────────────────────────────────────────
@@ -2977,145 +3022,93 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   cy.wait(2000);
 
   cy.then(() => {
-    const p = Cypress.env('formattedDateMain')
-      || Cypress.env('formattedDate')
-      || Cypress.env('projectName')
-      || Cypress.env('formattedDateMainPONAME')
-      || Cypress.env('formattedDateOntopPONAME')
-      || Cypress.env('poName')
-      || 'Product';
-
+    const p = Cypress.env('formattedDateMain') || Cypress.env('formattedDate') || Cypress.env('projectName') || 'Product';
     const poName = Cypress.env('poName') || 'Product Offering';
-
     const poolsData = createPOWordingPools(p, poName, type, 'recurring');
 
     const pools = {
-      shortPromo: {
-        EN: () => pick(poolsData.shortPromotionName.EN),
-        TH: () => pick(poolsData.shortPromotionName.TH),
-      },
-      cmsDisplay: {
-        EN: () => pick(poolsData.description.EN),
-        TH: () => pick(poolsData.description.TH),
-      },
-      promoDesc: {
-        EN: () => pick(poolsData.promotionDescription.EN),
-        TH: () => pick(poolsData.promotionDescription.TH),
-      },
-      checkCurrent: {
-        EN: () => pick(poolsData.yourPackageName.EN),
-        TH: () => pick(poolsData.yourPackageName.TH),
-      },
-      greeting: {
-        EN: () => pick(poolsData.smsGreeting.EN),
-        TH: () => pick(poolsData.smsGreeting.TH),
-      },
-      deletePRE: {
-        EN: () => pick(poolsData.smsDelete.EN),
-        TH: () => pick(poolsData.smsDelete.TH),
-      },
-      deletePOST: {
-        EN: () => pick(poolsData.smsDelete.EN),
-        TH: () => pick(poolsData.smsDelete.TH),
-      },
+      shortPromo: { EN: () => pick(poolsData.shortPromotionName.EN), TH: () => pick(poolsData.shortPromotionName.TH) },
+      cmsDisplay: { EN: () => pick(poolsData.description.EN), TH: () => pick(poolsData.description.TH) },
+      promoDesc: { EN: () => pick(poolsData.promotionDescription.EN), TH: () => pick(poolsData.promotionDescription.TH) },
+      checkCurrent: { EN: () => pick(poolsData.yourPackageName.EN), TH: () => pick(poolsData.yourPackageName.TH) },
+      greeting: { EN: () => pick(poolsData.smsGreeting.EN), TH: () => pick(poolsData.smsGreeting.TH) },
+      delete: { EN: () => pick(poolsData.smsDelete.EN), TH: () => pick(poolsData.smsDelete.TH) },
+      promotePack: { EN: () => pick(poolsData.smsPromotePack.EN), TH: () => pick(poolsData.smsPromotePack.TH) },
+      lastMinute: { EN: () => pick(poolsData.lastMinuteAlert.EN), TH: () => pick(poolsData.lastMinuteAlert.TH) },
+      beforeFee: { EN: () => pick(poolsData.beforeFeeDeduction.EN), TH: () => pick(poolsData.beforeFeeDeduction.TH) },
+      recSuccess: { EN: () => pick(poolsData.recurringSuccess.EN), TH: () => pick(poolsData.recurringSuccess.TH) },
+      recFail: { EN: () => pick(poolsData.recurringFail.EN), TH: () => pick(poolsData.recurringFail.TH) },
+      beforePromoExp: { EN: () => pick(poolsData.beforePromoExpired.EN), TH: () => pick(poolsData.beforePromoExpired.TH) },
+      promoExp: { EN: () => pick(poolsData.promoExpired.EN), TH: () => pick(poolsData.promoExpired.TH) },
       marketingName: () => pick(poolsData.shortPromotionName.EN),
-      yourPackage: {
-        EN: () => pick(poolsData.yourPackageName.EN),
-        TH: () => pick(poolsData.yourPackageName.TH),
-      },
-      greetingLetter: {
-        EN: () => pick(poolsData.greetingLetter.EN),
-        TH: () => pick(poolsData.greetingLetter.TH),
-      },
+      yourPackage: { EN: () => pick(poolsData.yourPackageName.EN), TH: () => pick(poolsData.yourPackageName.TH) },
+      greetingLetter: { EN: () => pick(poolsData.greetingLetter.EN), TH: () => pick(poolsData.greetingLetter.TH) },
     };
 
-    const flags = {
-      greeting: flag(),
-      delete: flag(),
-      lastMinute: flag(),
-      beforeDeduct: flag(),
-      deductOk: flag(),
-      deductFail: flag(),
-      promote: flag(),
-    };
-
-    const beforePromoVal = flag();
-    const promoExpVal = beforePromoVal === 'Send' ? "Don't Send" : 'Send';
-
-    cy.log('🎲 SMS Wording Randomization Results:');
-    cy.log(`  ✓ Greeting: ${flags.greeting}`);
-    cy.log(`  ✓ Delete: ${flags.delete}`);
-    cy.log(`  ✓ Last Minute Alert: ${flags.lastMinute}`);
-    cy.log(`  ✓ Before Fee Deduct: ${flags.beforeDeduct}`);
-    cy.log(`  ✓ Recurring Deduct Success: ${flags.deductOk}`);
-    cy.log(`  ✓ Recurring Deduct Fail: ${flags.deductFail}`);
-    cy.log(`  ✓ Promote Package: ${flags.promote}`);
-    cy.log(`  ✓ Before Promo Expired: ${beforePromoVal}`);
-    cy.log(`  ✓ Promo Expired: ${promoExpVal} (ตรงข้ามกับ Before Promo)`);
-
-    // ── Mode: 50/50 Generate vs Manual ───────────────────────────────────────
+    cy.log('🎲 SMS Wording: สุ่ม flag ใหม่ทีละ section');
     const useGenerate = Math.random() < 0.5;
     cy.log(`🎲 SMS Wording mode: ${useGenerate ? '🤖 Generate Button' : '✍️ Manual Type'}`);
 
-    // ── Trim generated overflow ───────────────────────────────────────────────
-    const trimOverflow = (): void => {
-      cy.log('✂️ Trimming overflowed generated fields...');
+    // ════════════════════════════════════════════════════════════════════════
+    //  🌍 LOGIC สุ่มภาษาเพิ่ม (Dual List Box)
+    // ════════════════════════════════════════════════════════════════════════
+    const extraLangOptions = ['Burmese', 'Chinese', 'Japanese', 'Korean', 'Lao'];
+    const shouldAddExtraLangs = Math.random() < 0.2;
+    let selectedExtraLangs: string[] = [];
 
-      // ✅ FIX: Wait for the form to re-stabilize after Generate click
-      // Angular may tear down/rebuild the component briefly after generation
-      cy.get('app-mass-mkt-sms-wording-detail', { timeout: 15000 })
-        .should('exist')
-        .find('textarea', { timeout: 15000 })
-        .should('exist');
-
-      cy.get('app-mass-mkt-sms-wording-detail textarea').each(($el: any) => {
-        if ($el.is(':disabled')) return;
-        const max = parseInt($el.attr('maxlength') || '9999', 10);
-        const val = String($el.val() ?? '');
-        if (val.length <= max) return;
-        let trimmed = val.substring(0, max).trimEnd();
-        if (trimmed.includes(' ')) {
-          const ls = trimmed.lastIndexOf(' ');
-          if (ls > max * 0.7) trimmed = trimmed.substring(0, ls);
-        }
-        cy.wrap($el)
-          .focus()
-          .invoke('val', trimmed)
-          .trigger('input', { bubbles: true, force: true })
-          .trigger('change', { bubbles: true, force: true })
-          .blur({ force: true });
-      });
+    if (shouldAddExtraLangs) {
+      const count = Cypress._.random(1, 2);
+      selectedExtraLangs = Cypress._.sampleSize(extraLangOptions, count);
+      cy.log(`🌍 สุ่มเพิ่มภาษา: ${selectedExtraLangs.join(', ')}`);
+      cy.get('ng2-dual-list-box select[formcontrolname="availableListBox"]').select(selectedExtraLangs, { force: true });
+      cy.get('ng2-dual-list-box button.str').should('not.be.disabled').click({ force: true });
       cy.wait(1500);
-    };
+    }
 
-    // ── Fill only if empty ────────────────────────────────────────────────────
-    const fillIfEmpty = (sel: string, en: string, th: string, maxEn: number, maxTh: number): void => {
-      cy.get('body').then(($b: any) => {
-        if (!$b.find(sel).length) return;
-        cy.get(sel).then(($els: any) => {
-          const $el0 = $els.eq(0);
-          if (!$el0.is(':disabled') && !String($el0.val() ?? '').trim()) {
-            cy.wrap($el0)
-              .focus()
-              .type(capEN(en, maxEn), { delay: 0, force: true })
-              .trigger('input', { bubbles: true, force: true })
-              .trigger('change', { bubbles: true, force: true })
-              .blur({ force: true });
-          }
+    // ✨ Helper สำหรับจัดการ Default Wording (สุ่ม Yes/No แบบยืดหยุ่น)
+    // ประกาศใน cy.then เพื่อให้เข้าถึง useGenerate และ selectedExtraLangs ได้
+    const handleDefaultWording = (
+      radioSel: string, textSel: string, enPool: () => string, thPool: () => string, maxEn: number, maxTh: number
+    ) => {
+      cy.get('body').then(($b) => {
+        const $radios = $b.find(radioSel);
+        if (!$radios.length) return;
 
-          if ($els.length > 1) {
-            const $el1 = $els.eq(1);
-            if (!$el1.is(':disabled') && !String($el1.val() ?? '').trim()) {
-              cy.wrap($el1)
-                .focus()
-                .type(capTH(th, maxTh), { delay: 0, force: true })
-                .trigger('input', { bubbles: true, force: true })
-                .trigger('change', { bubbles: true, force: true })
-                .blur({ force: true });
+        // สุ่ม Yes (70%) / No (30%)
+        const defaultVal = Math.random() < 0.3 ? 'No' : 'Yes';
+        cy.log(`🎲 Default Wording = ${defaultVal}`);
+        cy.wrap($radios).parent().contains(defaultVal).click({ force: true });
+        cy.wait(WAIT);
+
+        if (defaultVal === 'No') {
+          cy.log(`✍️ Checking fields for Default Wording = No`);
+          cy.get(textSel).each(($el, idx) => {
+            if ($el.is(':disabled')) return;
+
+            const currentVal = String($el.val() ?? '').trim();
+            const hasValue = currentVal.length > 0;
+
+            // ถ้ามีค่าอยู่แล้ว (เช่น จาก Generate) -> สุ่ม 50/50 ว่าจะเก็บไว้หรือ clear
+            if (hasValue && useGenerate) {
+              const keepOriginal = Math.random() < 0.5;
+              if (keepOriginal) {
+                cy.log(`🔒 Keeping original value for idx ${idx}`);
+                return;
+              }
             }
-          }
-        });
-        cy.wait(1300);
+
+            let val = (idx % 2 === 0) ? capEN(enPool(), maxEn) : capTH(thPool(), maxTh);
+            if (selectedExtraLangs.length > 0 && !hasValue) {
+              val = 'Default System';
+            }
+
+            cy.wrap($el).focus().clear({ force: true })
+              .type(val, { force: true, delay: 0 })
+              .trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
+          });
+        } else {
+          cy.log(`✅ Default Wording = Yes (Using system default, skipping manual type)`);
+        }
       });
     };
 
@@ -3123,33 +3116,22 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     //  PATH A — Generate Button
     // ════════════════════════════════════════════════════════════════════════
     if (useGenerate) {
-      cy.get('app-mass-mkt-sms-wording-detail button[title="generate"]')
-        .first().scrollIntoView({ duration: SCROLL, offset: { top: -100, left: 0 } })
-        .should('be.visible').click({ force: true });
-
-      // ✅ FIX: Bumped from 2500 → 4000 to give Angular time to finish
-      // async generation + change detection + DOM repaint
+      cy.get('app-mass-mkt-sms-wording-detail button[title="generate"]').first().scrollIntoView({ duration: SCROLL, offset: { top: -100, left: 0 } }).should('be.visible').click({ force: true });
       cy.wait(4000);
-
       trimOverflow();
 
-      fillIfEmpty('textarea[formcontrolname="shortPromotionName"]', pools.shortPromo.EN(), pools.shortPromo.TH(), 50, 50);
-      fillIfEmpty('textarea[formcontrolname="cmsDisplay"]', pools.cmsDisplay.EN(), pools.cmsDisplay.TH(), 250, 250);
-      fillIfEmpty('textarea[formcontrolname="promotionDescription"]', pools.promoDesc.EN(), pools.promoDesc.TH(), 255, 255);
-      fillIfEmpty('textarea[formcontrolname="smsCheckCurrent"]', pools.checkCurrent.EN(), pools.checkCurrent.TH(), 50, 50);
+      withSection(SEL.shortPromo, 'Short Promo', ($el) => fillIfEmpty($el, pools.shortPromo.EN(), pools.shortPromo.TH(), 50, 50));
+      withSection(SEL.cmsDisplay, 'CMS Display', ($el) => fillIfEmpty($el, pools.cmsDisplay.EN(), pools.cmsDisplay.TH(), 250, 250));
+      withSection(SEL.promoDesc, 'Promo Desc', ($el) => fillIfEmpty($el, pools.promoDesc.EN(), pools.promoDesc.TH(), 255, 255));
+      withSection(SEL.checkCurrent, 'Check Current', ($el) => fillIfEmpty($el, pools.checkCurrent.EN(), pools.checkCurrent.TH(), 50, 50));
 
-      if (flags.greeting === 'Send')
-        fillIfEmpty('textarea[formcontrolname="smsGreeting"]', pools.greeting.EN(), pools.greeting.TH(), 400, 400);
-
-      if (flags.delete === 'Send') {
-        const dp = type === 'PRE' ? pools.deletePRE : pools.deletePOST;
-        fillIfEmpty('textarea[formcontrolname="smsDelete"]', dp.EN(), dp.TH(), 250, 250);
-      }
+      if (flag() === 'Send') withSection(SEL.greetingText, 'Greeting', ($el) => fillIfEmpty($el, pools.greeting.EN(), pools.greeting.TH(), 400, 400));
+      if (flag() === 'Send') withSection(SEL.deleteText, 'Delete', ($el) => fillIfEmpty($el, pools.delete.EN(), pools.delete.TH(), 250, 250));
 
       if (type === 'POST') {
-        fillIfEmpty('textarea[formcontrolname="marketingName"]', pools.marketingName(), pools.marketingName(), 40, 40);
-        fillIfEmpty('textarea[formcontrolname="yourPackage"]', pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100);
-        fillIfEmpty('textarea[formcontrolname="greetingLetter"]', pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250);
+        withSection(SEL.marketingName, 'Marketing Name', ($el) => fillIfEmpty($el, pools.marketingName(), pools.marketingName(), 40, 40));
+        withSection(SEL.yourPackage, 'Your Package', ($el) => fillIfEmpty($el, pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100));
+        withSection(SEL.greetingLetter, 'Greeting Letter', ($el) => fillIfEmpty($el, pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250));
       }
     }
 
@@ -3157,138 +3139,131 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     //  PATH B — Manual Type (sections 1–4)
     // ════════════════════════════════════════════════════════════════════════
     if (!useGenerate) {
-      withSection('textarea[formcontrolname="shortPromotionName"]', 'Short Promotion Name', () =>
-        fillTextarea('textarea[formcontrolname="shortPromotionName"]', pools.shortPromo.EN(), pools.shortPromo.TH(), 50, 50));
-
-      withSection('textarea[formcontrolname="cmsDisplay"]', 'CMS Display', () =>
-        fillTextarea('textarea[formcontrolname="cmsDisplay"]', pools.cmsDisplay.EN(), pools.cmsDisplay.TH(), 250, 250));
-
-      withSection('textarea[formcontrolname="promotionDescription"]', 'Promotion Description', () =>
-        fillTextarea('textarea[formcontrolname="promotionDescription"]', pools.promoDesc.EN(), pools.promoDesc.TH(), 250, 250));
-
-      withSection('textarea[formcontrolname="smsCheckCurrent"]', 'SMS Check Current', () =>
-        fillTextarea('textarea[formcontrolname="smsCheckCurrent"]', pools.checkCurrent.EN(), pools.checkCurrent.TH(), 50, 50));
+      withSection(SEL.shortPromo, 'Short Promotion Name', ($el) => fillTextareaMulti($el, pools.shortPromo.EN(), pools.shortPromo.TH(), 50, 50));
+      withSection(SEL.cmsDisplay, 'CMS Display', ($el) => fillTextareaMulti($el, pools.cmsDisplay.EN(), pools.cmsDisplay.TH(), 250, 250));
+      withSection(SEL.promoDesc, 'Promotion Description', ($el) => fillTextareaMulti($el, pools.promoDesc.EN(), pools.promoDesc.TH(), 250, 250));
+      withSection(SEL.checkCurrent, 'SMS Check Current', ($el) => fillTextareaMulti($el, pools.checkCurrent.EN(), pools.checkCurrent.TH(), 50, 50));
     }
 
     // ════════════════════════════════════════════════════════════════════════
-    //  ALWAYS — Sections 5–15
+    //  ALWAYS — Sections Flags & Events
     // ════════════════════════════════════════════════════════════════════════
 
-    // SECTION 5: SMS Greeting
-    withSection('select[formcontrolname="smsGreetingSendFlag"]', 'SMS Greeting', () => {
-      cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(flags.greeting, { force: true });
-      if (flags.greeting === 'Send' && !useGenerate)
-        fillTextarea('textarea[formcontrolname="smsGreeting"]', pools.greeting.EN(), pools.greeting.TH(), 400, 400);
+    withSection(SEL.greetingFlag, 'SMS Greeting', ($el) => {
+      const v = selectFlag($el, 'Greeting');
+      if (v === 'Send' && !useGenerate) {
+        withSection(SEL.greetingText, 'Greeting Text', ($textEl) => fillTextareaMulti($textEl, pools.greeting.EN(), pools.greeting.TH(), 400, 400));
+      }
     });
 
-    // SECTION 6: SMS Confirm Subscription (PRE only)
-    cy.get('body').then(($b: any) => {
-      if ($b.find('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').length)
-        cy.get('select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]').select(flags.greeting, { force: true });
-    });
+    withSection(SEL.confirmSubFlag, 'Confirm Sub', ($el) => selectFlag($el, 'Confirm Sub'));
 
-    // SECTION 7: SMS Delete
-    withSection('select[formcontrolname="smsDeleteSendFlag"]', 'SMS Delete', () => {
-      cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(flags.delete, { force: true });
+    // SMS Delete
+    withSection(SEL.deleteFlag, 'SMS Delete', ($el) => {
+      const vDel = selectFlag($el, 'Delete');
       cy.wait(WAIT);
-
-      if (flags.delete === 'Send') {
+      if (vDel === 'Send') {
         if (type === 'PRE') {
-          cy.get('input[formcontrolname="SmsDeletedefaultWordingFlag"]').then(($radios: any) => {
-            if (!$radios.length) return;
-            const defaultVal = pick(['Yes', 'No']);
-            cy.wrap($radios).parent().contains(defaultVal).click({ force: true });
-            cy.wait(WAIT);
-            if (defaultVal === 'No' && !useGenerate)
-              fillTextarea('textarea[formcontrolname="smsDelete"]', pools.deletePRE.EN(), pools.deletePRE.TH(), 250, 250);
+          handleDefaultWording(SEL.deleteDefaultRadio, SEL.deleteText, pools.delete.EN, pools.delete.TH, 250, 250);
+        } else {
+          cy.get(SEL.deleteText).each(($textEl, idx) => {
+            if (!$textEl.is(':disabled')) {
+              const currentVal = String($textEl.val() ?? '').trim();
+              const hasValue = currentVal.length > 0;
+              if (hasValue && useGenerate && Math.random() < 0.5) return;
+
+              let val = (idx % 2 === 0) ? pools.delete.EN() : pools.delete.TH();
+              if (selectedExtraLangs.length > 0 && !hasValue) val = 'Default System';
+
+              cy.wrap($textEl).focus().clear({ force: true }).type(val, { force: true, delay: 0 })
+                .trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
+            }
           });
-        } else if (!useGenerate) {
-          fillTextarea('textarea[formcontrolname="smsDelete"]', pools.deletePOST.EN(), pools.deletePOST.TH(), 250, 250);
         }
       }
     });
 
-    // SECTIONS 8–11: simple flag selects
-    const simpleFlagSections: [string, string, string][] = [
-      ['select[formcontrolname="lastMinuteAlertSendFlag"]', 'Last Minute Alert', flags.lastMinute],
-      ['select[formcontrolname="smsBeforeFeeDeductSendFlag"]', 'Before Fee Deduction', flags.beforeDeduct],
-      ['select[formcontrolname="recurringDeductSuccessAlertSendFlag"]', 'Recurring Deduct Success', flags.deductOk],
-      ['select[formcontrolname="recurringDeductFailAlertSendFlag"]', 'Recurring Deduct Fail', flags.deductFail],
+    // Simple Flags with Default Wording
+    const simpleFlags: [string, string, string, string, () => string, () => string, number, number][] = [
+      [SEL.lastMinuteFlag, 'Last Minute Alert', SEL.lastMinuteRadio, SEL.lastMinuteText, pools.lastMinute.EN, pools.lastMinute.TH, 250, 250],
+      [SEL.beforeFeeFlag, 'Before Fee Deduction', SEL.beforeFeeRadio, SEL.beforeFeeText, pools.beforeFee.EN, pools.beforeFee.TH, 250, 250],
+      [SEL.recSuccessFlag, 'Recurring Deduct Success', SEL.recSuccessRadio, SEL.recSuccessText, pools.recSuccess.EN, pools.recSuccess.TH, 250, 250],
+      [SEL.recFailFlag, 'Recurring Deduct Fail', SEL.recFailRadio, SEL.recFailText, pools.recFail.EN, pools.recFail.TH, 250, 250],
     ];
-    simpleFlagSections.forEach(([sel, label, val]) =>
-      withSection(sel, label, () => cy.get(sel).select(val, { force: true })));
 
-    // SECTION 12: SMS Promote Package
-    withSection('select[formcontrolname="smsPromotePackSendFlag"]', 'SMS Promote Package', () => {
-      cy.get('select[formcontrolname="smsPromotePackSendFlag"]').select(flags.promote, { force: true });
-      if (flags.promote === 'Send')
-        fillTextarea('textarea[formcontrolname="smsPromotePack"]',
-          `Special offer! ${p} - Get it now`, `ข้อเสนอพิเศษ! ${p} - รับเลยตอนนี้`, 250, 250);
+    simpleFlags.forEach(([sel, label, radioSel, textSel, enPool, thPool, maxEn, maxTh]) => {
+      withSection(sel, label, ($el) => {
+        const v = selectFlag($el, label);
+        if (v === 'Send' && radioSel && textSel) {
+          handleDefaultWording(radioSel, textSel, enPool, thPool, maxEn, maxTh);
+        }
+      });
     });
 
-    // SECTION 13: Before Promotion Expired
-    withSection('select[formcontrolname="beforePromotionExpAlertSendFlag"]', 'Before Promotion Expired', () => {
-      cy.get('select[formcontrolname="beforePromotionExpAlertSendFlag"]').select(beforePromoVal, { force: true });
-      if (beforePromoVal === 'Send') {
-        cy.get('input[formcontrolname="beforePromotionExpAlertDeduction"]')
-          .clear({ force: true }).type(`${Cypress._.random(1, 30)}`, { force: true });
-        cy.get('select[formcontrolname="beforePromotionExpAlertDeductionUnit"]').then(($s: any) => {
-          const opts = $s.find('option').toArray()
-            .filter((o: HTMLOptionElement) => o.value && o.value !== 'null' && !o.disabled)
-            .map((o: HTMLOptionElement) => o.value);
-          if (opts.length) cy.wrap($s).select(Cypress._.sample(opts), { force: true });
-        });
+    // SMS Promote Package
+    withSection(SEL.promoteFlag, 'SMS Promote Package', ($el) => {
+      const vPro = selectFlag($el, 'Promote');
+      if (vPro === 'Send') {
+        withSection(SEL.promoteText, 'Promote Text', ($textEl) =>
+          fillTextareaMulti($textEl, pools.promotePack.EN(), pools.promotePack.TH(), 250, 250)
+        );
       }
     });
 
-    // SECTION 14: Promotion Expired
-    withSection('select[formcontrolname="promotionExpAlertSendFlag"]', 'Promotion Expired', () => {
-      cy.log(`🔒 Promo Expired Logic: Before=${beforePromoVal}, Expired=${promoExpVal} (ต้องตรงข้ามกันเสมอ)`);
-      cy.get('select[formcontrolname="promotionExpAlertSendFlag"]').select(promoExpVal, { force: true });
+    // Before / After Promotion Expired
+    const beforePromoVal = flag();
+    const promoExpVal = beforePromoVal === 'Send' ? "Don't Send" : 'Send';
+    cy.log(`🎲 BeforePromo=${beforePromoVal}, PromoExp=${promoExpVal} (inverse กันเสมอ)`);
+
+    withSection(SEL.beforePromoFlag, 'Before Promotion Expired', ($el) => {
+      cy.wrap($el).select(beforePromoVal, { force: true });
+      if (beforePromoVal === 'Send') {
+        cy.get(SEL.beforePromoDeduct).clear({ force: true }).type(`${Cypress._.random(1, 30)}`, { force: true });
+        cy.get(SEL.beforePromoUnit).then(($s) => {
+          const opts = ($s.find('option').toArray() as HTMLOptionElement[])
+            .filter((o) => o.value && o.value !== 'null' && !o.disabled)
+            .map((o) => o.value);
+          if (opts.length) cy.wrap($s).select(Cypress._.sample(opts) || '', { force: true });
+        });
+        handleDefaultWording(SEL.beforePromoDefaultRadio, SEL.beforePromoText, pools.beforePromoExp.EN, pools.beforePromoExp.TH, 250, 250);
+      }
     });
 
-    // SECTION 15: POST-only fields (Manual only)
-    if (type === 'POST' && !useGenerate) {
-      withSection('textarea[formcontrolname="marketingName"]', 'Marketing Name', () =>
-        cy.get('textarea[formcontrolname="marketingName"]').then(($el: any) => {
-          if ($el.is(':disabled')) return;
-          cy.wrap($el)
-            .focus()
-            .clear({ force: true })
+    withSection(SEL.promoExpFlag, 'Promotion Expired', ($el) => {
+      cy.log(`🔒 PromoExp=${promoExpVal} (ต้องตรงข้าม Before=${beforePromoVal})`);
+      cy.wrap($el).select(promoExpVal, { force: true });
+      if (promoExpVal === 'Send') {
+        handleDefaultWording(SEL.promoExpRadio, SEL.promoExpText, pools.promoExp.EN, pools.promoExp.TH, 250, 250);
+      }
+    });
+
+    // POST-only fields
+    if (type === 'POST') {
+      if (!useGenerate) {
+        withSection(SEL.marketingName, 'Marketing Name', ($el) => {
+          cy.wrap($el).focus().clear({ force: true })
             .type(capEN(pools.marketingName(), 40), { delay: 0, force: true })
-            .trigger('input', { bubbles: true, force: true })
-            .trigger('change', { bubbles: true, force: true })
-            .blur({ force: true });
-        })
-      );
-
-      withSection('textarea[formcontrolname="yourPackage"]', 'Your Package', () =>
-        fillTextarea('textarea[formcontrolname="yourPackage"]', pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100));
-
-      withSection('textarea[formcontrolname="greetingLetter"]', 'Greeting Letter', () =>
-        fillTextarea('textarea[formcontrolname="greetingLetter"]', pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250));
+            .trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
+        });
+        withSection(SEL.yourPackage, 'Your Package', ($el) => fillTextareaMulti($el, pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100));
+        withSection(SEL.greetingLetter, 'Greeting Letter', ($el) => fillTextareaMulti($el, pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250));
+      } else {
+        withSection(SEL.marketingName, 'Marketing Name', ($el) => fillIfEmpty($el, pools.marketingName(), pools.marketingName(), 40, 40));
+        withSection(SEL.yourPackage, 'Your Package', ($el) => fillIfEmpty($el, pools.yourPackage.EN(), pools.yourPackage.TH(), 100, 100));
+        withSection(SEL.greetingLetter, 'Greeting Letter', ($el) => fillIfEmpty($el, pools.greetingLetter.EN(), pools.greetingLetter.TH(), 250, 250));
+      }
     }
 
-    // ── Flush all pending Angular form state before Save ──────────────────────
-    cy.get('app-mass-mkt-sms-wording-detail textarea').each(($el: any) => {
-      if ($el.is(':disabled')) return;
-      const val = String($el.val() ?? '').trim();
-      if (!val) return;
-
-      cy.wrap($el)
-        .focus()
-        .trigger('input', { bubbles: true, force: true })
-        .trigger('change', { bubbles: true, force: true })
-        .blur({ force: true });
+    // Flush state & Save
+    cy.get('app-mass-mkt-sms-wording-detail textarea').each(($el) => {
+      if ($el.is(':disabled') || !String($el.val() ?? '').trim()) return;
+      cy.wrap($el).focus().trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
     });
-    cy.wait(1500);
+    cy.wait(1000);
 
-    // ── Save ─────────────────────────────────────────────────────────────────
-    cy.get('body').then(($b: any) => {
-      if (!$b.find('.container-fluid > :nth-child(3) > .btn').length) return;
-      scrollTo('.container-fluid > :nth-child(3) > .btn', 'Save Button');
+    withSection(SEL.saveBtn, 'Save Button', ($el) => {
       cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-      cy.get('.container-fluid > :nth-child(3) > .btn').should('be.visible').click();
+      cy.wrap($el).should('be.visible').click();
       cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
       closeSuccessModal();
     });
@@ -6140,18 +6115,33 @@ const checkAndUpdateVerticalAppPriority = (): void => {
   });
 };
 
-export const CopyDeductFail = (): void => {
-  const mainTabs = ['Internet', 'Voice', 'SMS', 'MMS', 'Vertical App', 'Cloud Game', 'WiFi'];
+export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void => {
+  const mainTabs = ['Internet', 'Voice', 'SMS', 'MMS', 'Vertical App', 'Cloud Game', 'WiFi']
 
-  const COMPONENT_MAP: Record<string, string> = {
-    'Internet':     'app-mass-mkt-internet',
-    'Voice':        'app-mass-mkt-voice',
-    'SMS':          'app-mass-mkt-sms',
-    'MMS':          'app-mass-mkt-mms',
-    'Vertical App': 'app-mass-mkt-vertical-app',
-    'Cloud Game':   'app-mass-mkt-cloud-game',
-    'WiFi':         'app-mass-mkt-wifi',
+  const COMPONENT_MAP: Record<'mass-market' | 'enhancement', Record<string, string>> = {
+    'mass-market': {
+      'Internet': 'app-mass-mkt-internet',
+      'Voice': 'app-mass-mkt-voice',
+      'SMS': 'app-mass-mkt-sms',
+      'MMS': 'app-mass-mkt-mms',
+      'Vertical App': 'app-mass-mkt-vertical-app',
+      'Cloud Game': 'app-mass-mkt-cloud-game',
+      'WiFi': 'app-mass-mkt-wifi',
+    },
+    'enhancement': {
+      'Internet': 'app-mass-enh-internet',
+      'Voice': 'app-mass-enh-voice',
+      'SMS': 'app-mass-enh-sms',
+      'MMS': 'app-mass-enh-mms',
+      'Vertical App': 'app-mass-enh-vertical-app',
+      'Cloud Game': 'app-mass-enh-cloud-game',
+      'WiFi': 'app-mass-enh-wifi',
+    },
   }
+
+  const tabBarSelector = pageType === 'enhancement'
+    ? 'ul.nav.nav-tabs a'
+    : '.scrollmenu .nav a'
 
   const processTab = (index: number): void => {
     if (index >= mainTabs.length) {
@@ -6160,38 +6150,44 @@ export const CopyDeductFail = (): void => {
     }
 
     const tabName = mainTabs[index]
-    const componentSelector = COMPONENT_MAP[tabName]
-    cy.log(`\n🔄 Processing [${index + 1}/${mainTabs.length}]: "${tabName}"`)
+    const componentSelector = COMPONENT_MAP[pageType][tabName]
+    cy.log(`\n🔄 [${pageType}] Processing [${index + 1}/${mainTabs.length}]: "${tabName}"`)
 
-    cy.get('.scrollmenu .nav a').contains(tabName).click()
+    cy.get(tabBarSelector).contains(tabName).click()
 
-    cy.get(componentSelector, { timeout: 20000 }).should('exist')
-    cy.wait(600)
+    cy.get('body').then(($body) => {
+      if (!$body.find(componentSelector).length) {
+        cy.log(`⚠️ Component "${componentSelector}" not found — skipping.`)
+        processTab(index + 1)
+        return
+      }
 
-    cy.get(componentSelector).within(() => {
-      cy.get('.nav-tabs a').contains('Deduct Fail').click()
-      
-      cy.get('.tab-pane.active', { timeout: 10000 }).should('be.visible')
+      cy.get(componentSelector, { timeout: 20000 }).should('exist')
+      cy.wait(600)
 
-      // ✅ ตรวจสอบว่าปุ่มมีอยู่จริงก่อน ถ้าไม่มีก็ข้ามไปโดยไม่พัง
-      cy.get('.tab-pane.active').then(($pane) => {
-        const $btn = $pane.find('button:contains("Copy From Deduct Success")')
-        
-        if ($btn.length > 0) {
-          cy.wrap($btn.first()).click({ force: true })
-          cy.log(`✅ Copied Deduct Success → Deduct Fail for "${tabName}"`)
-        } else {
-          cy.log(`⚠️ No "Copy From Deduct Success" button found in "${tabName}" — skipping.`)
-        }
+      cy.get(componentSelector).within(() => {
+        cy.get('.nav-tabs a').contains('Deduct Fail').click()
+
+        cy.get('.tab-pane.active', { timeout: 10000 }).should('be.visible')
+
+        cy.get('.tab-pane.active').then(($pane) => {
+          const $btn = $pane.find('button:contains("Copy From Deduct Success")')
+
+          if ($btn.length > 0) {
+            cy.wrap($btn.first()).click({ force: true })
+            cy.log(`✅ Copied Deduct Success → Deduct Fail for "${tabName}"`)
+          } else {
+            cy.log(`⚠️ No "Copy From Deduct Success" button in "${tabName}" — skipping.`)
+          }
+        })
       })
-    })
 
-    cy.wait(500)
-    
-    processTab(index + 1)
+      cy.wait(500)
+      processTab(index + 1)
+    })
   }
 
-  cy.get('.scrollmenu .nav').should('exist')
+  cy.get(tabBarSelector).should('exist')
   processTab(0)
 }
 
@@ -6354,8 +6350,6 @@ export const ProjectBasicInformationComplete = (
   const { projectName, poName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
 
   createProjectBase(credentials, projectName, Module, subModule);
-
-  // เปลี่ยนเงื่อนไขมาใช้เช็ค ProductClass === 'main' แทน
   const envKey = ProductClass === 'main' ? 'formattedDateMain' : 'formattedDate';
   Cypress.env(envKey, projectName);
   registerProjectName(projectName, ProductClass === 'main' ? 0 : 1);
@@ -6458,7 +6452,7 @@ export const ProjectBasicInformationComplete = (
     }
 
     if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
-      CopyDeductFail();
+      CopyDeductFail('mass-market');
     }
 
     smsWording();
@@ -6470,9 +6464,12 @@ export const ProjectBasicInformationComplete = (
     }
   }
 
-  Cypress.env(poEnvKey, poNames[0]);
-  Cypress.env('allPoNames', poNames);
-  Cypress.env('poCount', poCount);
+  Cypress.env('currentModule', Module);
+  Cypress.env('currentSubModule', subModule);
+  Cypress.env('currentPriceType', PriceType);
+  Cypress.env('currentProductClass', ProductClass);
+  Cypress.env('currentProjectName', projectName);
+  Cypress.env('currentPoName', poNames[0] || poName);
 
   cy.log(`✅ All ${poCount} PO(s) processed. Finalizing...`);
   backBacicInfo();
@@ -6868,44 +6865,44 @@ const setPriceVAT = (): void => {
 
 export const beforeapproveMKT = (): void => {
 
-const semiEN = [
-  'File description for this offering',
-  'Attached file for product team review',
-  'File description updated for this PO',
-  'Supporting file for internal reference',
-  'File description submitted for team review',
-  'Updated file attached for consideration',
-  'File pending sign-off and confirmation',
-  'File description included for this submission',
-];
+  const semiEN = [
+    'File description for this offering',
+    'Attached file for product team review',
+    'File description updated for this PO',
+    'Supporting file for internal reference',
+    'File description submitted for team review',
+    'Updated file attached for consideration',
+    'File pending sign-off and confirmation',
+    'File description included for this submission',
+  ];
 
-const semiTH = [
-  'คำอธิบายไฟล์สำหรับข้อเสนอนี้',
-  'ไฟล์แนบสำหรับทีมผลิตภัณฑ์',
-  'อัปเดตคำอธิบายไฟล์สำหรับ PO นี้',
-  'ไฟล์ประกอบสำหรับอ้างอิงภายใน',
-  'คำอธิบายไฟล์ส่งให้ทีมตรวจสอบ',
-  'แนบไฟล์ที่อัปเดตแล้วเพื่อประกอบการพิจารณา',
-  'ไฟล์รอการลงนามและยืนยัน',
-  'คำอธิบายไฟล์สำหรับการส่งมอบนี้',
-];
+  const semiTH = [
+    'คำอธิบายไฟล์สำหรับข้อเสนอนี้',
+    'ไฟล์แนบสำหรับทีมผลิตภัณฑ์',
+    'อัปเดตคำอธิบายไฟล์สำหรับ PO นี้',
+    'ไฟล์ประกอบสำหรับอ้างอิงภายใน',
+    'คำอธิบายไฟล์ส่งให้ทีมตรวจสอบ',
+    'แนบไฟล์ที่อัปเดตแล้วเพื่อประกอบการพิจารณา',
+    'ไฟล์รอการลงนามและยืนยัน',
+    'คำอธิบายไฟล์สำหรับการส่งมอบนี้',
+  ];
 
-const useThai = Math.random() < 0.5;
-const pool = useThai ? semiTH : semiEN;
-let attachmentDesc = pool[Math.floor(Math.random() * pool.length)];
+  const useThai = Math.random() < 0.5;
+  const pool = useThai ? semiTH : semiEN;
+  let attachmentDesc = pool[Math.floor(Math.random() * pool.length)];
 
-const MAX_LEN = 120;
-if (attachmentDesc.length > MAX_LEN) attachmentDesc = attachmentDesc.substring(0, MAX_LEN - 3) + '...';
+  const MAX_LEN = 120;
+  if (attachmentDesc.length > MAX_LEN) attachmentDesc = attachmentDesc.substring(0, MAX_LEN - 3) + '...';
 
-cy.log(`📎 Attachment Description: ${attachmentDesc}`);
-cy.get('textarea[formcontrolname="fileDescription"]', { timeout: 10000 })
-  .should('be.visible')
-  .focus()
-  .clear({ force: true })
-  .type(attachmentDesc, { delay: 30 })
-  .trigger('input', { bubbles: true, force: true })
-  .trigger('change', { bubbles: true, force: true })
-  .blur({ force: true });
+  cy.log(`📎 Attachment Description: ${attachmentDesc}`);
+  cy.get('textarea[formcontrolname="fileDescription"]', { timeout: 10000 })
+    .should('be.visible')
+    .focus()
+    .clear({ force: true })
+    .type(attachmentDesc, { delay: 30 })
+    .trigger('input', { bubbles: true, force: true })
+    .trigger('change', { bubbles: true, force: true })
+    .blur({ force: true });
 
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
