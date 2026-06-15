@@ -1,11 +1,1 @@
-# Ignore all log files
-*.log
-
-# Ignore the node_modules directory
-node_modules/
-
-*cypress.config.js
-*cypress.env
-*package-lock.json
-*cypress.env.json
-*package.json
+Nothing should be ignored based on the provided changes. The only added file is `skills.md`, which is a markdown source file and should not be ignored.
