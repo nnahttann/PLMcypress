@@ -4,7 +4,7 @@
 // ========================
 
 import { Module } from '../types';
-import { ABBREVIATIONS } from '../config';
+import { ABBREVIATIONS } from '../config/config-index';
 import { limitAndCleanEN, limitAndCleanTH, buildUniqueName } from '../utils';
 import { projectManager } from '../core';
 
