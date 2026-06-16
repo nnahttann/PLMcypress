@@ -3,7 +3,7 @@
 // Claim, Approve, Assign
 // ========================
 
-import { searchInTableWithPagination } from '../core';
+import { searchInTableWithPagination } from '../core/core-index';
 
 export const ClaimProject = (projectName: string, options?: { claimBy?: 'project' | 'po' }): void => {
   const poCount: number = Cypress.env('poCount') ?? 1;
@@ -188,7 +188,7 @@ export const approveProject = (projectName: string): void => {
   searchInTableWithPagination(
     'To Do List',
     projectName,
-    (_$row, _index) => {
+    (_$row: JQuery<HTMLElement>, _index: number) => {
       cy.get('h3:contains("To Do List")')
         .parent()
         .contains('td[colspan="2"]', projectName)
@@ -202,7 +202,7 @@ export const approveProject = (projectName: string): void => {
     },
     {
       waitAfterNext: 2000,
-      filterCallback: ($row) => {
+      filterCallback: ($row: JQuery<HTMLElement>) => {
         const rowText = $row.text().trim();
         return rowText.includes(projectName) && !rowText.includes('Fetching data');
       }

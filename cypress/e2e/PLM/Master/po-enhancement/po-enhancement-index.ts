@@ -2,8 +2,8 @@
 // PO ENHANCEMENT FUNCTIONS
 // ========================
 
-import { Module, GetProjectNameFn } from '../types';
-import { getTomorrowDateString } from '../utils';
+import { Module, GetProjectNameFn } from '../types/types-index';
+import { getTomorrowDateString } from '../utils/utils-index';
 
 const registerPoEnhancementIntercepts = (): void => {
   cy.intercept('GET', '/PLMSpringBoot/api/mass-enh-po-detail/getByPoEnhRowId/**').as('getPoEnhDetail');

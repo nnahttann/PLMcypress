@@ -3,10 +3,10 @@
 // Project Creation, Basic Information
 // ========================
 
-import { Module } from '../types';
+import { Module } from '../types/types-index';
 import { ABBREVIATIONS } from '../config/config-index';
-import { limitAndCleanEN, limitAndCleanTH, buildUniqueName } from '../utils';
-import { projectManager } from '../core';
+import { limitAndCleanEN, limitAndCleanTH, buildUniqueName } from '../utils/utils-index';
+import { projectManager } from '../core/core-index';
 
 const getAbbreviation = (word: string | undefined): string => {
   if (!word) return '';

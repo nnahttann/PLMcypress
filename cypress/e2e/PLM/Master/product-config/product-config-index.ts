@@ -3,7 +3,7 @@
 // Tariff, Price, Target Group, SMS, etc.
 // ========================
 
-import { closeSuccessModal } from '../utils';
+import { closeSuccessModal } from '../utils/utils-index';
 
 export const Tariff = (): void => {
   cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount').scrollIntoView().should('be.visible').click();

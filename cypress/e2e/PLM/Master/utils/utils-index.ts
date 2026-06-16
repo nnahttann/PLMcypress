@@ -2,7 +2,7 @@
 // UTILITY FUNCTIONS
 // ========================
 
-import { Module } from '../types';
+import { Module } from '../types/types-index';
 import { MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from '../config/config-index';
 
 export const getCredentials = (module: Module): { user: string, pass: string } => {
