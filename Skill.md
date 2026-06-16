@@ -1,7 +1,6 @@
 ---
-name: Mass Mobile PLM - CKS Role
+name: mass-mobile-plm-cks-role
 description: Comprehensive skill document for Mass Mobile PLM system (CKS/ENH role) including all modules, workflows, validations, database mappings, and test scenarios.
-version: 1.0.0
 ---
 
 # Mass Mobile PLM - Skill Document (CKS Role)
@@ -11,25 +10,25 @@ version: 1.0.0
 
 ## สารบัญ
 
-1. [ภาพรวมระบบ](#ภาพรวมระบบ)
-2. [User Credentials & Authentication](#user-credentials--authentication)
-3. [Project Management System](#project-management-system)
-4. [Product Offering Management](#product-offering-management)
-5. [Mass ENH Product Offering Definition](#mass-enh-product-offering-definition)
-6. [Voice Services](#voice-services)
-7. [SMS Services](#sms-services)
-8. [Internet Services](#internet-services)
-9. [Content VDO](#content-vdo)
-10. [Revenue Sharing](#revenue-sharing)
-11. [Human Touch Point](#human-touch-point)
-12. [Application Channel](#application-channel)
-13. [SMS Wording](#sms-wording)
-14. [Approval Workflow Functions](#approval-workflow-functions)
-15. [Service Configuration Functions](#service-configuration-functions)
-16. [Script Validation Rules](#script-validation-rules)
-17. [Database Mapping](#database-mapping)
-18. [Type Definitions](#type-definitions)
-19. [Constants & Configuration](#constants--configuration)
+- [ภาพรวมระบบ](#ภาพรวมระบบ)
+- [User Credentials & Authentication](#user-credentials--authentication)
+- [Project Management System](#project-management-system)
+- [Product Offering Management](#product-offering-management)
+- [Mass ENH Product Offering Definition](#mass-enh-product-offering-definition)
+- [Voice Services](#voice-services)
+- [SMS Services](#sms-services)
+- [Internet Services](#internet-services)
+- [Content VDO](#content-vdo)
+- [Revenue Sharing](#revenue-sharing)
+- [Human Touch Point](#human-touch-point)
+- [Application Channel](#application-channel)
+- [SMS Wording](#sms-wording)
+- [Approval Workflow Functions](#approval-workflow-functions)
+- [Service Configuration Functions](#service-configuration-functions)
+- [Script Validation Rules](#script-validation-rules)
+- [Database Mapping](#database-mapping)
+- [Type Definitions](#type-definitions)
+- [Constants & Configuration](#constants--configuration)
 
 ---
 
