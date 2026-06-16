@@ -34,15 +34,16 @@ export default defineConfig({
   viewportWidth: 1920,
   viewportHeight: 1080,
 
-  defaultCommandTimeout: 10000,
-  pageLoadTimeout: 90000,
-  requestTimeout: 30000,
-  responseTimeout: 60000,
+  defaultCommandTimeout: 5000,
+  pageLoadTimeout: 30000,
+  requestTimeout: 15000,
+  responseTimeout: 30000,
 
   chromeWebSecurity: false,
 
   experimentalMemoryManagement: true,
   numTestsKeptInMemory: 0,
+  blockHosts: ['fonts.googleapis.com', 'cdnjs.cloudflare.com', 'fonts.gstatic.com'],
 
   retries: {
     runMode: 1,
@@ -75,8 +76,9 @@ export default defineConfig({
         launchOptions.args.push("--disable-gpu");
         launchOptions.args.push("--no-sandbox");
         launchOptions.args.push("--disable-background-networking");
+        launchOptions.args.push("--disable-web-security");
         // Block requests to external CDN that are unreachable from intranet
-        launchOptions.args.push("--host-rules=MAP fonts.googleapis.com 127.0.0.1, MAP cdnjs.cloudflare.com 127.0.0.1");
+        launchOptions.args.push("--host-rules=MAP fonts.googleapis.com 127.0.0.1, MAP cdnjs.cloudflare.com 127.0.0.1, MAP fonts.gstatic.com 127.0.0.1");
 
         return launchOptions;
       });

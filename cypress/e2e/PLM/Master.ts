@@ -181,7 +181,7 @@ export const handleAddToUSMP = (): void => {
     if ($body.find('button:contains("Add to USMP")').length > 0) {
       cy.log('🟢 Found Add to USMP button, clicking...');
       cy.contains('button', 'Add to USMP').click();
-      cy.wait(3500);
+      cy.wait(800);
 
       // ✅ รอ Bootstrap modal เปิดสนิทก่อน (fade → in)
       // จับ Bootstrap modal หรือ Angular dialog อย่างใดอย่างหนึ่ง
@@ -209,14 +209,14 @@ export const handleAddToUSMP = (): void => {
         }
       });
 
-      cy.wait(2000);
+      cy.wait(500);
     } else {
       cy.log('⚪ Add to USMP button not found, skipping...');
     }
   });
 };
 
-export const scrollAndWait = (ms: number = 4000): void => {
+export const scrollAndWait = (ms: number = 2000): void => {
   cy.scrollTo('bottom');
   cy.wait(ms);
 };
@@ -246,20 +246,20 @@ export const getRandomPhone = (): string => {
 // ========================
 
 export const login = (username: string, password: string): void => {
-  cy.get('app-login', { timeout: 3000000 }).should('be.visible');
-  cy.get('form', { timeout: 2000000 }).should('be.visible');
+  cy.get('app-login', { timeout: 30000 }).should('be.visible');
+  cy.get('form', { timeout: 30000 }).should('be.visible');
 
-  cy.get('input[name="userId"]', { timeout: 2000000 })
+  cy.get('input[name="userId"]', { timeout: 30000 })
     .should('exist')
     .should('be.visible')
     .should('not.be.disabled')
     .clear()
-    .type(username, { delay: 150 });
+    .type(username, { delay: 50 });
 
   cy.get('input[name="pwd"]')
     .should('be.visible')
     .clear()
-    .type(password, { delay: 150 });
+    .type(password, { delay: 50 });
 
   cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll').as('getErrorCodes');
 
@@ -292,10 +292,10 @@ const searchInTableWithPagination = (
     filterCallback?: ($row: JQuery<HTMLElement>, index: number) => boolean;
   } = {}
 ): void => {
-  const { waitAfterNext = 4000, filterCallback } = options;
+  const { waitAfterNext = 2000, filterCallback } = options;
 
   const searchInCurrentPage = (): Cypress.Chainable<boolean> => {
-    return cy.get('h3').contains(sectionHeader, { timeout: 100000 })
+    return cy.get('h3').contains(sectionHeader, { timeout: 30000 })
       .parent()
       .find('tbody tr')
       .should(($rows) => {
@@ -346,7 +346,7 @@ const searchInTableWithPagination = (
 
         cy.wrap($nextBtn).click();
 
-        cy.get('h3').contains(sectionHeader, { timeout: 100000 })
+        cy.get('h3').contains(sectionHeader, { timeout: 30000 })
           .parent()
           .find('tbody tr')
           .should(($rows) => {
@@ -398,7 +398,7 @@ export const ClaimProject = (projectName: string, options?: { claimBy?: 'project
 
   const waitForUnassignedReady = (): Cypress.Chainable => {
     return cy
-      .get('h3:contains("Unassigned Task")', { timeout: 15000 })
+      .get('h3:contains("Unassigned Task")', { timeout: 10000 })
       .parent()
       .find('tbody tr')
       .should(($rows) => {
@@ -463,7 +463,7 @@ export const ClaimProject = (projectName: string, options?: { claimBy?: 'project
               const firstRowTextBefore = $section.find('tbody tr').first().text().trim();
               cy.wrap($nextBtn).click();
 
-              cy.get('h3:contains("Unassigned Task")', { timeout: 15000 })
+              cy.get('h3:contains("Unassigned Task")', { timeout: 10000 })
                 .parent()
                 .find('tbody tr')
                 .should(($r) => {
@@ -545,7 +545,7 @@ export const ClaimProject = (projectName: string, options?: { claimBy?: 'project
             const firstRowTextBefore = $section.find('tbody tr').first().text().trim();
             cy.wrap($nextBtn).click();
 
-            cy.get('h3:contains("Unassigned Task")', { timeout: 15000 })
+            cy.get('h3:contains("Unassigned Task")', { timeout: 10000 })
               .parent()
               .find('tbody tr')
               .should(($r) => {
@@ -612,7 +612,7 @@ export function assignTeamTask(
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
 
   cy.get('h3').contains('Team Task').should('be.visible');
-  cy.wait('@getRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
   const partialIdentifier = taskIdentifier.split('_')[0];
   cy.log(`🔍 Searching for: "${partialIdentifier}" keyword: "${uniqueKeyword}"`);
@@ -749,16 +749,16 @@ const createFullPageApprovalFlow = (
         }
       });
     });
-    cy.contains('tbody tr', projectName, { timeout: 100000 })
+    cy.contains('tbody tr', projectName, { timeout: 30000 })
       .should('be.visible')
       .within(() => {
         cy.get('span').contains('Approve').click();
       });
   });
 
-  cy.url({ timeout: 600000 }).should('include', expectedUrl);
+  cy.url({ timeout: 30000 }).should('include', expectedUrl);
 
-  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 60000 })
+  cy.wait(['@getProject', '@getDetail', '@getAttachment'], { timeout: 30000 })
     .then((interceptions) => {
       interceptions.forEach((interception) => {
         expect(interception.response).to.exist;
@@ -770,11 +770,11 @@ const createFullPageApprovalFlow = (
 
   switch (finalAction) {
     case 'AlertAndLogout':
-      cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
       cy.contains('button', 'Logout').click();
       break;
     case 'ComplexLogout':
-      cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
+      cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
       cy.contains('button', 'Logout').click();
       break;
     case 'StopAfterCore':
@@ -793,16 +793,16 @@ const createSimplePageApprovalFlow = (
   cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
 
   cy.get('h3').contains(taskListHeader).parent().within(() => {
-    cy.contains('tbody tr', projectName, { timeout: 100000 })
+    cy.contains('tbody tr', projectName, { timeout: 30000 })
       .should('be.visible')
       .within(() => {
         cy.get('span').contains('Approve').click();
       });
   });
 
-  cy.url({ timeout: 60000 }).should('include', expectedUrl);
+  cy.url({ timeout: 30000 }).should('include', expectedUrl);
   coreTaskCallback();
-  cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
   cy.contains('button', 'Logout').click();
 };
 
@@ -837,7 +837,7 @@ const pollUntilSPADDeployReady = (maxAttempts = 24, intervalMs = 5000): void => 
     cy.log(`🔄 Polling Refresh Status... (attempts left: ${remaining})`);
     cy.wait(intervalMs);
 
-    cy.contains('button', 'Refresh Status', { timeout: 15000 })
+    cy.contains('button', 'Refresh Status', { timeout: 10000 })
       .should('be.visible')
       .click();
     scrollAndWait();
@@ -886,7 +886,7 @@ const _approveSPADSup = (projectName: string, isComplex: boolean): void => {
       });
 
       scrollAndWait();
-      cy.contains('button', buttonText, { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', buttonText, { timeout: 30000 }).should('be.visible').click();
     },
     'ComplexLogout'
   );
@@ -906,7 +906,7 @@ const _approveSPADDoer = (projectName: string, isMainFlow: boolean): void => {
     '/cgmd/cgmd-configure',
     () => {
       if (isMainFlow) {
-        cy.wait(3500);
+        cy.wait(800);
 
         // FIX: ใช้ .then() เพื่อดีเลย์การสุ่มค่า Math.random() ไปทำงานตอน Execution Time จริงๆ 
         // และใช้ .clear() เพื่อล้างค่าเดิมก่อนพิมพ์ค่าใหม่เสมอ
@@ -927,11 +927,11 @@ const _approveSPADDoer = (projectName: string, isMainFlow: boolean): void => {
       }
 
       selectRandomOption('Gprs type');
-      cy.wait(1500);
+      cy.wait(800);
       selectRandomOption('Template');
 
       scrollAndWait();
-      cy.contains('button', 'Promote To SPAD Tester', { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', 'Promote To SPAD Tester', { timeout: 30000 }).should('be.visible').click();
     },
     'AlertAndLogout'
   );
@@ -950,7 +950,7 @@ const _approveSPADTester = (projectName: string, isMainFlow: boolean): void => {
     '/cgmd/cgmd-tester',
     () => {
       if (isMainFlow) {
-        cy.wait(3500);
+        cy.wait(800);
         scrollAndWait();
 
         cy.intercept('GET', '**/api/SendPluginMain_v2/**').as('sendPluginApi');
@@ -964,7 +964,7 @@ const _approveSPADTester = (projectName: string, isMainFlow: boolean): void => {
         cy.on('window:confirm', () => true);
 
         // FIX: เพิ่ม .and('not.be.disabled') เพื่อรอให้ปุ่มหาย disabled ก่อน และใส่ { force: true } เพื่อบังคับกด
-        cy.contains('button', 'Send PlugIN', { timeout: 3000000 })
+        cy.contains('button', 'Send PlugIN', { timeout: 30000 })
           .should('be.visible')
           .and('not.be.disabled')
           .click({ force: true });
@@ -980,7 +980,7 @@ const _approveSPADTester = (projectName: string, isMainFlow: boolean): void => {
           }
         });
 
-        cy.contains('button', 'Promote to SPAD Deploy', { timeout: 3000000 })
+        cy.contains('button', 'Promote to SPAD Deploy', { timeout: 30000 })
           .should('be.visible')
           .and('not.be.disabled')
           .click({ force: true });
@@ -988,7 +988,7 @@ const _approveSPADTester = (projectName: string, isMainFlow: boolean): void => {
         clickYesIfExists(10000, 'last');
       } else {
         scrollAndWait();
-        cy.contains('button', 'Promote to SPAD Deploy', { timeout: 3000000 })
+        cy.contains('button', 'Promote to SPAD Deploy', { timeout: 30000 })
           .should('be.visible')
           .and('not.be.disabled')
           .click({ force: true });
@@ -1011,7 +1011,7 @@ export const approveProjectSPADdeploy = (projectName: string): void => {
     '/actm/actm-doer',
     () => {
       scrollAndWait();
-      cy.contains('button', 'Promote To ACTM', { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', 'Promote To ACTM', { timeout: 30000 }).should('be.visible').click();
     },
     'AlertAndLogout'
   );
@@ -1563,12 +1563,12 @@ export const performMusicRoles = (): void => {
     approveProject(finalProjectName);
 
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-    cy.url({ timeout: 60000 }).should('include', '/zenon/ts-center');
-    cy.wait(1500);
+    cy.url({ timeout: 30000 }).should('include', '/zenon/ts-center');
+    cy.wait(800);
     cy.get('select[formcontrolname="olympus"]').should('be.visible').select('No').should('have.value', 'No');
 
     cy.scrollTo('bottom');
-    cy.wait(1500);
+    cy.wait(800);
     cy.contains('button', 'Approve').should('be.visible').click({ force: true });
     cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
     cy.contains('button', 'Logout').should('be.visible').click();
@@ -1590,10 +1590,10 @@ export const performMusicRoles = (): void => {
       else if (urlPart === 'aafdp') checkUrl = '/zenon/aaf-support';
       else checkUrl = urlPart;
 
-      cy.url({ timeout: 60000 }).should('include', checkUrl);
-      cy.wait(1500);
+      cy.url({ timeout: 30000 }).should('include', checkUrl);
+      cy.wait(800);
       cy.scrollTo('bottom');
-      cy.wait(1500);
+      cy.wait(800);
       cy.contains('button', btnText).should('be.visible').click({ force: true });
       cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
       cy.contains('button', 'Logout').should('be.visible').click();
@@ -1610,10 +1610,10 @@ export const performMusicRoles = (): void => {
     ClaimProject(finalProjectName);
     approveProject(finalProjectName);
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-    cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
-    cy.wait(1500);
+    cy.url({ timeout: 30000 }).should('include', '/zenon/e2e-tester');
+    cy.wait(800);
     cy.scrollTo('bottom');
-    cy.wait(1500);
+    cy.wait(800);
 
     cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
     cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
@@ -1634,10 +1634,10 @@ export const performMusicRoles = (): void => {
     cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
     approveProject(finalProjectName);
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-    cy.url({ timeout: 60000 }).should('include', '/owner-zenon');
-    cy.wait(1500);
+    cy.url({ timeout: 30000 }).should('include', '/owner-zenon');
+    cy.wait(800);
     cy.scrollTo('bottom');
-    cy.wait(1500);
+    cy.wait(800);
     cy.contains('button', 'Approve').should('be.visible').click({ force: true });
     cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
     cy.contains('button', 'Logout').should('be.visible').click();
@@ -1653,10 +1653,10 @@ export const performMusicRoles = (): void => {
     ClaimProject(finalProjectName);
     approveProject(finalProjectName);
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-    cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
-    cy.wait(1500);
+    cy.url({ timeout: 30000 }).should('include', '/zenon/e2e-tester');
+    cy.wait(800);
     cy.scrollTo('bottom');
-    cy.wait(1500);
+    cy.wait(800);
     cy.contains('button', 'Approve to Pre Go live').should('be.visible').click({ force: true });
     cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
     cy.contains('button', 'Logout').should('be.visible').click();
@@ -1716,7 +1716,7 @@ export const approveProjectCGMD = (projectName: string): void => {
 
                   cy.wrap($tr).find('mat-select').click();
                   selectSingleRandomMatOption();
-                  cy.wait(1000);
+                  cy.wait(500);
                 }
               });
             }
@@ -1756,7 +1756,7 @@ export const approveProjectCGMD = (projectName: string): void => {
 
       handleAddToUSMP();
       scrollAndWait();
-      cy.get('button[name="CBS"]').should('be.visible', { timeout: 3000000 }).click();
+      cy.get('button[name="CBS"]').should('be.visible', { timeout: 30000 }).click();
       cy.contains('button', 'Yes').should('be.visible').click();
     },
     'AlertAndLogout'
@@ -1778,7 +1778,7 @@ export const approveProjectCGMDPRE = (projectName: string): void => {
       cy.contains('label', 'CBS_OFFERING_ID').closest('.col-md-4').find('input').type(randomNumber.toString());
       cy.contains('label', 'CBS_OFFERING_ID').closest('.col-md-4').find('a.btn').first().click();
       scrollAndWait();
-      cy.contains('button', 'Approve To CGMD', { timeout: 3000000 }).should('be.visible').click({ force: true });
+      cy.contains('button', 'Approve To CGMD', { timeout: 30000 }).should('be.visible').click({ force: true });
       cy.contains('button', 'Yes').should('be.visible').click({ force: true });
       handleAddToUSMP();
     },
@@ -1795,11 +1795,11 @@ export const approveProjectCGMDPREMainNotComplex = (projectName: string): void =
       cy.get('label:contains("PACKAGE_ID (PP ID)")').parent().next('div').find('input')
         .type('PP' + Math.floor(Math.random() * 90000) + 10000);
       selectRandomOption('Gprs type');
-      cy.wait(1500);
+      cy.wait(800);
       selectRandomOption('Template');
       scrollAndWait();
       handleAddToUSMP();
-      cy.contains('button', 'Approve To CGMD Tester', { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', 'Approve To CGMD Tester', { timeout: 30000 }).should('be.visible').click();
       cy.contains('button', 'Yes').should('be.visible').click();
     },
     'AlertAndLogout'
@@ -1830,7 +1830,7 @@ export const approveProjectCGMDtesterPRE = (projectName: string): void => {
     '/cgmd/cgmd-tester',
     () => {
       scrollAndWait();
-      cy.contains('button', 'Promote To Pre Go Live', { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', 'Promote To Pre Go Live', { timeout: 30000 }).should('be.visible').click();
       cy.contains('button', 'Yes').should('be.visible').click();
     },
     'AlertAndLogout'
@@ -1843,7 +1843,7 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string): void => 
     'To Do List',
     '/cgmd/cgmd-tester',
     () => {
-      cy.wait(3500);
+      cy.wait(800);
       scrollAndWait();
       cy.intercept('GET', '**/api/SendPluginMain_v2/**').as('sendPluginApi');
 
@@ -1854,7 +1854,7 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string): void => 
       });
 
       cy.on('window:confirm', () => true);
-      cy.contains('button', 'Send PlugIN', { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', 'Send PlugIN', { timeout: 30000 }).should('be.visible').click();
       clickYesIfExists(10000, 'first');
 
       // 🔄 Poll Refresh Status จนปุ่ม Promote to Pre Go Live พร้อม
@@ -1863,7 +1863,7 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string): void => 
           cy.log(`🔄 Polling Refresh Status... (attempts left: ${remaining})`);
           cy.wait(intervalMs);
 
-          cy.contains('button', 'Refresh Status', { timeout: 15000 })
+          cy.contains('button', 'Refresh Status', { timeout: 10000 })
             .should('be.visible')
             .click();
           scrollAndWait();
@@ -1901,7 +1901,7 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string): void => 
         }
       });
 
-      cy.contains('button', 'Promote to Pre Go Live', { timeout: 3000000 }).should('be.visible').click();
+      cy.contains('button', 'Promote to Pre Go Live', { timeout: 30000 }).should('be.visible').click();
       clickYesIfExists(10000, 'last');
     },
     'StopAfterCore'
@@ -1972,10 +1972,10 @@ export const approveProjectAPO = (projectName: string): void => {
 // ========================
 
 const assignTaskViaTracking = (projectName: string, assignee: string, billingSystem: string = ''): void => {
-  cy.contains('span', 'Menu', { timeout: 100000 }).click();
+  cy.contains('span', 'Menu', { timeout: 30000 }).click();
   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
   cy.get('a[href="#/new-report/home/tracking"]').click();
-  cy.url({ timeout: 3000000 }).should('include', '/new-report/home/tracking', { timeout: 100000 });
+  cy.url({ timeout: 30000 }).should('include', '/new-report/home/tracking', { timeout: 30000 });
 
   cy.get('table.table.table-condensed', { timeout: 200000 }).should('be.visible');
   cy.get('table.table.table-condensed tbody tr', { timeout: 200000 })
@@ -1986,10 +1986,10 @@ const assignTaskViaTracking = (projectName: string, assignee: string, billingSys
 };
 
 const navigateToWorkspace = (): void => {
-  cy.contains('span', 'Menu', { timeout: 100000 }).click();
+  cy.contains('span', 'Menu', { timeout: 30000 }).click();
   cy.intercept('GET', '**/api/plm-project/AllNonCompleteStatus/**').as('loadTracking');
   cy.get('a[href="#/workspace-home/workspace"]').click();
-  cy.url().should('include', '/workspace-home/workspace', { timeout: 1000000 });
+  cy.url().should('include', '/workspace-home/workspace', { timeout: 30000 });
 };
 
 const performApprovalRole = (
@@ -2006,7 +2006,7 @@ const performApprovalRole = (
 
   if (options?.assignee) {
     cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    cy.wait(['@getRequest'], { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+    cy.wait(['@getRequest'], { timeout: 30000 }).its('response.statusCode').should('eq', 200);
   }
 
   const projectNamePONAME: string = getStandardProjectName();
@@ -2036,7 +2036,7 @@ const performApprovalRole = (
       navigateToWorkspace();
       cy.intercept('GET', '**/PLMSpringBoot/api/Get-BillingSystemCGMD/**').as('getBillingSystem');
     } else {
-      cy.get('h3:contains("To Do List")', { timeout: 15000 })
+      cy.get('h3:contains("To Do List")', { timeout: 10000 })
         .parent()
         .find('tbody tr')
         .should(($rows) => {
@@ -2070,10 +2070,10 @@ const performApprovalRole = (
     approveFunction(projectNamePONAME);
 
     if (index < poCount - 1) {
-      if (options?.assignee) cy.wait(2000);
+      if (options?.assignee) cy.wait(500);
       navigateToWorkspace();
 
-      cy.get('h3:contains("To Do List")', { timeout: 15000 })
+      cy.get('h3:contains("To Do List")', { timeout: 10000 })
         .parent()
         .find('tbody tr')
         .should(($rows) => {
@@ -2206,19 +2206,19 @@ const handleProductNameTrim = (): void => {
 };
 
 const handlePoDetailRoute = (customStepsCallback: () => void): void => {
-  cy.wait('@getPoEnhDetail', { timeout: 60000 });
-  cy.wait('@getCheckGenPoEnh', { timeout: 60000 });
-  cy.wait('@getCheckSffEnh', { timeout: 60000 });
+  cy.wait('@getPoEnhDetail', { timeout: 30000 });
+  cy.wait('@getCheckGenPoEnh', { timeout: 30000 });
+  cy.wait('@getCheckSffEnh', { timeout: 30000 });
 
   handleProductNameTrim();
 
-  cy.wait(3500);
+  cy.wait(800);
   customStepsCallback();
 };
 
 const handleAdditionalRoute = (customStepsCallback: () => void): void => {
   cy.log('ℹ️ Landed on mass-enh-additional route — skipping PO detail waits');
-  cy.wait(3500);
+  cy.wait(800);
   customStepsCallback();
 };
 
@@ -2240,7 +2240,7 @@ const enhanceSinglePO = (
     .click();
 
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  cy.wait('@getRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
   cy.url()
     .should('match', /mass-enh-product-offering-detail|mass-enh-project-home\/mass-enh-additional/)
@@ -2259,7 +2259,7 @@ const enhanceSinglePO = (
         cy.url().should('include', '/new-flow/home/newcks/cks-doer');
 
         registerProjectPageIntercepts();
-        cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 100000 });
+        cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 30000 });
         cy.wait(3000);
       }
     });
@@ -2273,7 +2273,7 @@ const standardCksPoEnhancementFlow = (
   login(cks, ckspass);
 
   registerCksInitialIntercepts();
-  cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 100000 });
+  cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 30000 });
   cy.get('body').should('be.visible');
 
   const finalProjectName = getProjectNameFn();
@@ -2291,7 +2291,7 @@ const standardCksPoEnhancementFlow = (
 
   cy.then(() => {
     registerProjectPageIntercepts();
-    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 100000 });
+    cy.wait(['@getProject', '@getHistory', '@getAttachment', '@getNote'], { timeout: 30000 });
 
     cy.get('button.btn-sample')
       .filter((_, el) => el.textContent?.trim() === 'Enhance PO')
@@ -2329,11 +2329,11 @@ const backToCksDoer = (): void => {
   cy.contains('button', 'Yes').should('be.visible').click();
 
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
   cy.wait(5000);
 
-  cy.url({ timeout: 60000 }).should('include', '/new-flow/home/newcks/cks-doer');
-  cy.get('body', { timeout: 60000 }).should('be.visible');
+  cy.url({ timeout: 30000 }).should('include', '/new-flow/home/newcks/cks-doer');
+  cy.get('body', { timeout: 30000 }).should('be.visible');
 };
 
 const standardBeforeApproveCKS = (): void => {
@@ -2343,36 +2343,36 @@ const standardBeforeApproveCKS = (): void => {
   cy.get('.row.col-md-11').find('input[type="checkbox"]').check();
 
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-  cy.wait(['@getRequest'], { timeout: 100000 });
+  cy.wait(['@getRequest'], { timeout: 30000 });
 
   cy.get('input[aria-label="Date input field"]').eq(1).type(getTomorrowDateString());
 
   cy.intercept('GET', '**/api-cks/PromoteFromCksDoer/**').as('submitApprove');
   cy.contains('button', 'Approve').click();
-  cy.wait('@submitApprove', { timeout: 3000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@submitApprove', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
-  cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
   cy.wait(7000);
 
   const finalProjectName = getStandardProjectName();
   ClaimProject(finalProjectName, { claimBy: 'project' });
   approveProject(finalProjectName);
 
-  cy.url({ timeout: 3000000 }).should('include', '/#/new-flow/home/newcks/cks-checker');
-  cy.get('body', { timeout: 3000000 }).should('be.visible');
+  cy.url({ timeout: 30000 }).should('include', '/#/new-flow/home/newcks/cks-checker');
+  cy.get('body', { timeout: 30000 }).should('be.visible');
   cy.scrollTo('bottom');
-  cy.wait(3500);
+  cy.wait(800);
 
   cy.intercept('GET', '**/api-cks/promoteFromCksCheckerToCenter/**').as('promoteChecker');
   cy.intercept('POST', '**/api/flw-cgmd/assigneecgmdconfig/**').as('assignCgmd');
 
-  cy.contains('button', 'Approve To CGMD', { timeout: 3000000 }).should('be.visible').click();
+  cy.contains('button', 'Approve To CGMD', { timeout: 30000 }).should('be.visible').click();
 
-  cy.wait('@promoteChecker', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@assignCgmd', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@promoteChecker', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@assignCgmd', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
-  cy.url({ timeout: 3000000 }).should('include', '/#/workspace-home/workspace');
-  cy.wait(1500);
+  cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+  cy.wait(800);
   cy.contains('button', 'Logout').should('be.visible').click();
 };
 
@@ -2425,10 +2425,10 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
         ClaimProject(finalProjectName);
         approveProject(finalProjectName);
         cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-        cy.url({ timeout: 60000 }).should('include', '/cgmd/sasff-tester');
-        cy.wait(1500);
+        cy.url({ timeout: 30000 }).should('include', '/cgmd/sasff-tester');
+        cy.wait(800);
         cy.scrollTo('bottom');
-        cy.wait(1500);
+        cy.wait(800);
         cy.contains('button', 'Promote').should('be.visible').click({ force: true });
         cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
         cy.contains('button', 'Logout').should('be.visible').click();
@@ -2730,7 +2730,7 @@ export const dropdownPromotionGroup = (): void => {
       cy.get('select[formcontrolname="promotionGroup"]').select(valueToSelect);
     });
 
-  cy.wait(1500);
+  cy.wait(800);
 
   cy.get('select[formcontrolname="promotionSubGroup"]').each(($select: JQuery<HTMLElement>) => {
     const options = $select.find('option').toArray() as HTMLOptionElement[];
@@ -2825,11 +2825,11 @@ export const RetryPattern = (): void => {
 
 export const backBacicInfo = (): void => {
   cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getRequest4');
-  cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 100000 });
+  cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 30000 });
   cy.get('.modal-body > .col-md-12 > :nth-child(1) > .btn', { timeout: 30000 })
     .should('be.visible')
     .click();
-  cy.wait('@getRequest4', { timeout: 100000 }).then((interception) => {
+  cy.wait('@getRequest4', { timeout: 30000 }).then((interception) => {
     console.log(`Intercepted request: ${interception.request.method} ${interception.request.url}`);
   });
 };
@@ -2846,7 +2846,7 @@ export const addFile = (): void => {
   cy.get('input[type="file"]', { timeout: 30000 }).should('exist');
 
   cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/1.txt', 'binary').then((fileContent) => {
-    cy.get('input[type="file"][id="files"]', { timeout: 15000 }).selectFile(
+    cy.get('input[type="file"][id="files"]', { timeout: 10000 }).selectFile(
       {
         contents: Cypress.Buffer.from(fileContent, 'binary'),
         fileName: '1.txt',
@@ -2856,8 +2856,8 @@ export const addFile = (): void => {
     );
   });
 
-  cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@postRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
   beforeapproveMKT();
 };
@@ -2972,7 +2972,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       cy.wrap($textarea).focus().clear({ force: true }).type(cleaned, { delay: 0, force: true })
         .trigger('input', { bubbles: true, force: true }).trigger('change', { bubbles: true, force: true }).blur({ force: true });
     });
-    cy.wait(1000);
+    cy.wait(500);
   };
 
   const fillIfEmpty = ($el: JQuery<HTMLElement>, en: string, th: string, maxEn: number, maxTh: number): void => {
@@ -3012,14 +3012,14 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         nativeEl.dispatchEvent(new Event('change', { bubbles: true }));
       }).blur({ force: true });
     });
-    cy.wait(1000);
+    cy.wait(500);
   };
 
   // ── Init ─────────────────────────────────────────────────────────────────
   cy.scrollTo('bottom');
   cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
-  cy.get('textarea, select', { timeout: 15000 }).should('exist');
-  cy.wait(2000);
+  cy.get('textarea, select', { timeout: 10000 }).should('exist');
+  cy.wait(500);
 
   cy.then(() => {
     const p = Cypress.env('formattedDateMain') || Cypress.env('formattedDate') || Cypress.env('projectName') || 'Product';
@@ -3062,7 +3062,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       cy.log(`🌍 สุ่มเพิ่มภาษา: ${selectedExtraLangs.join(', ')}`);
       cy.get('ng2-dual-list-box select[formcontrolname="availableListBox"]').select(selectedExtraLangs, { force: true });
       cy.get('ng2-dual-list-box button.str').should('not.be.disabled').click({ force: true });
-      cy.wait(1500);
+      cy.wait(800);
     }
 
     // ✨ Helper สำหรับจัดการ Default Wording (สุ่ม Yes/No แบบยืดหยุ่น)
@@ -3117,7 +3117,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     // ════════════════════════════════════════════════════════════════════════
     if (useGenerate) {
       cy.get('app-mass-mkt-sms-wording-detail button[title="generate"]').first().scrollIntoView({ duration: SCROLL, offset: { top: -100, left: 0 } }).should('be.visible').click({ force: true });
-      cy.wait(4000);
+      cy.wait(500);
       trimOverflow();
 
       withSection(SEL.shortPromo, 'Short Promo', ($el) => fillIfEmpty($el, pools.shortPromo.EN(), pools.shortPromo.TH(), 50, 50));
@@ -3259,12 +3259,12 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       if ($el.is(':disabled') || !String($el.val() ?? '').trim()) return;
       cy.wrap($el).focus().trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
     });
-    cy.wait(1000);
+    cy.wait(500);
 
     withSection(SEL.saveBtn, 'Save Button', ($el) => {
       cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
       cy.wrap($el).should('be.visible').click();
-      cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+      cy.wait('@postRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
       closeSuccessModal();
     });
 
@@ -3304,7 +3304,7 @@ export const smsCKSPRE = (): void => {
 
 export const smsCKSPOST = (): void => {
   cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
-  cy.get('textarea, select', { timeout: 15000 }).should('exist');
+  cy.get('textarea, select', { timeout: 10000 }).should('exist');
   cy.wait(500);
 
   cy.then(() => {
@@ -3322,7 +3322,7 @@ export const smsCKSPOST = (): void => {
     };
 
     cy.get('select[formcontrolname="smsPromotePackSendFlag"]').first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
-    cy.wait(1000);
+    cy.wait(500);
 
     cy.get('select[formcontrolname="smsPromotePackSendFlag"]').then(($select) => {
       const currentValue = $select.val() as string;
@@ -3330,7 +3330,7 @@ export const smsCKSPOST = (): void => {
       if (currentValue === 'Send') {
         cy.log('✅ SMS Promote Package = Send, filling messageCode');
         cy.get('input[formcontrolname="messageCode"]').first().type(randomMessageCode(), { force: true });
-        cy.wait(1000);
+        cy.wait(500);
       } else {
         cy.log('⚠️ SMS Promote Package is not "Send", skipping messageCode');
       }
@@ -3339,7 +3339,7 @@ export const smsCKSPOST = (): void => {
     // Save - ใช้ selector ที่ถูกต้อง
     cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
     cy.contains('button', 'Save').should('be.visible').click(); // ✅ แก้ตรงนี้
-    cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+    cy.wait('@postRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
     closeSuccessModal();
   });
@@ -3505,7 +3505,7 @@ export const Voice = (fillRating = true): void => {
         .contains(/^Voice$/)
         .click({ force: true });
 
-      cy.wait(1500);
+      cy.wait(800);
 
       const shouldFill = {
         voiceFreeResource: Cypress._.random(0, 1) === 1,
@@ -3561,7 +3561,7 @@ export const Voice = (fillRating = true): void => {
         const TOTAL_FREE_RESOURCE = Cypress._.random(2, 6);
 
         expandPanel('app-mass-mkt-voice-free-resource');
-        cy.wait(1000);
+        cy.wait(500);
 
         Cypress._.times(TOTAL_FREE_RESOURCE, (frIndex) => {
           cy.log(`📦 Adding Free Resource: ${frIndex + 1}/${TOTAL_FREE_RESOURCE}`);
@@ -3569,7 +3569,7 @@ export const Voice = (fillRating = true): void => {
           cy.get('app-mass-mkt-voice-free-resource', { timeout: 10000 }).within(() => {
             cy.get('.collapse-panel').first().should('be.visible');
             cy.get('button.btn-primary.btn-xs').find('.glyphicon-plus').first().click({ force: true });
-            cy.wait(1500);
+            cy.wait(800);
 
             cy.get('select[formcontrolname="priceTypePattern"]', { timeout: 5000 }).then($select => {
               if ($select.length === 0) return;
@@ -3589,7 +3589,7 @@ export const Voice = (fillRating = true): void => {
             .then($matSelect => {
               if (!$matSelect.is(':visible') || $matSelect.attr('aria-disabled') === 'true') return;
               cy.wrap($matSelect).find('.mat-select-trigger').scrollIntoView().click({ force: true });
-              cy.wait(1000);
+              cy.wait(500);
               cy.get('.cdk-overlay-container mat-option', { timeout: 10000 })
                 .should('have.length.greaterThan', 0)
                 .then($options => {
@@ -3601,7 +3601,7 @@ export const Voice = (fillRating = true): void => {
                   cy.wrap($body).click({ force: true });
                 }
               });
-              cy.wait(1000);
+              cy.wait(500);
             });
 
           cy.get('app-mass-mkt-voice-free-resource', { timeout: 10000 }).within(() => {
@@ -3644,7 +3644,7 @@ export const Voice = (fillRating = true): void => {
                 cy.log(`  ℹ️ ${label} = Yes -> Filling`);
                 cy.wrap($input.first())
                   .clear({ force: true })
-                  .type(Cypress._.random(10, 1000).toString(), { force: true, delay: 150 });
+                  .type(Cypress._.random(10, 1000).toString(), { force: true, delay: 50 });
                 cy.wait(600);
                 safeSelectDropdown(`select[formcontrolname="${unitName}"]`);
               });
@@ -3653,7 +3653,7 @@ export const Voice = (fillRating = true): void => {
             cy.get('input[formcontrolname="commuFreeResource"]')
               .should('be.visible')
               .clear({ force: true })
-              .type(Cypress._.random(10, 500).toString(), { force: true, delay: 150 });
+              .type(Cypress._.random(10, 500).toString(), { force: true, delay: 50 });
             cy.wait(600);
             safeSelectDropdown('select[formcontrolname="commuFreeResourceUnit"]');
             checkRandomRadio('peakTimeFlag');
@@ -3664,10 +3664,10 @@ export const Voice = (fillRating = true): void => {
             cy.wait(800);
 
             cy.get('button[type="submit"].btn-primary').contains('Add').last().click({ force: true });
-            cy.wait(1500);
+            cy.wait(800);
           });
 
-          cy.wait(1000);
+          cy.wait(500);
           cy.log(`  ✅ Free Resource ${frIndex + 1} added`);
         });
 
@@ -3684,7 +3684,7 @@ export const Voice = (fillRating = true): void => {
         const TOTAL_FN = Cypress._.random(1, MAX_FN);
 
         expandPanel('app-mass-mkt-voice-fn');
-        cy.wait(1000);
+        cy.wait(500);
 
         cy.get('app-mass-mkt-voice-fn').within(() => {
           cy.get('.collapse-panel', { timeout: 10000 })
@@ -3701,14 +3701,14 @@ export const Voice = (fillRating = true): void => {
               .find('> button.btn-primary.btn-xs')
               .first()
               .click({ force: true });
-            cy.wait(1500);
+            cy.wait(800);
 
             cy.get('.panel-body:visible', { timeout: 10000 }).should('exist').as('voiceForm');
 
             cy.get('@voiceForm').find('input[formcontrolname="maxFNNumber"]')
               .should('be.visible')
               .clear()
-              .type(Cypress._.random(1, MAX_FN).toString(), { delay: 150 });
+              .type(Cypress._.random(1, MAX_FN).toString(), { delay: 50 });
             cy.wait(600);
             randomSelectFromDropdown('select[formcontrolname="fnNetwork"]');
 
@@ -3717,18 +3717,18 @@ export const Voice = (fillRating = true): void => {
               const index = Cypress._.random(0, options.length - 1);
               const text = options.eq(index).text().trim();
               cy.wrap($select).select(text);
-              cy.wait(1000);
+              cy.wait(500);
               cy.log(`  ✓ FN Type: ${text}`);
 
               if (text === 'Free Call') {
                 cy.get('@voiceForm').find('input[formcontrolname="fnFreeCall"]')
-                  .should('be.visible').clear().type(Cypress._.random(10, 60).toString(), { delay: 150 });
+                  .should('be.visible').clear().type(Cypress._.random(10, 60).toString(), { delay: 50 });
                 cy.wait(600);
                 randomSelectFromDropdown('select[formcontrolname="fnFreeCallUnit"]');
               }
               if (text === 'Special Rate') {
                 cy.get('@voiceForm').find('input[formcontrolname="fnRateExcVat"]')
-                  .should('be.visible').clear().type((Math.random() * 10).toFixed(2), { delay: 150 });
+                  .should('be.visible').clear().type((Math.random() * 10).toFixed(2), { delay: 50 });
                 cy.wait(600);
                 randomSelectFromDropdown('select[formcontrolname="fnRateExcVatUnit"]');
               }
@@ -3776,7 +3776,7 @@ export const Voice = (fillRating = true): void => {
         const TOTAL_PANELS = Cypress._.random(2, 5);
 
         expandPanel('app-mass-mkt-voice-b-number');
-        cy.wait(1000);
+        cy.wait(500);
 
         cy.get('app-mass-mkt-voice-b-number').within(() => {
           cy.get('.collapse-panel.show, .collapse-panel.in', { timeout: 10000 }).should('be.visible');
@@ -3788,7 +3788,7 @@ export const Voice = (fillRating = true): void => {
               .filter((_, el) => Cypress.$(el).find('span.glyphicon-plus').length > 0)
               .first()
               .click({ force: true });
-            cy.wait(1500);
+            cy.wait(800);
 
             cy.get('.panel.panel-default:visible', { timeout: 10000 }).last().as(`detailPanel${panelIndex}`);
 
@@ -3806,11 +3806,11 @@ export const Voice = (fillRating = true): void => {
 
                 const specialNum = genSpecialNumber();
                 cy.get('input[formcontrolname="specialNumber"]')
-                  .clear().type(specialNum, { delay: 150 });
+                  .clear().type(specialNum, { delay: 50 });
                 cy.wait(800);
 
                 cy.get('button[type="submit"]:visible').last().click({ force: true });
-                cy.wait(1500);
+                cy.wait(800);
               });
 
               cy.get('select[formcontrolname="bNumberType"]').should('be.visible').then($select => {
@@ -3818,14 +3818,14 @@ export const Voice = (fillRating = true): void => {
                 if (options.length === 0) throw new Error('❌ No bNumberType options');
                 const val = options.eq(Cypress._.random(0, options.length - 1)).val();
                 cy.wrap($select).select(val as string);
-                cy.wait(1500);
+                cy.wait(800);
 
                 cy.root().then($root => {
                   if (val === 'Free Call') {
                     const $freeCall = $root.find('input[formcontrolname="bFreeCall"]:visible');
                     const $freeCallUnit = $root.find('select[formcontrolname="bFreeCallUnit"]:visible');
                     if ($freeCall.length > 0) {
-                      cy.wrap($freeCall.first()).clear().type(Cypress._.random(1, 60).toString(), { delay: 150 });
+                      cy.wrap($freeCall.first()).clear().type(Cypress._.random(1, 60).toString(), { delay: 50 });
                       cy.wait(600);
                       if ($freeCallUnit.length > 0) {
                         cy.wrap($freeCallUnit.first()).find('option:not([disabled])').then($opts => {
@@ -3838,7 +3838,7 @@ export const Voice = (fillRating = true): void => {
                     const $rateExc = $root.find('input[formcontrolname="bRateExcVat"]:visible');
                     const $rateUnit = $root.find('select[formcontrolname="bRateExcVatUnit"]:visible');
                     if ($rateExc.length > 0) {
-                      cy.wrap($rateExc.first()).clear().type(Cypress._.random(0.5, 10).toFixed(2), { delay: 150 });
+                      cy.wrap($rateExc.first()).clear().type(Cypress._.random(0.5, 10).toFixed(2), { delay: 50 });
                       cy.wait(600);
                       if ($rateUnit.length > 0) {
                         cy.wrap($rateUnit.first()).find('option:not([disabled])').then($opts => {
@@ -3859,7 +3859,7 @@ export const Voice = (fillRating = true): void => {
               cy.wait(2500);
             });
 
-            cy.wait(1000);
+            cy.wait(500);
           });
         });
 
@@ -3876,7 +3876,7 @@ export const Voice = (fillRating = true): void => {
         if (!selector || !label) return;
         cy.log(`--- Filling ${label} ---`);
         expandPanel(selector);
-        cy.wait(1000);
+        cy.wait(500);
 
         cy.get(selector, { timeout: 10000 }).within(() => {
           cy.get('.collapse-panel').first().should('be.visible');
@@ -3886,7 +3886,7 @@ export const Voice = (fillRating = true): void => {
               cy.get('button.btn-info').contains('Copy From Voice Rating').then($btn => {
                 if ($btn.is(':visible')) {
                   cy.wrap($btn).click({ force: true });
-                  cy.wait(1500);
+                  cy.wait(800);
                   cy.log(`${label} - Copied from Voice Rating`);
                 }
               });
@@ -3898,7 +3898,7 @@ export const Voice = (fillRating = true): void => {
           });
         });
 
-        cy.wait(1500);
+        cy.wait(800);
 
         cy.get(selector, { timeout: 10000 }).within(() => {
           cy.get('.panel-body').then($panels => {
@@ -3911,7 +3911,7 @@ export const Voice = (fillRating = true): void => {
             }
 
             cy.wrap($formPanel.first()).within(() => {
-              cy.get('select[formcontrolname="networkFlag"]', { timeout: 3000 }).then($net => {
+              cy.get('select[formcontrolname="networkFlag"]', { timeout: 5000 }).then($net => {
                 if ($net.is(':visible') && !$net.is(':disabled')) {
                   const $opts = $net.find('option:not([disabled])');
                   if ($opts.length > 1) {
@@ -3922,17 +3922,17 @@ export const Voice = (fillRating = true): void => {
                 }
               });
 
-              cy.get('input[formcontrolname="rateExcludingVAT"]', { timeout: 3000 })
+              cy.get('input[formcontrolname="rateExcludingVAT"]', { timeout: 5000 })
                 .should('be.visible')
                 .then($input => {
                   if (!$input.is(':disabled')) {
                     const randomRate = Cypress._.random(0.5, 50.0).toFixed(2);
-                    cy.wrap($input).clear({ force: true }).type(randomRate, { force: true, delay: 150 });
+                    cy.wrap($input).clear({ force: true }).type(randomRate, { force: true, delay: 50 });
                     cy.wait(600);
                   }
                 });
 
-              cy.get('select[formcontrolname="rateUnit"]', { timeout: 3000 })
+              cy.get('select[formcontrolname="rateUnit"]', { timeout: 5000 })
                 .should('be.visible')
                 .then($sel => {
                   if (!$sel.is(':disabled')) {
@@ -3957,7 +3957,7 @@ export const Voice = (fillRating = true): void => {
           });
         });
 
-        cy.wait(2000);
+        cy.wait(500);
         cy.log(`${label} - Added new item`);
       };
 
@@ -4131,7 +4131,7 @@ export const WiFi = (): void => {
 
   const expandPanelIfNeeded = (): void => {
     cy.log('🔓 Ensuring WiFi panel is expanded...')
-    cy.get(COMPONENT, { timeout: 15000 })
+    cy.get(COMPONENT, { timeout: 10000 })
       .should('exist')
       .find(HEADING_SELECTOR, { timeout: 10000 })
       .should('be.visible')
@@ -4186,14 +4186,14 @@ export const WiFi = (): void => {
     cy.log(`🎲 Usage: ${usageType} | Quota: ${quotaType}`)
 
     getActivePane()
-      .find('button.btn-primary.btn-xs[style*="width:60px"]', { timeout: 12000 })
+      .find('button.btn-primary.btn-xs[style*="width:60px"]', { timeout: 10000 })
       .should('be.visible')
       .click({ force: true })
     cy.wait(600)
 
     // ✅ unhide WiFi Detail panel
     getActivePane()
-      .find('.panel.panel-default', { timeout: 8000 })
+      .find('.panel.panel-default', { timeout: 5000 })
       .then(($panels) => {
         $panels.toArray().forEach((el) => {
           if (Cypress.$(el).attr('hidden') !== undefined) {
@@ -4221,7 +4221,7 @@ export const WiFi = (): void => {
       .first()
       .should('be.visible')
       .click({ force: true })
-    cy.wait(1000)
+    cy.wait(500)
 
     cy.get('body').then(($body) => {
       if ($body.find('mat-option').length === 0) {
@@ -4234,7 +4234,7 @@ export const WiFi = (): void => {
       }
     })
 
-    cy.get('.cdk-overlay-container mat-option, mat-option', { timeout: 12000 })
+    cy.get('.cdk-overlay-container mat-option, mat-option', { timeout: 10000 })
       .should('have.length.greaterThan', 0)
       .then(($opts) => {
         const available = $opts.toArray().filter(
@@ -4259,7 +4259,7 @@ export const WiFi = (): void => {
       .first()
       .should('be.visible')
       .click({ force: true })
-    cy.wait(1000)
+    cy.wait(500)
 
     cy.log('✨ [WiFi – Deduct Success] Done')
   }
@@ -4268,7 +4268,7 @@ export const WiFi = (): void => {
     cy.log(`🔎 Verifying data in tab: "${tabName}"`)
     clickTab(tabName)
     getActivePane()
-      .find('table.table tbody', { timeout: 8000 })
+      .find('table.table tbody', { timeout: 5000 })
       .first()
       .should(($tbody) => {
         expect($tbody.text().trim()).not.to.match(/No data|ไม่พบข้อมูล/i)
@@ -4300,7 +4300,7 @@ export const VerticalApp = (): void => {
   cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
     .contains(/^Vertical App$/)
     .click({ force: true });
-  cy.wait(3500);
+  cy.wait(800);
 
   cy.get('app-mass-mkt-vertical-app').within(() => {
     cy.get('.collapse-panel').then(($panel) => {
@@ -4395,10 +4395,10 @@ export const VerticalApp = (): void => {
       }
     });
 
-    cy.wait(2000);
+    cy.wait(500);
     cy.contains('button', /^Add$/).click({ force: true });
     cy.log(`✅ Vertical App → Add clicked`);
-    cy.wait(2000);
+    cy.wait(500);
   });
 };
 
@@ -4411,7 +4411,7 @@ export const CloudGame = (): void => {
     .contains(/^Cloud Game$/)
     .click({ force: true });
 
-  cy.wait(3500);
+  cy.wait(800);
 
   cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
     .first()
@@ -4471,7 +4471,7 @@ export const EntertainmentPartnership = (platforms: Array<'Arcade' | 'TV Plus' |
 
       cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
 
-      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 10000 })
         .should('be.visible')
         .within(() => {
           platforms.forEach((platform) => {
@@ -4487,14 +4487,14 @@ export const EntertainmentPartnership = (platforms: Array<'Arcade' | 'TV Plus' |
               .find('select[formcontrolname="cpName"]')
               .select(randomCp);
 
-            cy.wait(1500);
+            cy.wait(800);
 
             cy.contains('label', 'Platform')
               .closest('.form-group')
               .find('select[formcontrolname="platform"]')
               .select(targetPlatform);
 
-            cy.wait(1500);
+            cy.wait(800);
 
             cy.contains('h3', 'Partner App ID')
               .closest('.panel')
@@ -4521,9 +4521,9 @@ export const EntertainmentPartnership = (platforms: Array<'Arcade' | 'TV Plus' |
                           .should('have.value', matched.value.trim());
                         cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
                       });
-                    cy.wait(2000)
+                    cy.wait(500)
                     cy.contains('button', /^Add$/).should('be.visible').click();
-                    cy.wait(2000)
+                    cy.wait(500)
                   });
 
                 cy.contains('h3', 'Partner App ID Detail')
@@ -4537,7 +4537,7 @@ export const EntertainmentPartnership = (platforms: Array<'Arcade' | 'TV Plus' |
                   });
               });
 
-            cy.wait(1500);
+            cy.wait(800);
 
             cy.get('button')
               .filter(':visible')
@@ -4640,8 +4640,8 @@ export const AIIPCamera = (): void => {
                 .should('have.value', matched.value.trim());
               cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
             });
-          cy.wait(2000)
-          // ✅ ลบ cy.wait(2000) ออก → .should('be.enabled') จะรอจนกว่า DOM และ JS พร้อม
+          cy.wait(500)
+          // ✅ ลบ cy.wait(500) ออก → .should('be.enabled') จะรอจนกว่า DOM และ JS พร้อม
           cy.contains('button', /^Add$/).should('be.enabled').click();
         });
 
@@ -4655,9 +4655,9 @@ export const AIIPCamera = (): void => {
             !$panel.is(':visible');
           expect(isHidden, 'Partner App ID Detail panel should be hidden').to.be.true;
         });
-      cy.wait(2000)
+      cy.wait(500)
       // 8. กดปุ่ม Add ที่ท้าย Form
-      // ✅ ลบ cy.wait(2000) ออก → ใช้ Cypress Auto-waiting แทน
+      // ✅ ลบ cy.wait(500) ออก → ใช้ Cypress Auto-waiting แทน
       cy.get('app-mass-mkt-ai-ip-camera')
         .within(() => {
           cy.get('.row.ng-star-inserted')
@@ -4703,7 +4703,7 @@ export const Karaoke = (): void => {
 
       cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
 
-      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 10000 })
         .should('be.visible')
         .within(() => {
           cy.get('select[formcontrolname="cpName"]')
@@ -4724,7 +4724,7 @@ export const Karaoke = (): void => {
 
           cy.log(`Selected Platform: ${randomPlatform}`);
 
-          cy.wait(1500);
+          cy.wait(800);
 
           cy.contains('h3', 'Partner App ID')
             .closest('.panel')
@@ -4751,7 +4751,7 @@ export const Karaoke = (): void => {
                         .should('have.value', matched.value.trim());
                       cy.log(`Selected Partner CustomerType: ${matched.value.trim()}`);
                     });
-                  cy.wait(2000)
+                  cy.wait(500)
                   cy.contains('button', /^Add$/).should('be.visible').click();
                 });
 
@@ -4766,7 +4766,7 @@ export const Karaoke = (): void => {
                 });
             });
 
-          cy.wait(1500);
+          cy.wait(800);
 
           if (isAISPlayBox) {
             cy.contains('h3', 'Vimmi Product')
@@ -4784,14 +4784,14 @@ export const Karaoke = (): void => {
                     cy.log(`Random Vimmi Product ID: ${random19Digits}`);
 
                     cy.get('input[formcontrolname="vimmiProductId"]').should('be.visible').clear().type(random19Digits);
-                    cy.wait(2000)
+                    cy.wait(500)
                     cy.contains('button', /^Add$/).should('be.visible').click();
                   });
               });
 
-            cy.wait(1500);
+            cy.wait(800);
           }
-          cy.wait(2000)
+          cy.wait(500)
           cy.get('button')
             .filter(':visible')
             .contains(/^Add$/)
@@ -4835,7 +4835,7 @@ export const MusicStreaming = (): void => {
 
       cy.log(`Product Offering CustomerType: ${label} → Partner CustomerType: ${partnerCustomerType}`);
 
-      cy.get('app-mass-mkt-content-music-streaming', { timeout: 15000 })
+      cy.get('app-mass-mkt-content-music-streaming', { timeout: 10000 })
         .should('be.visible')
         .within(() => {
           const cpOptions = ['GMM Plern', 'jooxvip', 'Apple'];
@@ -4854,7 +4854,7 @@ export const MusicStreaming = (): void => {
               cy.log(`Selected CP Name: ${matched.value.trim()}`);
             });
 
-          cy.wait(1500);
+          cy.wait(800);
 
           const platforms = ['1: Music Streaming', '2: AIS Play', '3: AIS Play Box'];
           const randomPlatform = platforms[Math.floor(Math.random() * platforms.length)];
@@ -4866,7 +4866,7 @@ export const MusicStreaming = (): void => {
 
           cy.log(`Selected Platform: ${randomPlatform}`);
 
-          cy.wait(1500);
+          cy.wait(800);
 
           cy.contains('h3', 'Partner App ID')
             .closest('.panel')
@@ -4908,7 +4908,7 @@ export const MusicStreaming = (): void => {
                 });
             });
 
-          cy.wait(1500);
+          cy.wait(800);
 
           cy.get('button')
             .filter(':visible')
@@ -4936,9 +4936,9 @@ export const VRBT = (): void => {
     .should('be.enabled')
     .click({ force: true });
 
-  cy.wait(1500);
+  cy.wait(800);
 
-  cy.get('app-mass-mkt-vrbt', { timeout: 15000 })
+  cy.get('app-mass-mkt-vrbt', { timeout: 10000 })
     .should('be.visible')
     .within(() => {
       cy.get('.panel')
@@ -4958,7 +4958,7 @@ export const VRBT = (): void => {
               cy.get('select[formcontrolname="productName"]').select(matched.value.trim()).should('have.value', matched.value.trim());
               cy.log(`Selected Product Name: ${matched.value.trim()}`);
             });
-          cy.wait(1500);
+          cy.wait(800);
 
           cy.get('ng2-dual-list-box[formcontrolname="partnerSku"]')
             .within(() => {
@@ -4977,7 +4977,7 @@ export const VRBT = (): void => {
                   cy.get('button.str').click();
                 });
             });
-          cy.wait(2000)
+          cy.wait(500)
 
           cy.contains('button', /^Add$/).should('be.visible').should('be.enabled').click();
         });
@@ -5044,7 +5044,7 @@ const selectDropdownOption = <T extends string>(
         if (matchedOptions.length > 0) {
           const randomOpt = matchedOptions[Math.floor(Math.random() * matchedOptions.length)] as HTMLOptionElement;
           cy.wrap($select).select(randomOpt.value);
-          cy.wait(1500);
+          cy.wait(800);
           cy.log(`✅ ${logPrefix}Selected: ${randomOpt.text}`);
           return;
         }
@@ -5052,7 +5052,7 @@ const selectDropdownOption = <T extends string>(
         attempts++;
         if (attempts < maxRetries) {
           cy.log(`⚠️ ${logPrefix}No match, retry ${attempts}/${maxRetries}`);
-          cy.wait(2000);
+          cy.wait(500);
           attemptSelection();
           return;
         }
@@ -5062,7 +5062,7 @@ const selectDropdownOption = <T extends string>(
         if (availableOptions.length > 0) {
           const fallback = availableOptions[Math.floor(Math.random() * availableOptions.length)] as HTMLOptionElement;
           cy.wrap($select).select(fallback.value);
-          cy.wait(1500);
+          cy.wait(800);
           cy.log(`⚠️ ${logPrefix}Fallback: ${fallback.text}`);
         }
       });
@@ -5096,7 +5096,7 @@ const selectMatOption = (
       } else {
         cy.get('.cdk-overlay-backdrop').click({ force: true });
       }
-      cy.wait(1500);
+      cy.wait(800);
     });
 };
 
@@ -5125,7 +5125,7 @@ const selectMatOptionWithValidation = (
       }
     });
 
-  cy.wait(1500);
+  cy.wait(800);
 
   cy.contains('label', labelSelector)
     .closest('.row')
@@ -5234,7 +5234,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
 
         const selectedType = availableOptions[Math.floor(Math.random() * availableOptions.length)] as InternetQuotaType;
         cy.wrap($select).select(selectedType);
-        cy.wait(1500);
+        cy.wait(800);
         cy.log(`📌 Selected Quota Type: ${selectedType}`);
 
         // Route to appropriate handler
@@ -5250,7 +5250,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
         handlers[selectedType]?.();
       });
     });
-  cy.wait(2000)
+  cy.wait(500)
   cy.get('app-mass-mkt-internet').find('form, [formgroup]').should('have.class', 'ng-valid');
 
   cy.get('app-mass-mkt-internet button.btn-primary')
@@ -5332,7 +5332,7 @@ function checkAndFillContentType(): void {
       cy.log(`✅ Found tab: "${tabConfig.name}"`);
 
       cy.wrap($tab).click({ force: true });
-      cy.wait(2000);
+      cy.wait(500);
       cy.log(`✅ Clicked tab: ${tabConfig.name}`);
 
       // ✅ รอให้ container ของ tab นี้โหลด
@@ -5389,7 +5389,7 @@ function checkAndFillContentType(): void {
             }
 
             cy.wrap($currentBtn).click({ force: true });
-            cy.wait(1500);
+            cy.wait(800);
             cy.log(`✅ [${tabConfig.name}] Clicked Edit button #${currentEditIndex + 1}`);
 
             // ✅ หา Content Type select ใน container
@@ -5519,7 +5519,7 @@ export const checkAndUpdatePriority = (): void => {
 
   const safeClickCancel = (): void => {
     // รอ component แทน bail out
-    cy.get(INTERNET_COMPONENT, { timeout: 6000 }).should('exist').then(($comp) => {
+    cy.get(INTERNET_COMPONENT, { timeout: 5000 }).should('exist').then(($comp) => {
       const $cancelBtns = $comp
         .find('button')
         .toArray()
@@ -5697,14 +5697,14 @@ const updatePriorityInPanel = (): void => {
     cy.wrap($innerEditBtn).scrollIntoView().click({ force: true });
     cy.log('✅ คลิก inner Edit (2nd Edit) — รอ sub-panel โผล่');
     // รอ Angular re-render เสร็จก่อนไปขั้นต่อไป
-    cy.wait(3500);
+    cy.wait(800);
   });
 
   // Step 3: guard ด้วย body check ก่อน แล้วค่อย fill priority ใน sub-panel
   cy.get('body').then(($body) => {
     if (!$body.find(INTERNET_COMPONENT).length) {
       cy.log('⏳ Step 3: INTERNET_COMPONENT หายหลัง inner Edit — รอ re-render');
-      cy.wait(4000);
+      cy.wait(500);
     }
   });
 
@@ -5735,7 +5735,7 @@ const updatePriorityInPanel = (): void => {
   });
 
   // Step 4: click inner Update — แยก block เพื่อให้ re-query หลัง fill
-  cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should('exist').then(($comp) => {
+  cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should('exist').then(($comp) => {
     const $pb = getInternetDetailPanelBody($comp);
     if (!$pb.length) return;
 
@@ -5761,14 +5761,14 @@ const updatePriorityInPanel = (): void => {
   });
 
   // Step 5: fill fixedSpeedPriority อีกรอบหลัง sub-panel close
-  cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should('exist').then(($comp) => {
+  cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should('exist').then(($comp) => {
     const $pb = getInternetDetailPanelBody($comp);
     if (!$pb.length) return;
     tryFillVisible($pb, 'fixedSpeedPriority', 'Fixed Speed Priority');
   });
 
   // Step 6: click outer Update/Add
-  cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should('exist').then(($comp) => {
+  cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should('exist').then(($comp) => {
     const $pb = getInternetDetailPanelBody($comp);
     if (!$pb.length) return;
 
@@ -5836,7 +5836,7 @@ const performSimpleClaimAndApprovalRole = (
 
     cy.log(`📦 [${index + 1}/${poCount}] Searching by "${searchBy}": "${currentUniqueKeyword}"`);
 
-    cy.get('h3:contains("To Do List")', { timeout: 15000 })
+    cy.get('h3:contains("To Do List")', { timeout: 10000 })
       .parent()
       .find('tbody tr')
       .should(($rows) => {
@@ -5873,7 +5873,7 @@ const performSimpleClaimAndApprovalRole = (
     if (index < poCount - 1) {
       navigateToWorkspace();
 
-      cy.get('h3:contains("To Do List")', { timeout: 15000 })
+      cy.get('h3:contains("To Do List")', { timeout: 10000 })
         .parent()
         .find('tbody tr')
         .should(($rows) => {
@@ -5906,10 +5906,10 @@ const checkAndUpdateVerticalAppPriority = (): void => {
           .scrollIntoView()
           .focus()
           .clear()
-          .type(randomNum.toString(), { delay: 150 })
+          .type(randomNum.toString(), { delay: 50 })
           .blur();
         cy.log(`✅ ใส่ค่า ${label}: ${randomNum}`);
-        cy.wait(2000);
+        cy.wait(500);
         onFilled();
       } else {
         cy.log(`ℹ️ ${label} มีค่าอยู่แล้ว: "${val}" — ข้าม`);
@@ -5951,7 +5951,7 @@ const checkAndUpdateVerticalAppPriority = (): void => {
       if ($cancelBtn.length) {
         cy.wrap($cancelBtn.first()).click({ force: true });
         cy.log('✅ คลิก Cancel');
-        cy.wait(1000);
+        cy.wait(500);
       } else {
         cy.log('⚠️ ไม่พบ Cancel button');
       }
@@ -5991,7 +5991,7 @@ const checkAndUpdateVerticalAppPriority = (): void => {
       }
 
       cy.wrap($editBtn).click({ force: true });
-      cy.wait(1500);
+      cy.wait(800);
       cy.log(`✅ คลิก Edit button แถวที่ ${rowIndex + 1}`);
 
       cy.get(`${COMPONENT} .panel-body`).then(($panelBody) => {
@@ -6098,7 +6098,7 @@ const checkAndUpdateVerticalAppPriority = (): void => {
     const $target = $tab.first();
     cy.log(`✅ Found tab: "Vertical App" (${$target.length} element)`);
     cy.wrap($target).scrollIntoView().click({ force: true });
-    cy.wait(1500);
+    cy.wait(800);
 
     cy.get('body').then(($b) => {
       const $rows = $b.find(`${COMPONENT} table > tbody > tr`);
@@ -6313,7 +6313,7 @@ const createProjectBase = (
   cy.intercept('GET', '/PLMSpringBoot/api/edsOfferingController/getExistPackage/**').as('getExistPackage');
 
   cy.get('input[aria-label="Date input field"]').click().type(formattedDateString);
-  cy.wait(1500);
+  cy.wait(800);
 
   if (Module === 'ENTER' || Module === 'MUSIC') {
     if (!subModule) throw new Error(`subModule is required for Module ${Module}`);
@@ -6325,10 +6325,10 @@ const createProjectBase = (
   RandomProjectDescription(projectName, subModule, Module);
 
   cy.get('button[type="button"]').contains('Save').click();
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
   cy.wait('@getExistPackage', { timeout: 30000 });
 
-  cy.get('.modal-body > :nth-child(1) > div > .btn', { timeout: 15000 })
+  cy.get('.modal-body > :nth-child(1) > div > .btn', { timeout: 10000 })
     .should('be.visible').click({ force: true });
 
   cy.get('modal-container').should('not.exist');
@@ -6460,7 +6460,7 @@ export const ProjectBasicInformationComplete = (
     if (i < poCount - 1) {
       cy.log(`🔙 PO ${currentPoName} done. Navigating back for next PO...`);
       backBacicInfo();
-      cy.wait(1500);
+      cy.wait(800);
     }
   }
 
@@ -6501,11 +6501,11 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
   cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
   cy.get('input[aria-label="Date input field"]').type(formattedDate);
-  cy.wait(1500);
+  cy.wait(800);
   cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
   RandomProjectDescription(projectName, Module);
   cy.get('button[type="button"]').contains('Save').click();
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
   cy.wait(8000);
   cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
 
@@ -6521,11 +6521,11 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
   cy.contains('button', 'Create', { timeout: 10000 }).click();
-  cy.wait('@postRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@postRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
   cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
-  cy.wait('@getProject', { timeout: 1000000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getProject', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
   cy.wait(15000);
 
   if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
@@ -6571,7 +6571,7 @@ const createPOBase = (
   cy.wait('@createPO').its('response.statusCode').should('eq', 200);
 
   cy.intercept('GET', '**/getProjectByProjectId/*').as('getProject');
-  cy.wait('@getProject', { timeout: 300000 });
+  cy.wait('@getProject', { timeout: 30000 });
 
   cy.location('hash').should('include', '/project-home/mass-mkt/mass-mkt-product-offering');
 
@@ -6844,9 +6844,9 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
     cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
     cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
   }
-  cy.wait(2000)
+  cy.wait(500)
   cy.get('button.btn.btn-primary').contains('Add').click();
-  cy.wait(2000);
+  cy.wait(500);
   cy.get('button.btn.btn-primary').contains('Add').click();
 };
 
@@ -6917,12 +6917,12 @@ export const beforeapproveMKT = (): void => {
     .contains('Submit')
     .click();
 
-  cy.wait('@postRequest', { timeout: 120000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 120000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@submitApprove', { timeout: 180000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@submitApprove', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
   // ===== 🔄 3. NAVIGATION & PROJECT WORKFLOW =====
-  cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
+  cy.url({ timeout: 60000 }).should('include', '/#/workspace-home/workspace');
 
   // cy.wait(7000); // ⚠️ Hard wait ไม่แนะนำ ใช้ cy.get('...').should('exist') แทนถ้าเป็นไปได้
   const finalProjectName = getStandardProjectName();
@@ -6932,15 +6932,15 @@ export const beforeapproveMKT = (): void => {
   approveProject(finalProjectName);
 
   // ===== 📥 4. FINAL CHECK & SCROLL =====
-  cy.wait('@postRequest', { timeout: 120000 }).its('response.statusCode').should('eq', 200);
-  cy.wait('@getRequest', { timeout: 120000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+  cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
   cy.scrollTo('bottom');
-  // cy.wait(1500); // ⚠️ แทนที่ด้วย assertion ของ element ที่โผล่มาหลัง scroll จะเสถียรกว่า
+  // cy.wait(800); // ⚠️ แทนที่ด้วย assertion ของ element ที่โผล่มาหลัง scroll จะเสถียรกว่า
 
-  cy.url({ timeout: 120000 }).should('include', '/mkt/mktchecker');
+  cy.url({ timeout: 60000 }).should('include', '/mkt/mktchecker');
   cy.get('button.btn.btn-xs.btn-primary').should('be.visible').click();
-  cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
+  cy.url({ timeout: 60000 }).should('include', '/#/workspace-home/workspace');
 
   // ===== 🚪 5. LOGOUT =====
   cy.contains('button', 'Logout').should('be.visible').click();
@@ -7103,7 +7103,7 @@ export const RandomHumanTouchPoint = (subModule: string): void => {
             .should('be.visible')
             .click({ force: true });
 
-          cy.wait(3500);
+          cy.wait(800);
         });
     });
 };
