@@ -1,10 +1,33 @@
 ```
+# Cypress specific ignores
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+
+# General test artifacts
+*.log
+*.tmp
+
 # Dependencies
 node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
 # Environment
 .env
 .env.local
-.env.*
-# Logs
-*.log
+*.env.*
+
+# Coverage and reports
+coverage/
+htmlcov/
+*.coverage
+
+# OS generated files
+.DS_Store
+Thumbs.db
 ```
