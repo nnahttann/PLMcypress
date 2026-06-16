@@ -16,7 +16,10 @@
 // Import commands.js using ES2015 syntax:
 import './commands'
 
+// Block external resource requests to speed up page load
 beforeEach(() => {
-  cy.intercept('GET', 'https://fonts.googleapis.com/**', { statusCode: 200, body: '' })
-  cy.intercept('GET', 'https://cdnjs.cloudflare.com/**', { statusCode: 200, body: '' })
+  // Block Google Fonts and CDN requests that timeout on intranet
+  cy.intercept('GET', '**/fonts.googleapis.com/**', { statusCode: 200, body: '' })
+  cy.intercept('GET', '**/cdnjs.cloudflare.com/**', { statusCode: 200, body: '' })
+  cy.intercept('GET', '**/fonts.gstatic.com/**', { statusCode: 200, body: '' })
 })
