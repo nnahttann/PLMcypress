@@ -3,7 +3,7 @@
 // Project Manager, Login, Pagination
 // ========================
 
-import { formattedDateMain, formattedDateOntop } from '../config';
+import { formattedDateMain, formattedDateOntop } from '../config/config-index';
 
 class ProjectManager {
   private static instance: ProjectManager;

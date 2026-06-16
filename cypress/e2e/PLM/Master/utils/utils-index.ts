@@ -3,7 +3,7 @@
 // ========================
 
 import { Module } from '../types';
-import { MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from '../config';
+import { MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from '../config/config-index';
 
 export const getCredentials = (module: Module): { user: string, pass: string } => {
   const credMap: Record<Module, { user: string, pass: string }> = {
