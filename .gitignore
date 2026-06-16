@@ -1,33 +1,41 @@
 ```
-# Cypress specific ignores
-cypress/screenshots/
-cypress/videos/
-cypress/downloads/
-
-# General test artifacts
-*.log
-*.tmp
-
 # Dependencies
 node_modules/
 
-# IDE files
-.vscode/
-.idea/
-*.swp
-*.swo
+# Logs and temp files
+*.log
+*.tmp
 
 # Environment
 .env
 .env.local
 *.env.*
 
-# Coverage and reports
+# Editors
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+.env
+.env.local
+*.env.*
+.mypy_cache/
+.pytest_cache/
+.coverage
 coverage/
 htmlcov/
-*.coverage
 
-# OS generated files
+# Build directories
+dist/
+build/
+target/
 .DS_Store
 Thumbs.db
 ```

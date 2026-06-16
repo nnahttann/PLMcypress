@@ -6,6 +6,61 @@
 const env = Cypress.env();
 
 /**
+ * Interface for environment variables
+ */
+interface EnvVariables {
+  urlsit: string;
+  MKTpre: string;
+  MKTpre1: string;
+  MKTpost: string;
+  MKTpost1: string;
+  cks: string;
+  ckspass: string;
+  cgcirb: string;
+  cgcirbpass: string;
+  cgccbs: string;
+  cgccbspass: string;
+  cgtcbs: string;
+  cgtcbspass: string;
+  cgtirb: string;
+  cgtirbpass: string;
+  actm: string;
+  actmpass: string;
+  oper: string;
+  operpass: string;
+  spadsup: string;
+  spadsuppass: string;
+  spaddoer: string;
+  spaddoerpass: string;
+  spadtest: string;
+  spadtestpass: string;
+  spaddp: string;
+  spaddppass: string;
+  apo: string;
+  apopass: string;
+  enter: string;
+  enterpass: string;
+  music: string;
+  musicpass: string;
+  tscenter: string;
+  tscenterpass: string;
+  aafsp: string;
+  aafsppass: string;
+  csisp: string;
+  csisppass: string;
+  e2etest: string;
+  e2etestpass: string;
+  aafdp: string;
+  aafdppass: string;
+  csidp: string;
+  csidppass: string;
+  e2edp: string;
+  e2edppass: string;
+  sasff: string;
+  sasffpass: string;
+}
+
+/**
  * Destructure environment variables for credentials and URLs
  * All values are loaded from Cypress environment configuration
  */
@@ -34,7 +89,7 @@ export const {
   csidp, csidppass,
   e2edp, e2edppass,
   sasff, sasffpass
-} = env as Record<string, string>;
+} = env as EnvVariables;
 
 // ========================
 // DATE/TIME UTILITIES
