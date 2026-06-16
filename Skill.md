@@ -1,3 +1,9 @@
+---
+name: Mass Mobile PLM - CKS Role
+description: Comprehensive skill document for Mass Mobile PLM system (CKS/ENH role) including all modules, workflows, validations, database mappings, and test scenarios.
+version: 1.0.0
+---
+
 # Mass Mobile PLM - Skill Document (CKS Role)
 
 **หมายเหตุสำคัญ**: เอกสารนี้อ้างอิงจาก HLD Version ENH และ Database Tables ใช้ชื่อ `ENH` 
@@ -23,6 +29,7 @@
 16. [Script Validation Rules](#script-validation-rules)
 17. [Database Mapping](#database-mapping)
 18. [Type Definitions](#type-definitions)
+19. [Constants & Configuration](#constants--configuration)
 
 ---
 
