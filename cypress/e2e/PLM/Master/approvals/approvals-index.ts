@@ -3,8 +3,8 @@
 // SPAD, CGMD, ACTM, OPER, etc.
 // ========================
 
-import { TaskListHeader, CoreTaskCallback, FinalAction } from '../types';
-import { scrollAndWait, clickYesIfExists, selectRandomOption } from '../utils';
+import { TaskListHeader, CoreTaskCallback, FinalAction } from '../types/types-index';
+import { scrollAndWait, clickYesIfExists, selectRandomOption } from '../utils/utils-index';
 
 // Helper for approval flows
 const createFullPageApprovalFlow = (
