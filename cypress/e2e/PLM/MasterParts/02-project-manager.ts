@@ -1,20 +1,9 @@
 // ========================
-// PROJECT MANAGEMENT SYSTEM
+// PROJECT MANAGER
 // ========================
+import { formattedDateMain, formattedDateOntop } from './01-types-and-constants';
 
-import { Module } from './01-types-and-constants';
-
-let formattedDateMain: string = '';
-let formattedDateOntop: string = '';
-
-export const setFormattedDates = (main: string, ontop: string) => {
-  formattedDateMain = main;
-  formattedDateOntop = ontop;
-};
-
-export const getFormattedDates = () => ({ formattedDateMain, formattedDateOntop });
-
-export class ProjectManager {
+class ProjectManager {
   private static instance: ProjectManager;
   private projects: Map<number, string> = new Map();
   private currentIndex: number = 0;

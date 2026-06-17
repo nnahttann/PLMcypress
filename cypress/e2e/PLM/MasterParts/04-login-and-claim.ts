@@ -1,3 +1,7 @@
+// ========================
+// LOGIN AND CLAIM FUNCTIONS
+// ========================
+
 export const login = (username: string, password: string): void => {
   cy.get('app-login', { timeout: 3000000 }).should('be.visible');
   cy.get('form', { timeout: 2000000 }).should('be.visible');
@@ -33,7 +37,7 @@ export const loginAndWaitReady = (username: string, password: string): void => {
 };
 
 // ========================
-// PAGINATION HELPER - FIXED ASYNC CHAIN
+// PAGINATION HELPER
 // ========================
 
 const searchInTableWithPagination = (
@@ -78,8 +82,6 @@ const searchInTableWithPagination = (
         });
 
         if (found && matchingIndex >= 0) {
-          // ✅ ส่ง empty jQuery + index เข้า callback
-          // callback ต้องไม่ใช้ $row — ให้ re-query เองด้วย sectionHeader/searchText
           rowCallback(Cypress.$(), matchingIndex);
         }
 
@@ -135,7 +137,186 @@ const searchInTableWithPagination = (
 
   searchPage();
 };
+
 // ========================
 // CLAIM PROJECT
 // ========================
 
+export const ClaimProject = (projectName: string, options?: { claimBy?: 'project' | 'po' }): void => {
+  const poCount: number = Cypress.env('poCount') ?? 1;
+  const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
+  const claimBy = options?.claimBy ?? 'po';
+
+  cy.log(`🔁 Total PO to Claim: ${poCount}`);
+  cy.log(`🔑 Claim mode: ${claimBy}`);
+
+  const MAX_PAGES = 3;
+
+  const waitForUnassignedReady = (): Cypress.Chainable => {
+    return cy
+      .get('h3:contains("Unassigned Task")', { timeout: 15000 })
+      .parent()
+      .find('tbody tr')
+      .should(($rows) => {
+        expect($rows.text()).not.to.contain('Fetching data');
+        expect($rows.length).to.be.greaterThan(0);
+      });
+  };
+
+  const claimOnce = (keyword: string): void => {
+    const searchAndClaimOnce = (currentPage: number = 1): void => {
+      if (currentPage > MAX_PAGES) {
+        cy.log(`⚠️ Checked ${MAX_PAGES} pages, not found: "${keyword}"`);
+        return;
+      }
+
+      cy.log(`🔍 [Claim-Project] Page ${currentPage} keyword: "${keyword}"`);
+
+      waitForUnassignedReady().then(($rows) => {
+        let found = false;
+        let foundRowIndex = -1;
+
+        $rows.each((index: number, row: HTMLElement) => {
+          if (found) return;
+          const rowText = Cypress.$(row).text().trim();
+          if (rowText.includes(keyword) && !rowText.includes('Fetching data')) {
+            found = true;
+            foundRowIndex = index;
+          }
+        });
+
+        if (found) {
+          cy.log(`✅ Found - Page ${currentPage}, Row ${foundRowIndex}`);
+
+          cy.get('h3:contains("Unassigned Task")')
+            .parent()
+            .find('tbody tr')
+            .eq(foundRowIndex)
+            .find('button.claim-top')
+            .click({ force: true });
+
+          cy.log(`✅ Claimed project (once)`);
+
+          cy.get('h3:contains("To Do List")', { timeout: 30000 })
+            .parent()
+            .find('tbody tr')
+            .should(($todoRows) => {
+              expect($todoRows.text()).not.to.contain('Fetching data');
+              expect($todoRows.text()).to.include(keyword);
+            });
+
+          cy.log(`✅ Confirmed in To Do List`);
+
+        } else {
+          cy.get('body').then(($body) => {
+            const $section = $body.find('h3:contains("Unassigned Task")').parent();
+            const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+
+            if ($nextBtn.length > 0) {
+              cy.log(`➡️ Page ${currentPage} - Not found, going next...`);
+              const firstRowTextBefore = $section.find('tbody tr').first().text().trim();
+              cy.wrap($nextBtn).click();
+
+              cy.get('h3:contains("Unassigned Task")', { timeout: 15000 })
+                .parent()
+                .find('tbody tr')
+                .should(($r) => {
+                  expect($r.first().text().trim()).not.to.equal(firstRowTextBefore);
+                  expect($r.text()).not.to.contain('Fetching data');
+                });
+
+              searchAndClaimOnce(currentPage + 1);
+            } else {
+              cy.log(`📋 No more pages, "${keyword}" not found`);
+            }
+          });
+        }
+      });
+    };
+
+    searchAndClaimOnce();
+  };
+
+  const claimByPO = (remainingPOs: number, poIndex: number = 0, currentPage: number = 1): void => {
+    if (remainingPOs <= 0) {
+      cy.log('✅ All POs claimed and moved to To Do List');
+      return;
+    }
+
+    if (currentPage > MAX_PAGES) {
+      cy.log(`⚠️ Checked ${MAX_PAGES} pages, checking To Do List...`);
+      return;
+    }
+
+    const keyword = allPoNames[poIndex] ?? `${projectName}_PO${poIndex + 1}`;
+    cy.log(`🔍 [Claim-PO] Page ${currentPage} (Remaining: ${remainingPOs}) keyword: "${keyword}"`);
+
+    waitForUnassignedReady().then(($rows) => {
+      let found = false;
+      let foundRowIndex = -1;
+
+      $rows.each((index: number, row: HTMLElement) => {
+        if (found) return;
+        const rowText = Cypress.$(row).text().trim();
+        if (rowText.includes(keyword) && !rowText.includes('Fetching data')) {
+          found = true;
+          foundRowIndex = index;
+        }
+      });
+
+      if (found) {
+        cy.log(`✅ Found - Page ${currentPage}, Row ${foundRowIndex}, keyword: "${keyword}"`);
+
+        cy.get('h3:contains("Unassigned Task")')
+          .parent()
+          .find('tbody tr')
+          .eq(foundRowIndex)
+          .find('button.claim-top')
+          .click({ force: true });
+
+        cy.log(`✅ Claimed 1 PO`);
+
+        cy.get('h3:contains("To Do List")', { timeout: 30000 })
+          .parent()
+          .find('tbody tr')
+          .should(($todoRows) => {
+            expect($todoRows.text()).not.to.contain('Fetching data');
+            expect($todoRows.text()).to.include(keyword);
+          });
+
+        cy.log(`✅ PO confirmed in To Do List`);
+        claimByPO(remainingPOs - 1, poIndex + 1, 1);
+
+      } else {
+        cy.get('body').then(($body) => {
+          const $section = $body.find('h3:contains("Unassigned Task")').parent();
+          const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+
+          if ($nextBtn.length > 0) {
+            cy.log(`➡️ Page ${currentPage} - Not found, going next...`);
+            const firstRowTextBefore = $section.find('tbody tr').first().text().trim();
+            cy.wrap($nextBtn).click();
+
+            cy.get('h3:contains("Unassigned Task")', { timeout: 15000 })
+              .parent()
+              .find('tbody tr')
+              .should(($r) => {
+                expect($r.first().text().trim()).not.to.equal(firstRowTextBefore);
+                expect($r.text()).not.to.contain('Fetching data');
+              });
+
+            claimByPO(remainingPOs, poIndex, currentPage + 1);
+          } else {
+            cy.log(`📋 No more pages, "${keyword}" not found`);
+          }
+        });
+      }
+    });
+  };
+
+  if (claimBy === 'project') {
+    claimOnce(projectName);
+  } else {
+    claimByPO(poCount);
+  }
+};

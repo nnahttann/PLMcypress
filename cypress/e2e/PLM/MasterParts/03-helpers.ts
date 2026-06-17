@@ -1,12 +1,7 @@
 // ========================
 // HELPER FUNCTIONS
 // ========================
-
-import { Module } from './01-types-and-constants';
-
-// Import credentials from Master environment (will be re-exported)
-declare const MKTpost: string, MKTpost1: string, MKTpre: string, MKTpre1: string;
-declare const enter: string, enterpass: string, music: string, musicpass: string;
+import { Module, MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from './01-types-and-constants';
 
 export const getCredentials = (module: Module): { user: string, pass: string } => {
   const credMap: Record<Module, { user: string, pass: string }> = {
@@ -18,13 +13,14 @@ export const getCredentials = (module: Module): { user: string, pass: string } =
   return credMap[module] || credMap['POST'];
 };
 
-const now = new Date();
-const day = String(now.getDate()).padStart(2, '0');
-const month = String(now.getMonth() + 1).padStart(2, '0');
-const hours = String(now.getHours()).padStart(2, '0');
-const minutes = String(now.getMinutes()).padStart(2, '0');
-
-export const getTimeSuffix = (): string => `${day}${month} ${hours}${minutes}`;
+export const getTimeSuffix = (): string => {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  return `${day}${month} ${hours}${minutes}`;
+};
 
 export const getTruncatedName = (baseName: string, suffix: string, maxLength: number): string => {
   let finalName = `${baseName} ${suffix}`;
@@ -103,19 +99,4 @@ export const clickButtonIfExists = (buttonText: string, timeout: number = 10000)
 
 export const getRandomPhone = (): string => {
   return `0${Math.floor(8 + Math.random() * 2)}${Math.floor(10000000 + Math.random() * 90000000)}`;
-};
-
-export const pickRandom = <T>(arr: T[]): T => {
-  return arr[Math.floor(Math.random() * arr.length)];
-};
-
-export const pickMultiple = <T>(arr: T[], count: number): T[] => {
-  const shuffled = [...arr].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
-};
-
-export const selectMultipleFromDualList = (selector: string, items: string[]): void => {
-  items.forEach(item => {
-    cy.contains(selector, item).click();
-  });
 };
