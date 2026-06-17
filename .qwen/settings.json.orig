@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del *)",
+      "Bash(rmdir *)",
+      "Bash(npx *)",
+      "Bash(node *)"
+    ]
+  },
+  "$version": 4
+}
