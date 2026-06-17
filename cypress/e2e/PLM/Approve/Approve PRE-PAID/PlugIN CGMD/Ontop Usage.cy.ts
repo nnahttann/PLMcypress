@@ -1,3 +1,4 @@
+// ไฟล์ test.cy.ts
 import * as Master from '../../../Master';
 
 beforeEach(() => {
@@ -10,37 +11,21 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
-const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
-  const config: any = {
-    type: 'Ontop',
-    Module: Module,
-    autoSetDuration: true,
-    Plugin: 'Pl'
-  };
-  if (subModule) {
-    config.subModule = subModule;
-  }
-
-  Master.ProjectBasicInformationComplete('usage', 'ontop', config);
-};
-
-describe('PLM', () => {
-  describe('Scenario: Mob', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTprepaidFlow('PRE');
-    });
-    Master.afterMKTOntop_NotComplex();
+describe('Mobile', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'PRE', subModule: 'PRE', autoSetDuration: true ,Plugin: 'Pl'});
   });
-  describe('Scenario: ENTER', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTprepaidFlow('ENTER', 'PRE');
-    });
-    Master.afterMKTontopPREENTERPlugin();
+  Master.afterMKTontopPRE();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'MUSIC', subModule: 'PRE', autoSetDuration: true ,Plugin: 'Pl'});
   });
-  describe('Scenario: MUSIC', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTprepaidFlow('MUSIC', 'PRE');
-    });
-    Master.afterMKTontopPREMusicPlugin();
+  Master.afterMKTontopPREENTER();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'MUSIC', subModule: 'PRE', autoSetDuration: true ,Plugin: 'Pl'});
   });
+  Master.afterMKTontopPREMUSIC();
 });

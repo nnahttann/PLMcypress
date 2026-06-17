@@ -8,10 +8,9 @@ beforeEach(() => {
   cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
-
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('recurring', 'main', { ProductClass1: 'Main', Module: 'POST',subModule:'POST', autoSetDuration: true });
+    Master.ProjectBasicInformationComplete('recurring', 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
     // Master.InternetRandom('notrecurring');
     // Master.backBacicInfo();
     // Master.addFile();

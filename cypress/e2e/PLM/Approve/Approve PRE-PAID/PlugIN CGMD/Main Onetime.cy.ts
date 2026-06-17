@@ -1,4 +1,5 @@
 import * as Master from '../../../Master';
+
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -10,63 +11,8 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT PREPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { 
-      ProductClass1: 'Main', 
-      Module: 'PRE', 
-      autoSetDuration: true,
-      Plugin: 'Pl'
-    });
-
-    //targetgroup
-    Master.selectTargetGroup('random');
-
-    //Remark 
-    cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
-
-    Master.PriceExcluding();
-
-    //*Target group
-    Master.targetgroup();
-
-    //ProductSpec
-    const optionsToSelectProductSpec = [
-      // "AI IP Camera",
-      "AIS Secure Net",
-      // "Apple Care",
-      // "Cloud Game",
-      // "Cloud PC",
-      // "Content VDO",
-      // "Flowaccount",
-      // "Internet",
-      // "MMS",
-      // "Mobile Care",
-      // "SMS",
-      // "Vertical App",
-      // "Voice",
-      // "WiFi",
-      // "Youtube Premium"
-    ];
-
-    optionsToSelectProductSpec.forEach(option => {
-      cy.get('select[formcontrolname="availableListBox"]')
-        .contains(option)
-        .then($option => {
-          cy.wrap($option).dblclick();
-        });
-    });
-    cy.scrollTo('top');
-
-    Master.dropdownPromotionGroup();
-
-    Master.InternetRandom('notrecurring');
-
-    Master.smsWordingpre();
-
-    Master.backBacicInfo();
-
-    Master.addFile();
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'main', { Module: 'PRE', subModule: 'PRE', autoSetDuration: true,Plugin: 'Pl'});
   });
-  Master.afterMKTMainPRE_NotComplex();
+  Master.afterMKTMainPRE_FullSpadFlow();
 });
-

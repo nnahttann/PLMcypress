@@ -4,43 +4,28 @@ import * as Master from '../../Master';
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
+  cy.window().then((win) => {
+    win.sessionStorage.clear();
+  });
   cy.visit(Master.urlsit);
   cy.viewport(1920, 1080);
 });
 
-const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule?: string) => {
-  const config: any = {
-    type: 'Ontop',
-    Module: Module,
-    autoSetDuration: true
-  };
-  if (subModule) {
-    config.subModule = subModule;
-  }
-
-  Master.ProjectBasicInformationComplete('onetime', 'ontopextra', config);
-  // Master.InternetRandom('recurring');
-};
-
-describe('PLM', () => {
-  describe('Scenario: Mob POST', () => {
-    it('MKT POSTPAID role', () => {
-      runMKTPostpaidFlow('POST');
-    });
-    Master.afterMKTontopPOST();
+describe('Mobile', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
   });
-
-  describe('Scenario: ENTER', () => {
-    it('MKT POSTPAID role', () => {
-      runMKTPostpaidFlow('ENTER', 'POST');
-    });
-    Master.afterMKTontopENTER();
+  Master.afterMKTontopPOST();
+});
+describe.only('ENTER', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
   });
-
-  describe.only('Scenario: MUSIC', () => {
-    it('MKT POSTPAID role', () => {
-      runMKTPostpaidFlow('MUSIC', 'POST');
-    });
-    Master.afterMKTontopMUSIC();
+  Master.afterMKTontopENTER();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
   });
+  Master.afterMKTontopMUSIC();
 });

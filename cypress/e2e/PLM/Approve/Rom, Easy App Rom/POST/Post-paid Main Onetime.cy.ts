@@ -8,9 +8,10 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', { ProductClass1: 'Main', Module: 'POST', autoSetDuration: true });
+
+    Master.ProjectBasicInformationComplete('onetime', 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
+
     Master.RandomHumanTouchPoint('PRE');
   });
   Master.afterMKTMAINPOST();
 });
-

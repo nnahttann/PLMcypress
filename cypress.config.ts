@@ -58,10 +58,10 @@ export default defineConfig({
     MKTpost1: "mobpostaa",
 
     music: "musicmkt",
-    musicpass: "musicaaa",
+    musicpass: "musicmkt",
 
     enter: "entermkt",
-    enterpass: "enteraaa",
+    enterpass: "entermkt",
 
     ...userEnv,
   },

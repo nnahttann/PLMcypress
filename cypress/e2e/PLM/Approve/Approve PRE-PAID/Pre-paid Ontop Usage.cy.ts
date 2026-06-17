@@ -11,68 +11,21 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
-// Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
-  const config: any = {
-    type: 'Ontopextra',
-    Module: Module,
-    autoSetDuration: true
-  };
-
-  if (subModule) {
-    config.subModule = subModule;
-  }
-
-  Master.ProjectBasicInformationComplete('usage', 'ontopextra', config);
-
-  // Target group
-  Master.selectTargetGroup('random');
-
-  // Remark
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
-
-  Master.PriceExcluding();
-
-  // Target group
-  Master.targetgroup();
-
-  // ProductSpec
-  const optionsToSelectProductSpec = ["Internet"];
-
-  optionsToSelectProductSpec.forEach(option => {
-    cy.get('select[formcontrolname="availableListBox"]')
-      .contains(option)
-      .then($option => {
-        cy.wrap($option).dblclick();
-      });
+describe('Mobile', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'PRE', subModule: 'PRE', autoSetDuration: true });
   });
-  Master.dropdownPromotionGroup();
-  Master.InternetRandom();
-  Master.smsWordingpre();
-  Master.backBacicInfo();
-
-  Master.addFile();
-};
-
-describe('PLM', () => {
-  describe('Scenario: Mob PRE', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTPostpaidFlow('PRE');
-    });
-    Master.afterMKTontopPRE();
+  Master.afterMKTontopPRE();
+});
+describe('ENTER', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'ENTER', subModule: 'PRE', autoSetDuration: true });
   });
-
-  describe('Scenario: ENTER', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTPostpaidFlow('ENTER', 'PRE');
-    });
-    Master.afterMKTontopPREENTER();
+  Master.afterMKTontopPREENTER();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'MUSIC', subModule: 'PRE', autoSetDuration: true });
   });
-
-  describe.only('Scenario: MUSIC', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTPostpaidFlow('MUSIC', 'PRE');
-    });
-    Master.afterMKTontopPREMUSIC();
-  });
+  Master.afterMKTontopPREMUSIC();
 });

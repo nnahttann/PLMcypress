@@ -11,75 +11,21 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
-// Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTprepaidFlow = (Module: 'pre' | 'PRE' | 'ENTER' | 'MUSIC', subModule?: string) => {
-  const config: any = {
-    type: 'OntopExtra',
-    Module: Module,
-    autoSetDuration: true
-  };
-  if (subModule) {
-    config.subModule = subModule;
-  }
-
-  Master.ProjectBasicInformationComplete('onetime', 'ontopextra', config);
-
-  // Target group
-  Master.selectTargetGroup('random');
-
-  // Remark
-  cy.get('textarea[formcontrolname="remark"]').type('This is a new remark.');
-
-  Master.PriceExcluding();
-
-  // Target group
-  Master.targetgroup();
-  Master.RandomProductSpecification();
-  // ProductSpec
-  const optionsToSelectProductSpec = ["Internet"];
-
-  optionsToSelectProductSpec.forEach(option => {
-    cy.get('select[formcontrolname="availableListBox"]')
-      .contains(option)
-      .then($option => {
-        cy.wrap($option).dblclick();
-      });
+describe('Mobile', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { Module: 'PRE', subModule: 'PRE', autoSetDuration: true });
   });
-  if (Module === 'PRE') {
-    // allowMvpn สำหรับ PRE Module
-    cy.get('input[formcontrolname="allowMvpn"]').eq(1).check({ force: true });
-    Master.dropdownPromotionGroup();
-    Master.InternetRandom('notrecurring');
-    Master.smsWordingpre();
-    Master.backBacicInfo();
-  } else {
-    Master.dropdownPromotionGroup();
-    Master.InternetRandom('notrecurring');
-    Master.smsWordingpre();
-    Master.backBacicInfo();
-  }
-  Master.addFile();
-};
-
-describe('PLM', () => {
-  describe('Scenario: Mob', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTprepaidFlow('PRE');
-    });
-    Master.afterMKTontopPRE();
+  Master.afterMKTontopPRE();
+});
+describe('ENTER', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { Module: 'ENTER', subModule: 'PRE', autoSetDuration: true });
   });
-
-  describe('Scenario: ENTER', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTprepaidFlow('ENTER', 'PRE');
-    });
-    Master.afterMKTontopPREENTER();
+  Master.afterMKTontopPREENTER();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('onetime', 'ontopextra', { Module: 'MUSIC', subModule: 'PRE', autoSetDuration: true });
   });
-
-  describe('Scenario: MUSIC', () => {
-    it('MKT PREPAIDrole', () => {
-      runMKTprepaidFlow('MUSIC', 'PRE');
-    });
-    Master.afterMKTontopPREMUSIC();
-  });
+  Master.afterMKTontopPREMUSIC();
 });

@@ -1,4 +1,6 @@
-import * as Master from '../../../Master';
+// ไฟล์ test.cy.ts
+import * as Master from '../../Master';
+
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -10,14 +12,20 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT PREPAID role', () => {
-    Master.ProjectBasicInformationComplete('onetime', 'main', {
-      ProductClass1: 'Main',
-      Module: 'PRE',
-      autoSetDuration: true,
-      Plugin: 'Pl'
-    });
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontopextra', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
   });
-  Master.afterMKTMainPRE_NotComplex();
+  Master.afterMKTontopPOST();
 });
-
+describe.only('ENTER', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontopextra', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
+  });
+  Master.afterMKTontopENTER();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontopextra', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
+  });
+  Master.afterMKTontopMUSIC();
+});

@@ -1,4 +1,5 @@
 import * as Master from '../../../Master';
+
 beforeEach(() => {
   cy.clearLocalStorage();
   cy.clearCookies();
@@ -10,14 +11,8 @@ beforeEach(() => {
 });
 
 describe('Mobile', () => {
-  it('MKT PREPAID role', () => {
-    Master.ProjectBasicInformationComplete('usage', 'main', {
-      ProductClass1: 'Main',
-      Module: 'PRE',
-      autoSetDuration: true,
-      Plugin: 'Pl'
-    });
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'main', { Module: 'PRE', subModule: 'PRE', autoSetDuration: true,Plugin: 'Pl'});
   });
-  Master.afterMKTMainPRE_NotComplex();
+  Master.afterMKTMainPRE_FullSpadFlow();
 });
-

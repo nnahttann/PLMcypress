@@ -11,40 +11,21 @@ beforeEach(() => {
   cy.viewport(1920, 1080);
 });
 
-// Helper function สำหรับรัน test flow ทั้งหมด
-const runMKTPostpaidFlow = (Module: 'POST' | 'PRE' |'ENTER' | 'MUSIC', subModule?: string) => {
-  const config: any = {
-    type: 'Ontop',
-    Module: Module,
-    autoSetDuration: true
-  };
-  if (subModule) {
-    config.subModule = subModule;
-  }
-
-  Master.ProjectBasicInformationComplete('usage', 'ontop', config);
-  // Master.InternetRandom('notrecurring');
-};
-
-describe('PLM', () => {
-  describe('Scenario: Mob POST', () => {
-    it('MKT POSTPAID role', () => {
-      runMKTPostpaidFlow('POST');
-    });
-    Master.afterMKTontopPOST();
+describe('Mobile', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
   });
-
-  describe('Scenario: ENTER', () => {
-    it('MKT POSTPAID role', () => {
-      runMKTPostpaidFlow('ENTER', 'POST');
-    });
-    Master.afterMKTontopENTER();
+  Master.afterMKTontopPOST();
+});
+describe.only('ENTER', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
   });
-
-  describe('Scenario: MUSIC', () => {
-    it('MKT POSTPAID role', () => {
-      runMKTPostpaidFlow('MUSIC', 'POST');
-    });
-    Master.afterMKTontopMUSIC();
+  Master.afterMKTontopENTER();
+});
+describe('MUSIC', () => {
+  it('MKT PRE-PAID role', () => {
+    Master.ProjectBasicInformationComplete('usage', 'ontop', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
   });
+  Master.afterMKTontopMUSIC();
 });

@@ -11,7 +11,7 @@ beforeEach(() => {
 
 describe('Mobile', () => {
   it('MKT POSTPAID role', () => {
-    Master.ProjectBasicInformationComplete('usage', 'main', { ProductClass1: 'Main', Module: 'POST',subModule:'POST', autoSetDuration: true });
+    Master.ProjectBasicInformationComplete('usage', 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
     // Master.InternetRandom('notrecurring');
   });
   Master.afterMKTMainUsagePOST();
