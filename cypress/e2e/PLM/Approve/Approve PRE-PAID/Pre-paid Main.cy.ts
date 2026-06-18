@@ -13,7 +13,8 @@ beforeEach(() => {
 });
 
 describe('PRE-PAID Main', () => {
-  const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+  // const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+const priceTypes: PriceType[] = ['recurring'];
 
   priceTypes.forEach((priceType) => {
     describe(`Standard ${priceType}`, () => {

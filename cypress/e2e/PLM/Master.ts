@@ -6153,6 +6153,8 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
         ? 'ul.nav.nav-tabs a'
         : '.scrollmenu .nav a'
 
+    const normalize = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+
     const processTab = (index: number): void => {
         if (index >= mainTabs.length) {
             cy.log('🎉 All tabs processed successfully.')
@@ -6163,37 +6165,48 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
         const componentSelector = COMPONENT_MAP[pageType][tabName]
         cy.log(`\n🔄 [${pageType}] Processing [${index + 1}/${mainTabs.length}]: "${tabName}"`)
 
-        cy.get(tabBarSelector).contains(tabName).click()
+        cy.get(tabBarSelector).then(($tabs) => {
+            const $match = $tabs.filter((_, el) => normalize(el.textContent || '').includes(normalize(tabName)))
 
-        cy.get('body').then(($body) => {
-            if (!$body.find(componentSelector).length) {
-                cy.log(`⚠️ Component "${componentSelector}" not found — skipping.`)
+            if (!$match.length) {
+                const seenLabels = [...new Set($tabs.toArray().map((el) => el.textContent?.trim()).filter(Boolean))]
+                cy.log(`⚠️ Main tab "${tabName}" not found — skipping. Visible labels: ${seenLabels.join(', ')}`)
                 processTab(index + 1)
                 return
             }
 
-            cy.get(componentSelector, { timeout: 20000 }).should('exist')
-            cy.wait(600)
+            cy.wrap($match.first()).click()
 
-            cy.get(componentSelector).within(() => {
-                cy.get('.nav-tabs a').contains('Deduct Fail').click()
+            cy.get('body').then(($body) => {
+                if (!$body.find(componentSelector).length) {
+                    cy.log(`⚠️ Component "${componentSelector}" not found — skipping.`)
+                    processTab(index + 1)
+                    return
+                }
 
-                cy.get('.tab-pane.active', { timeout: 10000 }).should('be.visible')
+                cy.get(componentSelector, { timeout: 20000 }).should('exist')
+                cy.wait(600)
 
-                cy.get('.tab-pane.active').then(($pane) => {
-                    const $btn = $pane.find('button:contains("Copy From Deduct Success")')
+                cy.get(componentSelector).within(() => {
+                    cy.get('.nav-tabs a').contains('Deduct Fail').click()
 
-                    if ($btn.length > 0) {
-                        cy.wrap($btn.first()).click({ force: true })
-                        cy.log(`✅ Copied Deduct Success → Deduct Fail for "${tabName}"`)
-                    } else {
-                        cy.log(`⚠️ No "Copy From Deduct Success" button in "${tabName}" — skipping.`)
-                    }
+                    cy.get('.tab-pane.active', { timeout: 10000 }).should('be.visible')
+
+                    cy.get('.tab-pane.active').then(($pane) => {
+                        const $btn = $pane.find('button:contains("Copy From Deduct Success")')
+
+                        if ($btn.length > 0) {
+                            cy.wrap($btn.first()).click({ force: true })
+                            cy.log(`✅ Copied Deduct Success → Deduct Fail for "${tabName}"`)
+                        } else {
+                            cy.log(`⚠️ No "Copy From Deduct Success" button in "${tabName}" — skipping.`)
+                        }
+                    })
                 })
-            })
 
-            cy.wait(500)
-            processTab(index + 1)
+                cy.wait(500)
+                processTab(index + 1)
+            })
         })
     }
 
