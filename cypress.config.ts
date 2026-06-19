@@ -35,14 +35,15 @@ export default defineConfig({
   viewportHeight: 1080,
 
   defaultCommandTimeout: 10000,
-  pageLoadTimeout: 90000,
-  requestTimeout: 30000,
-  responseTimeout: 60000,
+  pageLoadTimeout: 30000,
+  requestTimeout: 10000,
+  responseTimeout: 15000,
 
   chromeWebSecurity: false,
 
   experimentalMemoryManagement: true,
   numTestsKeptInMemory: 0,
+  // experimentalFetchKeepAlive: true,
 
   retries: {
     runMode: 1,
@@ -64,6 +65,9 @@ export default defineConfig({
     enterpass: "entermkt",
 
     ...userEnv,
+
+    waitForAnimations: true,
+    animationDistanceThreshold: 1,
   },
 
   e2e: {
@@ -75,8 +79,17 @@ export default defineConfig({
         launchOptions.args.push("--disable-gpu");
         launchOptions.args.push("--no-sandbox");
         launchOptions.args.push("--disable-background-networking");
-        // Block requests to external CDN that are unreachable from intranet
-        launchOptions.args.push("--host-rules=MAP fonts.googleapis.com 127.0.0.1, MAP cdnjs.cloudflare.com 127.0.0.1");
+        launchOptions.args.push("--disable-default-apps");
+        launchOptions.args.push("--disable-extensions");
+        launchOptions.args.push("--disable-hang-monitor");
+        launchOptions.args.push("--disable-sync");
+        launchOptions.args.push("--disable-translate");
+        launchOptions.args.push("--metrics-recording-only");
+        launchOptions.args.push("--no-first-run");
+        launchOptions.args.push("--prerender-from-omnibox=disabled");
+        launchOptions.args.push("--disable-component-extensions-with-background-pages");
+        // Block unreachable external CDNs
+        launchOptions.args.push("--host-rules=MAP fonts.googleapis.com 127.0.0.1, MAP cdnjs.cloudflare.com 127.0.0.1, MAP fonts.gstatic.com 127.0.0.1");
 
         return launchOptions;
       });
