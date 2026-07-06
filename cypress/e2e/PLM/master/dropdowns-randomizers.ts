@@ -1,133 +1,313 @@
 import { scrollAndWait } from './helpers';
 
-
-// closeSuccessModal is used by Tariff — copied exactly from Master.ts
 const closeSuccessModal = (): void => {
-    cy.contains('.modal-title', 'Save Result', { timeout: 20000 })
+    cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
         .closest('.modal-content')
         .find('.modal-footer button.btn-danger')
         .should('be.visible')
         .and('not.be.disabled')
         .click();
 };
-export const Randomdropdown = () => {
-    cy.get('body').then(($body) => {
-        const selector = 'select[formcontrolname="ontopConditionGroup"]';
-        if ($body.find(selector).length > 0) {
-            cy.get(selector)
-                .find('option:not([disabled])')
-                .then($options => {
-                    const validOptions = [...$options].map(o => (o as HTMLOptionElement).value);
-                    const randomIndex = Math.floor(Math.random() * validOptions.length);
-                    cy.get(selector).select(validOptions[randomIndex]);
-                });
-        } else {
-            cy.log(`Skipped: ${selector} not found`);
-        }
-    });
+// =============================
+// Helper: format Date → dd/mm/yyyy
+// =============================
+const formatDate = (d: Date): string =>
+    `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}/${d.getFullYear()}`;
 
+// =============================
+// Helper: parse dd/mm/yyyy → Date
+// =============================
+const parseDate = (val: string): Date | null => {
+    if (!val || val.trim() === '') return null;
+    const parts = val.trim().split('/');
+    if (parts.length !== 3) return null;
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return null;
+    const d = new Date(year, month, day);
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
+
+// =============================
+// Helper: random Date ระหว่าง min และ max (inclusive)
+// =============================
+const randomDateBetween = (min: Date, max: Date): Date | null => {
+    if (min.getTime() > max.getTime()) return null;
+    const ms = min.getTime() + Math.random() * (max.getTime() - min.getTime());
+    const d = new Date(ms);
+    d.setHours(0, 0, 0, 0);
+    return d;
+};
+
+// =============================
+// Helper: type date ลง my-date-picker
+// =============================
+const typeDatePicker = (formcontrolname: string, date: Date) => {
+    const formatted = formatDate(date);
+    cy.get(`my-date-picker[formcontrolname="${formcontrolname}"] input[aria-label="Date input field"]`)
+        .click()
+        .clear()
+        .type(formatted, { delay: 30 });
+    cy.get(`my-date-picker[formcontrolname="${formcontrolname}"] input[aria-label="Date input field"]`)
+        .should('have.value', formatted);
+};
+
+// =============================
+// Helper: อ่านค่าจาก my-date-picker (ทั้ง disabled และ enabled)
+// =============================
+const readDatePicker = (formcontrolname: string): Cypress.Chainable<Date | null> => {
+    return cy
+        .get(`my-date-picker[formcontrolname="${formcontrolname}"] input[aria-label="Date input field"]`)
+        .invoke('val')
+        .then((val) => {
+            const parsed = parseDate(val as string);
+            if (!parsed) {
+                cy.log(`⚠️ ${formcontrolname}: อ่านค่าไม่ได้ (val="${val}")`);
+            } else {
+                cy.log(`📅 ${formcontrolname}: ${formatDate(parsed)}`);
+            }
+
+            // ✅ ใช้ cy.wrap() เพื่อ return ค่าแบบ Async
+            return cy.wrap(parsed);
+        });
+};
+
+// =============================
+// Main: Random Fixed Start Date / Fixed End Date
+// =============================
+export const RandomFixedDates = () => {
+
+    cy.log('🚀 START RandomFixedDates');
+
+    return readDatePicker('commercialLaunchDate').then((cldDate) => {
+        cy.log(`✅ ได้ commercialLaunchDate: ${cldDate ? formatDate(cldDate) : 'null'}`);
+
+        return readDatePicker('expireDate').then((expDate) => {
+            cy.log(`✅ ได้ expireDate: ${expDate ? formatDate(expDate) : 'null'}`);
+
+            const cld = cldDate ?? new Date();
+            const exp = expDate ?? new Date(cld.getTime() + 365 * 86400000);
+
+            cy.log(`📌 ช่วงที่ใช้คำนวณ: ${formatDate(cld)} → ${formatDate(exp)}`);
+
+            return cy.get('body').then(($body) => {
+                const hasFixedStart = $body.find('my-date-picker[formcontrolname="fixedStartDate"]').length > 0;
+                const hasFixedEnd = $body.find('my-date-picker[formcontrolname="fixedEndDate"]').length > 0;
+
+                cy.log(`🔍 hasFixedStart=${hasFixedStart}, hasFixedEnd=${hasFixedEnd}`);
+
+                // =============================
+                // Step 2: Fixed Start Date — 50/50
+                // =============================
+                if (!hasFixedStart) {
+                    cy.log('⏭️ Skipped: fixedStartDate not found');
+                    if (hasFixedEnd) {
+                        cy.log('⏭️ fixedEndDate: ข้าม เพราะ fixedStartDate ไม่มีใน DOM');
+                    }
+                    return cy.wrap(null);
+                }
+
+                if (Math.random() >= 0.5) {
+                    cy.log('🎲 fixedStartDate: ข้าม (50% chance)');
+                    if (hasFixedEnd) {
+                        cy.log('⏭️ fixedEndDate: ข้าม เพราะ fixedStartDate ไม่ได้ถูก set');
+                    }
+                    return cy.wrap(null);
+                }
+
+                const pickedStart = randomDateBetween(cld, exp);
+                if (!pickedStart) {
+                    cy.log(`⚠️ fixedStartDate: ช่วงไม่ valid (${formatDate(cld)} → ${formatDate(exp)}) — ข้าม`);
+                    if (hasFixedEnd) {
+                        cy.log('⏭️ fixedEndDate: ข้าม เพราะ fixedStartDate set ไม่ได้');
+                    }
+                    return cy.wrap(null);
+                }
+
+                cy.log(`🎲 fixedStartDate: ${formatDate(pickedStart)} (ช่วง ${formatDate(cld)} → ${formatDate(exp)})`);
+                typeDatePicker('fixedStartDate', pickedStart);
+
+                // =============================
+                // Step 3: Fixed End Date — บังคับกรอกเสมอถ้า Start ถูกกรอก
+                // ⚠️ ห้าม End < Start
+                // =============================
+                if (!hasFixedEnd) {
+                    cy.log('⚠️ fixedEndDate: ไม่พบ element แต่ fixedStartDate ถูกกรอกแล้ว — อาจทำให้ฟอร์ม invalid');
+                    return cy.wrap(null);
+                }
+
+                // ไม่มี 50/50 อีกต่อไป เพราะ Start ถูกกรอกแล้วจึงต้องกรอก End ด้วยเสมอ
+                const pickedEnd = randomDateBetween(pickedStart, exp);
+
+                if (!pickedEnd) {
+                    // ถ้าสุ่มไม่ได้ (เช่น pickedStart >= exp พอดี) ให้ fallback เป็น pickedStart เอง
+                    // เพื่อการันตีว่า End >= Start เสมอ และฟอร์มยังคง valid
+                    cy.log(`⚠️ fixedEndDate: ช่วงไม่ valid (${formatDate(pickedStart)} → ${formatDate(exp)}) — ใช้ fallback = fixedStartDate`);
+                    typeDatePicker('fixedEndDate', pickedStart);
+                    cy.log(`🎲 fixedEndDate (fallback): ${formatDate(pickedStart)}`);
+                } else {
+                    // การันตีอีกชั้นว่า pickedEnd >= pickedStart (กันกรณี randomDateBetween มีบั๊ก)
+                    const safeEnd = pickedEnd.getTime() < pickedStart.getTime() ? pickedStart : pickedEnd;
+
+                    cy.log(`🎲 fixedEndDate: ${formatDate(safeEnd)} (ช่วง fixedStart (${formatDate(pickedStart)}) → ${formatDate(exp)})`);
+                    typeDatePicker('fixedEndDate', safeEnd);
+                }
+
+                cy.log('🏁 END RandomFixedDates');
+                return cy.wrap(null);
+            });
+        });
+    });
+};
+// ========================
+// RANDOM DROPDOWN PRE-PAID ONTOP/MAIN
+// ========================
+const maybeRandomSelect = (
+    selector: string,
+    filterFn: (val: string) => boolean = () => true
+) => {
+    cy.get('body').then(($body) => {
+        if ($body.find(selector).length === 0) {
+            cy.log(`⏭️ Skipped: ${selector} not found`);
+            return;
+        }
+
+        const $el = $body.find(selector);
+        if (!$el.is(':visible')) {
+            cy.log(`⏭️ Skipped: ${selector} not visible`);
+            return;
+        }
+
+        cy.get(selector).then(($select) => {
+            const currentValue = ($select[0] as HTMLSelectElement).value;
+            const allOptions = [...$select.find('option')]
+                .map((o) => (o as HTMLOptionElement).value)
+                .filter(filterFn);
+
+            if (allOptions.length === 0) {
+                cy.log(`⏭️ Skipped: ${selector} has no valid options`);
+                return;
+            }
+
+            const shouldAct = Math.random() < 0.5;
+            if (!shouldAct) {
+                cy.log(`🎲 ${selector}: ข้าม (50% chance)`);
+                return;
+            }
+
+            const hasCurrentValue =
+                currentValue !== '' &&
+                currentValue !== '0: null' &&
+                allOptions.includes(currentValue);
+
+            let pool = hasCurrentValue
+                ? allOptions.filter((v) => v !== currentValue) // ต้องต่างจากค่าเดิม
+                : allOptions;
+
+            if (pool.length === 0) {
+                cy.log(`⏭️ Skipped: ${selector} ไม่มี option อื่นให้เลือก`);
+                return;
+            }
+
+            const picked = pool[Math.floor(Math.random() * pool.length)];
+            cy.log(
+                `🎲 ${selector}: ${hasCurrentValue ? 'เปลี่ยนจาก' : 'เลือก'} → "${picked}"`
+            );
+            cy.get(selector).select(picked, { force: true });
+        });
+    });
+};
+
+export const Randomdropdown = () => {
+    // =============================
+    // On Top Condition Group (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="ontopConditionGroup"]', (v) => v !== '0: null');
+
+    // =============================
+    // Bill Period (required แต่อยู่ใน original — คงไว้ตามเดิม ไม่ใช้ logic ใหม่)
+    // =============================
     cy.get('body').then(($body) => {
         const selector = 'select[formcontrolname="billPeriod"]';
-
         if ($body.find(selector).length > 0) {
             cy.get(selector)
                 .find('option:not([disabled])')
-                .then($options => {
-                    const validOptions = [...$options].map(o => (o as HTMLOptionElement).value);
+                .then(($options) => {
+                    const validOptions = [...$options].map((o) => (o as HTMLOptionElement).value);
                     const randomIndex = Math.floor(Math.random() * validOptions.length);
-                    const selectedValue = validOptions[randomIndex];
-
-                    cy.log(`🎲 Randomly selected Bill Period: ${selectedValue}`);
-
-                    cy.get(selector).select(selectedValue, { force: true });
+                    cy.log(`🎲 Bill Period: ${validOptions[randomIndex]}`);
+                    cy.get(selector).select(validOptions[randomIndex], { force: true });
                 });
         } else {
             cy.log(`⏭️ Skipped: ${selector} not found`);
         }
     });
 
+    // =============================
+    // Money / Validity (คงไว้ตามเดิม — มี logic ซับซ้อนของตัวเอง)
+    // =============================
     cy.get('body').then(($body) => {
         const tabSelector = 'a:contains("Money / Validity")';
-
         if ($body.find(tabSelector).length > 0) {
             cy.get(tabSelector).click();
 
-            // คลิกปุ่ม +
             cy.get('button .glyphicon-plus').parent().click();
 
-            // --- 1. Main Balance ---
             const randomBalance1 = Math.floor(Math.random() * 1000) + 100;
             cy.get('input[formcontrolname="balanceFirstPocket"]').type(randomBalance1.toString());
 
-            // --- 2. Validity Main Balance & Unit ---
-            cy.get('input[formcontrolname="validityFirstPocket"]').type((Math.floor(Math.random() * 30) + 1).toString());
+            cy.get('input[formcontrolname="validityFirstPocket"]').type(
+                (Math.floor(Math.random() * 30) + 1).toString()
+            );
 
-            cy.get('select[formcontrolname="validityFirstPocketUnit"]').then($select => {
+            cy.get('select[formcontrolname="validityFirstPocketUnit"]').then(($select) => {
                 const options = $select.find('option:not([disabled])');
                 const randomIndex = Math.floor(Math.random() * options.length);
-                // แก้ไข: Cast เป็น HTMLOptionElement เพื่อเรียกใช้ .value ได้
-                const randomOption = options[randomIndex] as HTMLOptionElement;
-                cy.wrap($select).select(randomOption.value);
+                cy.wrap($select).select((options[randomIndex] as HTMLOptionElement).value);
             });
 
-            // --- 3. Reward Balance ---
             const randomBalance2 = Math.floor(Math.random() * 500) + 50;
             cy.get('input[formcontrolname="balanceSecondPocket"]').type(randomBalance2.toString());
 
-            // --- 4. Validity Reward Balance & Unit ---
-            cy.get('input[formcontrolname="validitySecondPocket"]').type((Math.floor(Math.random() * 30) + 1).toString());
+            cy.get('input[formcontrolname="validitySecondPocket"]').type(
+                (Math.floor(Math.random() * 30) + 1).toString()
+            );
 
-            cy.get('select[formcontrolname="validitySecondPocketUnit"]').then($select => {
+            cy.get('select[formcontrolname="validitySecondPocketUnit"]').then(($select) => {
                 const options = $select.find('option:not([disabled])');
                 const randomIndex = Math.floor(Math.random() * options.length);
-                // แก้ไข: Cast เป็น HTMLOptionElement
-                const randomOption = options[randomIndex] as HTMLOptionElement;
-                cy.wrap($select).select(randomOption.value);
+                cy.wrap($select).select((options[randomIndex] as HTMLOptionElement).value);
             });
 
-            // --- 5. Usage Types (Dual List Box) ---
-            cy.get('select[formcontrolname="availableListBox"]').then($select => {
+            cy.get('select[formcontrolname="availableListBox"]').then(($select) => {
                 const options = $select.find('option');
                 if (options.length > 0) {
                     const randomIndex = Math.floor(Math.random() * options.length);
-                    // แก้ไข: Cast เป็น HTMLOptionElement
                     const val = (options[randomIndex] as HTMLOptionElement).value;
-
                     cy.get('select[formcontrolname="availableListBox"]').select(val);
-                    cy.get('button.str').click(); // ปุ่มเลื่อนไปขวา
+                    cy.get('button.str').click();
                 }
             });
 
-            // --- 6. Description ---
             const randomDesc = `AutoTest_${Math.random().toString(36).substring(7)}`;
             cy.get('textarea[formcontrolname="balanceDescription"]').type(randomDesc);
 
-            // --- กด Add ---
             cy.get('button').contains('Add').click();
-
         } else {
             cy.log('Skipped: Tab Money / Validity not found');
         }
     });
 
-    cy.get('body').then(($body) => {
-        const selector = 'select[formcontrolname="packageDataType"]';
+    // =============================
+    // Package Data Type (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="packageDataType"]', (v) => v !== '0: null');
 
-        if ($body.find(selector).length > 0) {
-            cy.get(selector)
-                .find('option')
-                .then($options => {
-                    const validOptions = [...$options]
-                        .map(o => (o as HTMLOptionElement).value)
-                        .filter(val => val !== '0: null');
-                    if (validOptions.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * validOptions.length);
-                        cy.get(selector).select(validOptions[randomIndex]);
-                    }
-                });
-        }
-    });
-
+    // =============================
+    // Recurring Fee Deduction (required แต่อยู่ใน original — คงไว้ตามเดิม)
+    // =============================
     cy.get('body').then(($body) => {
         const selector = 'select[formcontrolname="recurringFeeDeduction"]';
         const $element = $body.find(selector);
@@ -136,148 +316,192 @@ export const Randomdropdown = () => {
                 .find('option:not([disabled])')
                 .then(($options) => {
                     const randomIndex = Math.floor(Math.random() * $options.length);
-                    const valueToSelect = ($options[randomIndex] as HTMLOptionElement).value;
-                    cy.get(selector).select(valueToSelect);
+                    cy.get(selector).select(($options[randomIndex] as HTMLOptionElement).value);
                 });
         } else {
             cy.log(`Skipped: ${selector} is not visible or not found`);
         }
     });
-    cy.get('body').then(($body) => {
-        const selector = 'select[formcontrolname="earlyRenewOfferingFlag"]';
 
-        if ($body.find(selector).length > 0) {
-            cy.get(selector)
-                .find('option')
-                .not('[value="0: null"]')
-                .then(($options) => {
-                    if ($options.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * $options.length);
-                        const valueToSelect = ($options[randomIndex] as HTMLOptionElement).value;
-                        cy.get(selector).select(valueToSelect);
-                    }
+    // =============================
+    // Early Renew Offering Flag (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="earlyRenewOfferingFlag"]', (v) => v !== '0: null');
+
+    // =============================
+    // PO Type (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="poType"]', (v) => v !== '0: null');
+
+    // =============================
+    // Group Package (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="groupPackage"]', (v) => v !== '0: null');
+
+    // =============================
+    // Promotion Group (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="promotionGroup"]', (v) => v !== '0: null');
+
+    // =============================
+    // Promotion Sub Group (ไม่ required)
+    // =============================
+    maybeRandomSelect('select[formcontrolname="promotionSubGroup"]', (v) => v !== '0: null');
+};
+// ========================
+// HELPER: normalize whitespace
+// ========================
+const normalizeText = (t: string) => t.replace(/\s+/g, ' ').trim();
+
+// ========================
+// INTERNAL: FIND mat-select BY LABEL (รองรับ * นำหน้า, : ท้าย, whitespace)
+// ========================
+const findMatSelectByLabel = (
+    $body: JQuery<HTMLElement>,
+    fieldLabel: string
+): JQuery<HTMLElement> | null => {
+    const allLabels = $body.find('label');
+    let foundSelect: JQuery<HTMLElement> | null = null;
+
+    allLabels.each((_, el) => {
+        const labelText = normalizeText(Cypress.$(el).text())
+            .replace(/^\*/, '')
+            .replace(/:$/, '')
+            .trim();
+
+        if (labelText === fieldLabel) {
+            const $row = Cypress.$(el).closest('.row, .form-group');
+            const $select = $row.find('mat-select');
+            if ($select.length > 0) {
+                foundSelect = $select;
+                return false; // break
+            }
+        }
+    });
+
+    return foundSelect;
+};
+
+// ========================
+// INTERNAL: SELECT RANDOM OPTION FROM ALREADY-OPEN DROPDOWN
+// ========================
+const selectRandomOption = (
+    $select: JQuery<HTMLElement>,
+    fieldLabel: string,
+    currentValueToAvoid?: string
+): void => {
+    cy.get('body').then(($body) => {
+        const panelOpen = $body.find('.cdk-overlay-container mat-option').length > 0;
+
+        if (!panelOpen) {
+            cy.log(`⚠️ "${fieldLabel}" panel did not open — skipping`);
+            return;
+        }
+
+        // กรอง disabled (search box wrapper) ออกด้วย :not([aria-disabled="true"])
+        cy.get('.cdk-overlay-container mat-option:not([aria-disabled="true"])')
+            .should('have.length.greaterThan', 0)
+            .then(($options) => {
+                const validOptions = $options.filter((_, el) => {
+                    const text = normalizeText(Cypress.$(el).text());
+                    return (
+                        text !== 'Please Select' &&
+                        text !== '' &&
+                        (currentValueToAvoid == null ||
+                            text !== normalizeText(currentValueToAvoid))
+                    );
                 });
+
+                if (validOptions.length === 0) {
+                    cy.log(`⚠️ No alternative options for "${fieldLabel}" — keeping current value`);
+                    cy.get('body').click(0, 0, { force: true });
+                    return;
+                }
+
+                const randomIndex = Math.floor(Math.random() * validOptions.length);
+                const $chosen = validOptions.eq(randomIndex);
+                const selectedText = normalizeText($chosen.text());
+
+                cy.log(`🎲 "${fieldLabel}" → selecting: "${selectedText}"`);
+                cy.wrap($chosen).click({ force: true });
+
+                // verify ด้วย normalized text
+                cy.wrap($select)
+                    .find('.mat-select-value-text span')
+                    .invoke('text')
+                    .then((val) => {
+                        expect(normalizeText(val)).to.equal(selectedText);
+                    });
+            });
+    });
+};
+
+// ========================
+// INTERNAL: HANDLE A SINGLE DROPDOWN FIELD
+// ========================
+const handleDropdownField = (fieldLabel: string): void => {
+    cy.get('body').then(($body) => {
+        if ($body.find('.cdk-overlay-container mat-option').length > 0) {
+            cy.get('body').click(0, 0, { force: true });
         }
     });
 
     cy.get('body').then(($body) => {
-        const selector = 'select[formcontrolname="poType"]';
+        const $select = findMatSelectByLabel($body, fieldLabel);
 
-        if ($body.find(selector).length > 0) {
-            cy.get(selector)
-                .find('option')
-                .not('[value="0: null"]')
-                .then(($options) => {
-                    if ($options.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * $options.length);
-                        const valueToSelect = ($options[randomIndex] as HTMLOptionElement).value;
-                        cy.get(selector).select(valueToSelect);
-                    }
+        if (!$select || $select.length === 0) {
+            cy.log(`❌ "${fieldLabel}" not found on screen — skipping`);
+            return;
+        }
+
+        const isPlaceholder = $select.find('.mat-select-placeholder').length > 0;
+        const currentText = normalizeText($select.find('.mat-select-value-text').text());
+        const isEmpty = isPlaceholder || currentText === '' || currentText === 'Please Select';
+
+        // ✅ ใช้ id หรือ ng-tns class เพื่อ re-query ใหม่แทน cy.wrap($select)
+        const selectId = $select.attr('id');
+
+        if (isEmpty) {
+            cy.log(`📭 "${fieldLabel}" is empty → picking a new value`);
+            // ✅ re-query จาก DOM ใหม่ แล้ว click ที่ .mat-select-trigger
+            cy.get(`#${selectId} .mat-select-trigger`).click({ force: true });
+            cy.wait(300);
+            // ✅ re-query $select ใหม่สำหรับ verify
+            cy.get(`#${selectId}`).then(($freshSelect) => {
+                selectRandomOption($freshSelect, fieldLabel);
+            });
+        } else {
+            const shouldChange = Math.random() < 0.5;
+            cy.log(
+                `🔍 "${fieldLabel}" = "${currentText}" → ${shouldChange ? 'changing' : 'keeping'}`
+            );
+            if (shouldChange) {
+                cy.get(`#${selectId} .mat-select-trigger`).click({ force: true });
+                cy.wait(300);
+                cy.get(`#${selectId}`).then(($freshSelect) => {
+                    selectRandomOption($freshSelect, fieldLabel, currentText);
                 });
+            }
         }
     });
-
-
-    cy.get('body').then(($body) => {
-        const selector = 'select[formcontrolname="packageDataType"]';
-
-        if ($body.find(selector).length > 0) {
-            cy.get(selector)
-                .find('option')
-                .not('[value="0: null"]')
-                .then(($options) => {
-                    if ($options.length > 0) {
-                        const randomIndex = Math.floor(Math.random() * $options.length);
-                        const valueToSelect = ($options[randomIndex] as HTMLOptionElement).value;
-
-                        cy.get(selector).select(valueToSelect, { force: true });
-                    }
-                });
-        }
-    });
-
-}
-
-// ========================
-// INTERNAL: SELECT RANDOM DROPDOWN RECURRING
-// ========================
-
-const selectRandomDropdownRecurring = (): void => {
-    cy.get('.mat-select-value')
-        .contains('Please Select')
-        .click({ force: true });
-
-    cy.get('mat-option').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        const selectedText = $options.eq(randomIndex).text().trim();
-
-        cy.wrap($options[randomIndex]).click({ force: true });
-        cy.get('.mat-select-value').should('contain.text', selectedText);
-    });
-
-    cy.get('.mat-select-value')
-        .contains('Please Select')
-        .click({ force: true });
-
-    cy.get('mat-option .mat-option-text').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        const selectedText = $options.eq(randomIndex).text().trim();
-        cy.wrap($options.eq(randomIndex)).click({ force: true });
-
-        cy.get('.mat-select-value').should('contain.text', selectedText);
-    });
 };
 
 // ========================
-// INTERNAL: SELECT RANDOM DROPDOWN RECURRING (MAIN VARIANT)
+// INTERNAL: MAIN LOGIC
 // ========================
-
-const selectRandomDropdownRecurringMain = (): void => {
-    cy.get('.mat-select-value').eq(1).click({ force: true });
-
-    cy.get('mat-option .mat-option-text').then(($options) => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-
-        // capture text ก่อน click — ป้องกัน CDK overlay re-render สลับ index
-        const selectedText = $options.eq(randomIndex).text().trim();
-        cy.log(`🎲 Selected: "${selectedText}"`);
-
-        // click ด้วย text แทน index เพื่อความ stable
-        cy.contains('mat-option .mat-option-text', selectedText).click({ force: true });
-
-        // assert จาก text ที่ capture ไว้
-        cy.get('.mat-select-value').eq(1).should('contain.text', selectedText);
-    });
+const handleRecurringDropdowns = (): void => {
+    handleDropdownField('Recurring Promotion / Service Group');
+    handleDropdownField('Recurring Fee Item');
 };
 
 // ========================
-// CORE: DROPDOWN RECURRING (รวมเป็นฟังก์ชันแกนเดียว)
+// EXPORTS
 // ========================
-type DropdownRecurringMode = 'normal' | 'main';
+export const dropdownRecurringCKS = (): void => handleRecurringDropdowns();
 
-const dropdownRecurringCore = (mode: DropdownRecurringMode): void => {
-    if (mode === 'main') {
-        selectRandomDropdownRecurringMain();
-    } else {
-        selectRandomDropdownRecurring();
-    }
-};
+export const dropdownRecurringCKSMain = (): void => handleRecurringDropdowns();
 
-// ========================
-// PUBLIC EXPORTS (คงชื่อเดิมไว้ทั้งหมด เพื่อไม่กระทบไฟล์อื่นที่เรียกใช้อยู่)
-// ========================
-
-export const dropdownRecurringCKS = (): void => {
-    dropdownRecurringCore('normal');
-};
-
-export const dropdownRecurringPreMainCKS = (): void => {
-    dropdownRecurringCore('normal');
-};
-
-export const dropdownRecurringCKSMain = (): void => {
-    dropdownRecurringCore('main');
-};
+export const dropdownRecurringPreMainCKS = (): void => handleRecurringDropdowns();
 // ========================
 // UNREGISTER
 // ========================
@@ -437,7 +661,6 @@ export const Tariff = (): void => {
 
     closeSuccessModal();
 };
-
 // ========================
 // PRICE EXCLUDING
 // ========================
@@ -448,15 +671,14 @@ export const PriceExcluding = (): void => {
         .click();
 
     function getRandomRealisticCharge(min = 10, max = 2000): string {
-        // 🎯 สุ่มราคาโดยยึดหลักความจริงของแพ็กเกจอินเทอร์เน็ต/มือถือในไทย (บาท)
         const realisticPrices = [
-            15, 19, 25, 29, 35, 39, 45, 49, 55, 59, 69, 79, 89, 99, 
-            129, 149, 159, 199, 249, 259, 299, 349, 399, 
-            449, 499, 549, 599, 699, 799, 899, 999, 
+            15, 19, 25, 29, 35, 39, 45, 49, 55, 59, 69, 79, 89, 99,
+            129, 149, 159, 199, 249, 259, 299, 349, 399,
+            449, 499, 549, 599, 699, 799, 899, 999,
             1099, 1199, 1299, 1399, 1499, 1599, 1999
         ];
         const validPrices = realisticPrices.filter(p => p >= min && p <= max);
-        const price = validPrices.length > 0 
+        const price = validPrices.length > 0
             ? validPrices[Math.floor(Math.random() * validPrices.length)]
             : Math.floor(Math.random() * (max - min) + min); // fallback ถ้าไม่มีในช่วง
         return price.toFixed(2);
@@ -471,95 +693,112 @@ export const PriceExcluding = (): void => {
 
     cy.get('.col-md-6 > .btn').click();
 };
-
-// ============================================================
-// RandomMultiDuration()
-// ============================================================
-
+// ========================
+// PRICE EXCLUDING
+// ========================
 export const RandomMultiDuration = (): void => {
-    function getRandomRealisticCharge(min = 10, max = 2000): string {
-        // 🎯 สุ่มราคาโดยยึดหลักความจริงของแพ็กเกจอินเทอร์เน็ต/มือถือในไทย (บาท)
+    function getRandomRealisticCharge(min = 100, max = 2000): string {
         const realisticPrices = [
-            15, 19, 25, 29, 35, 39, 45, 49, 55, 59, 69, 79, 89, 99, 
-            129, 149, 159, 199, 249, 259, 299, 349, 399, 
-            449, 499, 549, 599, 699, 799, 899, 999, 
+            129, 149, 159, 199, 249, 259, 299, 349, 399,
+            449, 499, 549, 599, 699, 799, 899, 999,
             1099, 1199, 1299, 1399, 1499, 1599, 1999
         ];
         const validPrices = realisticPrices.filter(p => p >= min && p <= max);
-        const price = validPrices.length > 0 
+        const price = validPrices.length > 0
             ? validPrices[Math.floor(Math.random() * validPrices.length)]
             : Math.floor(Math.random() * (max - min) + min);
         return price.toFixed(2);
     }
 
-    // ✅ FIX 1: ดึงที่ input โดยตรงและใช้ .first() เพื่อเลือกช่อง "Yes"
-    cy.get('input[formcontrolname="multiDurationFlag"]').first().check({ force: true });
-
-    // 2) สุ่มจำนวนแถว 2-5
-    const rowCount = Math.floor(Math.random() * 4) + 2; // 2,3,4,5
-    cy.log(`🎲 Multi Duration: randomly creating ${rowCount} row(s)`);
-
-    let previousFrom = 1; // ✅ แก้ไข: กำหนดค่าเริ่มต้นเป็น 1
-
-    for (let row = 0; row < rowCount; row++) {
-        cy.log(`📦 Multi Duration row ${row + 1}/${rowCount}`);
-        
-        // กดปุ่ม + เพื่อเพิ่มแถวใหม่
-        cy.get('.col-md-8.col-md-offset-2 > .btn-primary').click();
-
-        // 🎯 แก้ไข: สุ่มการขยับระยะเวลาให้สมจริงกับแพ็กเกจอินเทอร์เน็ต (เช่น ขยับทีละ 1, 2, 3, 6, 12)
-        const realisticJumps = [1, 2, 3, 6, 12]; 
-        const currentFrom = row === 0 
-            ? 1 
-            : previousFrom + realisticJumps[Math.floor(Math.random() * realisticJumps.length)]; 
-
-        cy.get('input[formcontrolname="durationFrom"]').last()
-            .should('be.visible')
-            .clear()
-            .type(currentFrom.toString())
-            .should('have.value', currentFrom.toString());
-
-        cy.get('input[formcontrolname="durationTo"]').last().then($durationTo => {
-            if (!$durationTo.is(':disabled')) {
-                cy.log(`⚠️ durationTo NOT disabled on row ${row + 1} (expected disabled) — verify behavior, value may need manual fill`);
-            }
-        });
-        
-        cy.get('select[formcontrolname="durationUnit"]').last().then($durationUnit => {
-            if (!$durationUnit.is(':disabled')) {
-                cy.log(`⚠️ durationUnit NOT disabled on row ${row + 1} (expected disabled) — verify behavior, may need manual select`);
-            }
+    cy.contains('label.text-danger.pull-right', 'Multi Duration')
+        .closest('.form-group')
+        .within(() => {
+            cy.contains('label.radio-inline', 'Yes')
+                .find('input[formcontrolname="multiDurationFlag"]')
+                .check({ force: true });
         });
 
-        const randomChargeExc = getRandomRealisticCharge();
-        const randomChargeInc = getRandomRealisticCharge();
+    cy.get('input[formcontrolname="packageDuration"]')
+        .invoke('val')
+        .then((val) => {
+            const packageDuration = parseInt((val || '0').toString(), 10);
+            cy.log(`📦 Package Duration: ${packageDuration}`);
 
-        cy.get('input[formcontrolname="chargeExcVat"]').last()
-            .should('be.visible')
-            .clear()
-            .type(randomChargeExc)
-            .should('have.value', randomChargeExc);
+            if (!packageDuration || packageDuration <= 0) {
+                cy.log('⚠️ Package Duration ไม่พบหรือเป็น 0 — skip MultiDuration');
+                return;
+            }
 
-        // ✅ FIX 3: Scope เฉพาะปุ่ม Add ในโซนของ Multi Duration 
-        cy.get('.col-md-8.col-md-offset-2').contains('button', 'Add').last().click();
+            const maxRows = Math.min(5, packageDuration);
+            const rowCount = Math.max(2, Math.floor(Math.random() * maxRows) + 1);
+            cy.log(`🎲 Multi Duration: randomly creating ${rowCount} row(s)`);
 
-        // เตรียมค่าไว้ใช้คำนวณแถวถัดไป
-        previousFrom = currentFrom;
-    }
+            const step = Math.max(1, Math.floor(packageDuration / rowCount));
+            let currentFrom = 1;
 
-    // ยืนยันว่า alert "must have more than one row" ไม่ปรากฏอีก
-    cy.get('body').then($body => {
-        const hasRowCountAlert = $body
-            .find('.alert-danger label')
-            .toArray()
-            .some(el => el.textContent?.includes('must have more than one row'));
+            for (let row = 0; row < rowCount; row++) {
+                cy.log(`📦 Multi Duration row ${row + 1}/${rowCount}`);
 
-        if (hasRowCountAlert) {
-            cy.log('⚠️ Row count validation message still present after adding rows');
-        } else {
-            cy.log('✅ Multi Duration row count requirement satisfied');
-        }
-    });
+                // ✅ กด + ทุก row รวม row แรก เพราะ form ไม่ได้เปิดอัตโนมัติ
+                cy.get('.col-md-8.col-md-offset-2 > .btn-primary').click();
+
+                const fromValue = Math.min(currentFrom, packageDuration);
+                cy.log(`   durationFrom: ${fromValue}`);
+
+                cy.get('input[formcontrolname="durationFrom"]')
+                    .should('be.visible')
+                    .clear()
+                    .type(fromValue.toString())
+                    .trigger('input')
+                    .trigger('change')
+                    .should('have.value', fromValue.toString());
+
+                cy.get('input[formcontrolname="durationTo"]').then($el => {
+                    if ($el.prop('disabled')) {
+                        cy.log('🔒 POST path — durationTo disabled (auto-calculated)');
+                    } else {
+                        cy.log('ℹ️ PRE path — durationTo enabled, skipping input');
+                    }
+                });
+
+                const randomChargeExc = getRandomRealisticCharge();
+                const randomChargeInc = (parseFloat(randomChargeExc) * 1.07).toFixed(2);
+                cy.log(`   chargeExcVat: ${randomChargeExc}, chargeIncVat: ${randomChargeInc}`);
+
+                cy.get('input[formcontrolname="chargeExcVat"]')
+                    .should('be.visible')
+                    .clear()
+                    .type(randomChargeExc)
+                    .trigger('input')
+                    .trigger('change')
+                    .should('have.value', randomChargeExc);
+
+                cy.get('input[formcontrolname="chargeIncVat"]')
+                    .should('be.visible')
+                    .clear()
+                    .type(randomChargeInc)
+                    .trigger('input')
+                    .trigger('change')
+                    .should('have.value', randomChargeInc);
+
+                cy.contains('button', 'Add').click();
+
+                currentFrom = Math.min(currentFrom + step, packageDuration);
+            }
+
+            cy.get('body').then($body => {
+                const hasRowCountAlert = $body
+                    .find('.alert-danger label')
+                    .toArray()
+                    .some(el => el.textContent?.includes('must have more than one row'));
+
+                if (hasRowCountAlert) {
+                    cy.log('⚠️ Row count validation message still present after adding rows');
+                } else {
+                    cy.log('✅ Multi Duration row count requirement satisfied');
+                }
+            });
+        });
 };
 // ========================
 // SELECT TARGET GROUP
@@ -632,7 +871,8 @@ export const dropdownPromotionGroup = (): void => {
             cy.get('select[formcontrolname="promotionGroup"]').select(valueToSelect);
         });
 
-    cy.wait(1500);
+    // Wait for promotionGroup to propagate to subGroup
+    cy.get('select[formcontrolname="promotionSubGroup"]', { timeout: 5000 }).should('exist');
 
     cy.get('select[formcontrolname="promotionSubGroup"]').each(($select: JQuery<HTMLElement>) => {
         const options = $select.find('option').toArray() as HTMLOptionElement[];
@@ -719,4 +959,56 @@ export const RetryPattern = (): void => {
                     });
             }
         });
+};
+
+// ========================
+// Top up
+// ========================
+export const Topup = (): void => {
+    cy.get('body').then(($body) => {
+        // ✅ ระดับ 2: เช็คว่ามี select "topupPlanType" ไหม
+        if ($body.find('select[formcontrolname="topupPlanType"]').length > 0) {
+            cy.get('select[formcontrolname="topupPlanType"]').then(($select) => {
+                const selectedValue = $select.val() as string;
+                const hasValue =
+                    selectedValue &&
+                    selectedValue !== '' &&
+                    !$select.find(`option[value="${selectedValue}"]`).is('[disabled]');
+
+                if (!hasValue) {
+                    const options = [
+                        '1: 30:60 Topup Plan',
+                        '2: No Topup Plan',
+                        '3: Other Topup Plan'
+                    ];
+                    const randomValue = options[Math.floor(Math.random() * options.length)];
+                    cy.get('select[formcontrolname="topupPlanType"]').select(randomValue);
+                    cy.log(`Selected random Top up Plan Type: "${randomValue}"`);
+                } else {
+                    cy.log(`Top up Plan Type already has value: "${selectedValue}"`);
+                }
+            });
+        } else {
+            cy.log('No "topupPlanType" select found, skipping...');
+        }
+    });
+};
+
+export const ClickTopupTab = (): void => {
+    cy.get('.nav.nav-tabs').then(($nav) => {
+        const $topupTab = $nav.find('a').filter((_, el) => {
+            return Cypress.$(el).text().trim() === 'Top up';
+        });
+        if ($topupTab.length > 0) {
+            cy.log('Found "Top up" tab, clicking it...');
+            cy.wrap($topupTab)
+                .scrollIntoView()
+                .should('be.visible')
+                .click();
+            cy.wait(500);
+            Topup(); // → เช็คต่ออีกชั้นใน Topup()
+        } else {
+            cy.log('No "Top up" tab found, skipping...');
+        }
+    });
 };

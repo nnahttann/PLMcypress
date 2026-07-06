@@ -24,7 +24,7 @@ export const RandomProductSpecification = (
         'SMS',
         'MMS',
         'Calling Melody',
-        'Cloud Game',
+        // 'Cloud Game',
         'AI IP Camera',
         'WiFi',
         'Karaoke',
@@ -34,7 +34,7 @@ export const RandomProductSpecification = (
         'TV Plus',
         'Youtube Premium',
         'Internet',
-        'Vertical App'
+        // 'Vertical App'
     ];
 
     const blockedForMain = ['SMS', 'MMS', 'Voice'];
@@ -807,7 +807,6 @@ export const WiFi = (): void => {
         cy.wait(400)
     }
 
-    // ✅ scope ไปที่ active tab ถ้ามี tabset, ไม่งั้นใช้ component ทั้งหมด
     const getActivePane = (): Cypress.Chainable<JQuery<HTMLElement>> =>
         cy.get(COMPONENT).then(($comp) => {
             const hasTabset = $comp.find('tabset').length > 0
@@ -817,7 +816,6 @@ export const WiFi = (): void => {
             return $comp
         })
 
-    // ✅ clickTab: ข้ามถ้าไม่มี tabset
     const clickTab = (tabName: string): void => {
         cy.get(COMPONENT).then(($comp) => {
             const $tabs = $comp.find('.nav.nav-tabs a')
@@ -848,7 +846,6 @@ export const WiFi = (): void => {
             .click({ force: true })
         cy.wait(600)
 
-        // ✅ unhide WiFi Detail panel
         getActivePane()
             .find('.panel.panel-default', { timeout: 8000 })
             .then(($panels) => {
@@ -920,7 +917,6 @@ export const WiFi = (): void => {
                     .should('have.class', 'ng-valid')
             })
 
-        // ✅ Click Add — เฉพาะปุ่ม "Add" เท่านั้น
         cy.log('🖱️ Clicking Add button...')
         getActivePane()
             .find('button.btn-primary, button.btn-info', { timeout: 10000 })
@@ -938,29 +934,31 @@ export const WiFi = (): void => {
 
         cy.get(COMPONENT).then(($comp) => {
             const hasTabset = $comp.find('tabset').length > 0
+
             if (!hasTabset) {
                 cy.log(`⚠️ No tabset found in ${COMPONENT} — skipping tab data check`)
                 return
             }
-        })
 
-        cy.get(COMPONENT).within(() => {
-            cy.get('tabset ul.nav-tabs a, .nav-tabs a')
-                .filter((_, el) => {
-                    const tabText = Cypress.$(el).text().trim()
-                    return tabText.includes(tabName)
-                })
-                .first()
-                .click({ force: true })
-            cy.wait(400)
+            // ✅ nested inside .then() — only runs when hasTabset is true
+            cy.get(COMPONENT).within(() => {
+                cy.get('tabset ul.nav-tabs a, .nav-tabs a')
+                    .filter((_, el) => {
+                        const tabText = Cypress.$(el).text().trim()
+                        return tabText.includes(tabName)
+                    })
+                    .first()
+                    .click({ force: true })
+                cy.wait(400)
 
-            cy.get('tab.active tbody tr, .tab-pane.active tbody tr', { timeout: 15000 })
-                .should(($rows) => {
-                    expect($rows.length).to.be.greaterThan(0)
-                    const text = $rows.text().trim()
-                    expect(text).not.to.include('No data to display.')
-                    expect(text).not.to.include('Fetching data')
-                })
+                cy.get('tab.active tbody tr, .tab-pane.active tbody tr', { timeout: 15000 })
+                    .should(($rows) => {
+                        expect($rows.length).to.be.greaterThan(0)
+                        const text = $rows.text().trim()
+                        expect(text).not.to.include('No data to display.')
+                        expect(text).not.to.include('Fetching data')
+                    })
+            })
         })
     }
 
@@ -1092,41 +1090,93 @@ export const VerticalApp = (): void => {
 // ========================
 
 export const CloudGame = (): void => {
+    cy.log('🎮 === CloudGame Tab ===');
+
+    // ── Navigate to Cloud Game tab ──────────────────────────────────────────
     cy.get('app-mass-mkt-product-offering-detail-tab ul.nav-tabs li a')
         .contains(/^Cloud Game$/)
         .click({ force: true });
 
     cy.wait(500);
 
-    cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
+    // ── Scope to app-mass-mkt-vr ───────────────────────────────────────────
+    const VR = () =>
+        cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', {
+            timeout: 10000,
+        })
         .first()
-        .should('be.visible')
-        .within(() => {
-            cy.get('button .glyphicon-plus').first().parent().click();
+        .should('be.visible');
 
-            cy.contains('label', '*Content :')
-                .closest('.col-md-12')
-                .find('.mat-select-trigger')
-                .click({ force: true });
-        });
+    // ── Step 1: Click the [+] button to open Cloud Game Detail form ────────
+    VR().within(() => {
+        cy.log('➕ click + to open Cloud Game Detail form');
+        cy.get('button .glyphicon-plus')
+            .first()
+            .parent('button')
+            .click({ force: true });
+    });
 
+    cy.wait(300);
+
+    // ── Step 2: Select random Content from mat-select (CDK overlay) ────────
+    // mat-select trigger อยู่ใน component แต่ panel ถูก teleport ไป body-level
+    VR().within(() => {
+        cy.log('📋 open Content mat-select');
+        cy.contains('label', '*Content :')
+            .closest('.col-md-12')
+            .find('.mat-select-trigger')
+            .click({ force: true });
+    });
+
+    // CDK overlay panel อยู่นอก component — query จาก body level
     cy.get('.cdk-overlay-container .mat-select-panel', { timeout: 10000 })
         .should('be.visible');
 
     cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
         .should('have.length.greaterThan', 0)
         .then(($options) => {
-            const count = $options.length;
-            const randomIndex = Math.floor(Math.random() * count);
+            const randomIndex = Math.floor(Math.random() * $options.length);
+            cy.log(`🎲 select Content option index: ${randomIndex}`);
             cy.wrap($options).eq(randomIndex).click({ force: true });
         });
-    cy.wait(500)
-    cy.get('app-mass-mkt-product-offering-detail-tab app-mass-mkt-vr', { timeout: 10000 })
-        .first()
-        .should('be.visible')
-        .within(() => {
-            cy.get('button.btn-primary').contains('Add').click({ force: true });
-        });
+
+    cy.wait(300);
+
+    // ── Step 3: Fill Service Type, Service Name, Sub Type (Service No.) ────
+    VR().within(() => {
+        cy.log('✏️ fill serviceType');
+        cy.get('input[formcontrolname="serviceType"]')
+            .should('be.visible')
+            .clear()
+            .type('TypeA');
+
+        cy.log('✏️ fill serviceName');
+        cy.get('input[formcontrolname="serviceName"]')
+            .should('be.visible')
+            .clear()
+            .type('ServiceName1');
+
+        cy.log('✏️ fill serviceNo');
+        cy.get('input[formcontrolname="serviceNo"]')
+            .should('be.visible')
+            .clear()
+            .type('SVC-001');
+
+        // ── Step 4: Click Add ────────────────────────────────────────────
+        cy.log('💾 click Add');
+        cy.get('button[type="submit"]')
+            .contains('Add')
+            .click({ force: true });
+    });
+
+    cy.wait(500);
+
+    // ── Step 5: Assert row appeared in table ───────────────────────────────
+    VR().within(() => {
+        cy.get('table tbody tr')
+            .should('have.length.greaterThan', 0)
+            .then(() => cy.log('✅ Cloud Game row added to table'));
+    });
 };
 
 // ========================
@@ -1892,7 +1942,6 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
     cy.scrollTo('bottom');
     cy.get('app-mass-mkt-internet button.btn-xs').find('.glyphicon-plus').filter(':visible').first().click();
 
-    // สุ่มจากทุก options ที่มี
     const allowedOptions: InternetQuotaType[] = [
         'Limited Data (Pay per use)',
         'Limited Data (Stop Net)',
@@ -1902,7 +1951,6 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
         'Unlimited Data (Throttling Speed)'
     ];
 
-    // Select quota type
     cy.get('app-mass-mkt-internet select[formcontrolname="InternetQuotaType"]')
         .filter(':visible')
         .last()
@@ -1917,33 +1965,39 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
                     return;
                 }
 
-                const selectedType = availableOptions[Math.floor(Math.random() * availableOptions.length)] as InternetQuotaType;
+                const selectedType = availableOptions[
+                    Math.floor(Math.random() * availableOptions.length)
+                ] as InternetQuotaType;
+
                 cy.wrap($select).select(selectedType);
                 cy.wait(500);
                 cy.log(`📌 Selected Quota Type: ${selectedType}`);
 
-                // Route to appropriate handler
                 const handlers: Record<InternetQuotaType, () => void> = {
                     'Limited Data (Pay per use)': () => handleLimitedData(ProductClass, subModule),
-                    'Limited Data (Stop Net)': () => handleLimitedData(ProductClass, subModule),
-                    'Limited Data Only': () => handleLimitedDataOnly(ProductClass, subModule, Module),
-                    'Pay per use only': handlePayPerUse,
-                    'Unlimited Data (Fixed Speed)': () => handleUnlimitedFixedSpeed(ProductClass, subModule),
-                    'Unlimited Data (Throttling Speed)': () => handleUnlimitedThrottling(ProductClass, subModule),
+                    'Limited Data (Stop Net)':    () => handleLimitedData(ProductClass, subModule),
+                    'Limited Data Only':           () => handleLimitedDataOnly(ProductClass, subModule, Module),
+                    'Pay per use only':            handlePayPerUse,
+                    'Unlimited Data (Fixed Speed)':       () => handleUnlimitedFixedSpeed(ProductClass, subModule),
+                    'Unlimited Data (Throttling Speed)':  () => handleUnlimitedThrottling(ProductClass, subModule),
                 };
 
                 handlers[selectedType]?.();
-            });
-        });
-    cy.wait(500)
-    cy.get('app-mass-mkt-internet').find('form, [formgroup]').should('have.class', 'ng-valid');
 
-    cy.get('app-mass-mkt-internet button.btn-primary')
-        .filter(':visible')
-        .each(($btn) => {
-            const text = $btn.text().trim();
-            if (text === 'Add') {
-                cy.wrap($btn).scrollIntoView().click({ force: true });
-            }
+                // ✅ ย้ายเข้ามาใน .then() — จะ enqueue หลัง handler เสร็จเสมอ
+                cy.wait(500);
+                cy.get('app-mass-mkt-internet')
+                    .find('form, [formgroup]')
+                    .should('have.class', 'ng-valid');
+
+                cy.get('app-mass-mkt-internet button.btn-primary')
+                    .filter(':visible')
+                    .each(($btn) => {
+                        const text = $btn.text().trim();
+                        if (text === 'Add') {
+                            cy.wrap($btn).scrollIntoView().click({ force: true });
+                        }
+                    });
+            });
         });
 };

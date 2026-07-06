@@ -67,7 +67,6 @@ export {
     createFullPageApprovalFlow,
     createSimplePageApprovalFlow,
     navigateToWorkspace,
-    performRoleTaskWithAssignment,
     performSimpleApprovalRole,
     performSimpleClaimAndApprovalRole,
 } from './master/claim-approve';
@@ -130,7 +129,7 @@ export {
     afterMKTontopPREUsageEnter,
     afterMKTontopPREUsageMusic,
     beforeapproveMKT,
-} from './master/mkt-flows';
+} from './master/flows';
 
 // Project Creation
 export {
@@ -176,7 +175,7 @@ export {
 // SMS Wording
 export {
     smsWording,
-    smsWordingpre,
+    smsWordingPRE,
     smsCKSPRE,
     smsCKSPOST,
 } from './master/sms-wording';

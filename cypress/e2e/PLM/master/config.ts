@@ -45,7 +45,7 @@ export type ProductClass = 'main' | 'ontop' | 'ontopextra';
 export type TaskListHeader = 'To Do List' | 'Unassigned Task';
 export type FinalAction = 'AlertAndLogout' | 'ComplexLogout' | 'StopAfterCore';
 export type CoreTaskCallback = () => void;
-export type ApproveFunction = (projectName: string) => void;
+export type ApproveFunction = (projectName: string, options?: { alreadyOnPage?: boolean; skipLogout?: boolean }) => void;
 export type GetProjectNameFn = () => string;
 
 // อัปเดต Interface

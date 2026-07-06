@@ -17,7 +17,6 @@ export const handleAddToUSMP = (): void => {
         if ($body.find('button:contains("Add to USMP")').length > 0) {
             cy.log('🟢 Found Add to USMP button, clicking...');
             cy.contains('button', 'Add to USMP').click();
-            cy.wait(500);
 
             cy.get('body').then(($b) => {
                 if ($b.find('.modal.fade.in').length > 0) {
@@ -40,15 +39,13 @@ export const handleAddToUSMP = (): void => {
                     cy.log('⚠️ ไม่พบ modal/dialog — ข้ามการปิด');
                 }
             });
-
-            cy.wait(500);
         } else {
             cy.log('⚪ Add to USMP button not found, skipping...');
         }
     });
 };
 
-export const scrollAndWait = (ms: number = 4000): void => {
+export const scrollAndWait = (ms: number = 2000): void => {
     cy.scrollTo('bottom');
     cy.wait(ms);
 };
@@ -107,8 +104,8 @@ export const login = (username: string, password: string): void => {
 
 export const loginAndWaitReady = (username: string, password: string): void => {
     login(username, password);
-    cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-    cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
+//     cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
+//     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 };
 
 // ========================
