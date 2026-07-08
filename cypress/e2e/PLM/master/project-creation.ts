@@ -8,6 +8,7 @@ import { CopyDeductFail } from './priority-updaters';
 import { smsWording } from './sms-wording';
 import { RandomProductSpecification } from './product-specs';
 import { beforeapproveMKT } from './flows';
+import { ChargePartner, InternalShare, RevenueSharing, SharingPartner } from './MKT_Share.cy';
 
 // ========================
 // CREDENTIALS HELPER
@@ -673,6 +674,10 @@ export const ProjectBasicInformationComplete = (
         }
 
         targetgroup();
+        // InternalShare();
+        // SharingPartner();
+        // RevenueSharing();
+        // ChargePartner();
         RandomRemark(projectName, currentPoName, PriceType, ProductClass, subModule);
 
         if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {

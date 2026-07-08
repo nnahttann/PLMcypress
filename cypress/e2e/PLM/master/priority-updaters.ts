@@ -23,6 +23,15 @@ const randomPriority = (): string => {
 
     return String(value);
 };
+const normalizeQuotaText = (text: string): string =>
+    (text || '').replace(/\s+/g, ' ').trim();
+
+const isKnownQuotaType = (text: string): boolean => {
+    const normalized = normalizeQuotaText(text).toLowerCase();
+    return ALL_PRIORITY_QUOTA_TYPES.some(
+        (t) => normalizeQuotaText(t).toLowerCase() === normalized
+    );
+};
 
 const getInternetDetailPanelBody = ($root: JQuery): JQuery => {
     const $activePane = $root.find('.tab-pane.active');
@@ -50,6 +59,36 @@ const isInternetDetailPanelOpen = ($root: JQuery): boolean => {
     if (!$wrapperPanel.length) return false;
 
     return !$wrapperPanel[0].hasAttribute('hidden');
+};
+
+const getActiveScope = ($root: JQuery): JQuery => {
+    const $activePane = $root.find('.tab-pane.active');
+    return $activePane.length ? $activePane : $root;
+};
+const assertOuterQuotaHeaderReady = ($comp: JQuery): void => {
+    const $scope = getActiveScope($comp);
+
+    const $header = $scope
+        .find('table thead th')
+        .filter((_i, el) => (el.textContent || '').trim() === 'Quota Type');
+
+    expect(
+        $header.length,
+        'ควรพบ header "Quota Type" ใน active scope (tab ที่กำลังใช้งานอยู่ ถ้ามี)'
+    ).to.be.greaterThan(0);
+
+    expect(
+        Cypress.$($header.get(0)).is(':visible'),
+        'header "Quota Type" ควร visible อยู่ใน active scope'
+    ).to.be.true;
+
+    const $outerTable = $header.closest('table');
+    const $tbodyRows = $outerTable.find('tbody tr');
+
+    expect(
+        $tbodyRows.length,
+        'tbody ของ outer quota table ควร render แถวแล้ว (ข้อมูลจริงหรือ "No data to display.") — ป้องกัน race condition ตอน Angular ยังโหลดข้อมูลไม่เสร็จ'
+    ).to.be.greaterThan(0);
 };
 
 const tryFillPriority = (
@@ -149,6 +188,7 @@ export const checkAndUpdatePriority = (): void => {
 
     // ── คลิก Tab Internet ─────────────────────────────────────────────────────
     cy.get('body').then(($body) => {
+
         const $internetTab = $body
             .find('.scrollmenu > .nav a, .scrollmenu > .nav li a')
             .filter((_i, el) => (el.textContent || '').trim() === 'Internet');
@@ -164,11 +204,12 @@ export const checkAndUpdatePriority = (): void => {
             .click({ force: true });
 
         cy.log('✅ คลิก Tab Internet');
+        cy.wait(5000);
     });
 
-    cy.get(`${INTERNET_COMPONENT} table thead th`, { timeout: 15000 })
-        .contains('Quota Type')
-        .should('be.visible');
+    cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should(($comp) => {
+        assertOuterQuotaHeaderReady($comp);
+    });
 
     cy.log('✅ outer quota table พร้อมแล้ว');
 
@@ -194,15 +235,16 @@ export const checkAndUpdatePriority = (): void => {
                 return;
             }
 
+            // ── PATCH 1: ใช้ normalize + isKnownQuotaType แทน exact ALL_PRIORITY_QUOTA_TYPES.includes ──
             const rowCount: number = $outerTable
                 .find('tbody tr')
                 .toArray()
                 .filter((el) => {
-                    const text = Cypress.$(el).find('td').first().text().trim();
+                    const text = normalizeQuotaText(Cypress.$(el).find('td').first().text());
                     return (
                         text.length > 0 &&
                         text !== 'No data to display.' &&
-                        ALL_PRIORITY_QUOTA_TYPES.includes(text)
+                        isKnownQuotaType(text)
                     );
                 }).length;
 
@@ -241,14 +283,17 @@ export const checkAndUpdatePriority = (): void => {
                                 return;
                             }
 
+                            // ── PATCH 1: normalize เหมือนกันตรงนี้ด้วย ──
                             const $allDataRows = $outerTable2
                                 .find('tbody tr')
                                 .filter((_i, el) => {
-                                    const text = Cypress.$(el).find('td').first().text().trim();
+                                    const text = normalizeQuotaText(
+                                        Cypress.$(el).find('td').first().text()
+                                    );
                                     return (
                                         text.length > 0 &&
                                         text !== 'No data to display.' &&
-                                        ALL_PRIORITY_QUOTA_TYPES.includes(text)
+                                        isKnownQuotaType(text)
                                     );
                                 });
 
@@ -287,6 +332,33 @@ export const checkAndUpdatePriority = (): void => {
 
                     cy.log(`✅ [${loopIdx + 1}] Internet Detail panel เปิดแล้ว`);
 
+                    cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should(($comp) => {
+                        const $pb = getInternetDetailPanelBody($comp);
+                        expect(
+                            $pb.length,
+                            `panel-body ควรพบ (row ${loopIdx + 1})`
+                        ).to.be.greaterThan(0);
+
+                        const $updateBtn = $pb.find('button').filter(
+                            (_i, btn) => (btn.textContent || '').trim() === 'Update'
+                        );
+                        const $addBtn = $pb.find('button').filter(
+                            (_i, btn) => (btn.textContent || '').trim() === 'Add'
+                        );
+
+                        if ($addBtn.length > 0 && $updateBtn.length === 0) {
+                            throw new Error(
+                                `❌ [row ${loopIdx + 1}] Panel เปิดมาเป็นโหมด "Add" (Quota Type ยังไม่เลือก) ` +
+                                `แทนที่จะเป็นโหมด "Edit" — น่าจะกดปุ่มผิด (คลิก "+" แทน Edit) หรือ panel เดิมค้างอยู่ก่อนหน้า`
+                            );
+                        }
+
+                        expect(
+                            $updateBtn.length,
+                            `ควรพบปุ่ม "Update" ใน panel โหมด Edit (row ${loopIdx + 1})`
+                        ).to.be.greaterThan(0);
+                    });
+
                     updatePriorityInPanel();
 
                     safeClickCancel();
@@ -299,10 +371,10 @@ export const checkAndUpdatePriority = (): void => {
                         ).to.be.false;
                     });
 
-                    // ✅ รอ outer table stable
-                    cy.get(`${INTERNET_COMPONENT} table thead th`, { timeout: 12000 })
-                        .contains('Quota Type')
-                        .should('be.visible');
+                    // ✅ รอ outer table stable (scoped เฉพาะ active tab — กัน bug กรณีมี tab Success/Fail)
+                    cy.get(INTERNET_COMPONENT, { timeout: 12000 }).should(($comp5) => {
+                        assertOuterQuotaHeaderReady($comp5);
+                    });
 
                     cy.log(`✅ [${loopIdx + 1}] เสร็จสิ้น — พร้อม iteration ถัดไป`);
                 }
@@ -312,6 +384,28 @@ export const checkAndUpdatePriority = (): void => {
         });
 };
 
+
+const shouldCopyDeductFailEnhancement = (): boolean => {
+    const module = Cypress.env('currentModule');
+    const priceType = Cypress.env('currentPriceType');
+    const productClass = Cypress.env('currentProductClass');
+
+    const result = module === 'PRE' && priceType === 'recurring' && productClass === 'main';
+
+    cy.log(
+        `🔎 [shouldCopyDeductFailEnhancement] module="${module}", priceType="${priceType}", productClass="${productClass}" → ${result}`
+    );
+
+    return result;
+};
+
+const runCopyDeductFailIfNeeded = (): void => {
+    if (shouldCopyDeductFailEnhancement()) {
+        CopyDeductFail('enhancement');
+    } else {
+        cy.log('⚠️ ข้าม CopyDeductFail("enhancement") — เงื่อนไขไม่ตรง (ต้องเป็น Module=PRE, PriceType=recurring, ProductClass=main)');
+    }
+};
 
 export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void => {
     const mainTabs = ['Internet', 'Voice', 'SMS', 'MMS', 'Vertical App', 'Cloud Game', 'WiFi'];
@@ -419,37 +513,37 @@ export function checkAndFillContentType(): void {
         editButtonSelector: string;
         contentTypeSelector: string;
     }> = [
-        {
-            name: 'Karaoke',
-            containerSelector: 'app-mass-enh-content-karaoke',
-            editButtonSelector: 'button.btn-warning[title="Edit"]',
-            contentTypeSelector: 'select[formcontrolname="contentType"]',
-        },
-        {
-            name: 'Music Streaming',
-            containerSelector: 'app-mass-enh-content-music-streaming',
-            editButtonSelector: 'button.btn-warning[title="Edit"]',
-            contentTypeSelector: 'select[formcontrolname="contentType"]',
-        },
-        {
-            name: 'Entertainment Partnership',
-            containerSelector: 'app-mass-enh-content-music-streaming',
-            editButtonSelector: 'button.btn-warning[title="Edit"]',
-            contentTypeSelector: 'select[formcontrolname="contentType"]',
-        },
-        {
-            name: 'Cloud Game',
-            containerSelector: 'app-mass-enh-vr[title="Cloud Game"]',
-            editButtonSelector: 'button.btn-warning[title="Edit"]',
-            contentTypeSelector: 'select[formcontrolname="contentTypeValue"]',
-        },
-        {
-            name: 'AI IP Camera',
-            containerSelector: 'app-mass-enh-ai-ip-camera',
-            editButtonSelector: 'button.btn-warning[title="Edit"]',
-            contentTypeSelector: 'select[formcontrolname="contentType"]',
-        },
-    ];
+            {
+                name: 'Karaoke',
+                containerSelector: 'app-mass-enh-content-karaoke',
+                editButtonSelector: 'button.btn-warning[title="Edit"]',
+                contentTypeSelector: 'select[formcontrolname="contentType"]',
+            },
+            {
+                name: 'Music Streaming',
+                containerSelector: 'app-mass-enh-content-music-streaming',
+                editButtonSelector: 'button.btn-warning[title="Edit"]',
+                contentTypeSelector: 'select[formcontrolname="contentType"]',
+            },
+            {
+                name: 'Entertainment Partnership',
+                containerSelector: 'app-mass-enh-content-music-streaming',
+                editButtonSelector: 'button.btn-warning[title="Edit"]',
+                contentTypeSelector: 'select[formcontrolname="contentType"]',
+            },
+            {
+                name: 'Cloud Game',
+                containerSelector: 'app-mass-enh-vr[title="Cloud Game"]',
+                editButtonSelector: 'button.btn-warning[title="Edit"]',
+                contentTypeSelector: 'select[formcontrolname="contentTypeValue"]',
+            },
+            {
+                name: 'AI IP Camera',
+                containerSelector: 'app-mass-enh-ai-ip-camera',
+                editButtonSelector: 'button.btn-warning[title="Edit"]',
+                contentTypeSelector: 'select[formcontrolname="contentType"]',
+            },
+        ];
 
     const processTab = (index: number): void => {
         if (index >= targetTabs.length) {
@@ -897,6 +991,32 @@ const updatePriorityInPanel = (): void => {
         });
     };
 
+    // ── helper: หา visible priority input ใน panel-body ปัจจุบัน ──────────────
+    const getVisiblePriorityInput = ($pbScope: JQuery): JQuery => {
+        return $pbScope
+            .find('input[formcontrolname="priority"]')
+            .filter((_i, el) => {
+                return (
+                    Cypress.$(el).parentsUntil($pbScope[0]).filter('[hidden]').length === 0 &&
+                    Cypress.$(el).is(':visible')
+                );
+            });
+    };
+
+    // ── helper: หา visible inner Update button ใน panel-body ปัจจุบัน ─────────
+    const getVisibleInnerUpdateBtn = ($pbScope: JQuery): JQuery => {
+        return $pbScope
+            .find('form button')
+            .filter((_i, btn) => {
+                const text = (btn.textContent || '').trim();
+                return (
+                    /^Update$/i.test(text) &&
+                    Cypress.$(btn).is(':visible') &&
+                    Cypress.$(btn).parentsUntil($pbScope[0]).filter('[hidden]').length === 0
+                );
+            });
+    };
+
     // ── Step 2-4: loop ทุกแถวใน Internet Quota table (ไม่ใช่แถวแรกอย่างเดียว) ──
     cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should('exist').then(($comp) => {
         const $pb = getInternetDetailPanelBody($comp);
@@ -961,101 +1081,65 @@ const updatePriorityInPanel = (): void => {
                 cy.log(`✅ [row ${rowIdx + 1}] คลิก inner Edit แล้ว`);
             });
 
-            // -- กรอก priority ใน sub-form --
-            cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should('exist').then(($comp3) => {
-                const $pb3 = getInternetDetailPanelBody($comp3);
-                if (!$pb3.length) {
-                    cy.log(`ℹ️ [row ${rowIdx + 1}] ไม่พบ panel-body — ข้าม sub-form fill`);
-                    return;
-                }
+            cy.get(INTERNET_COMPONENT, { timeout: 15000 })
+                .should(($comp3) => {
+                    const $pb3 = getInternetDetailPanelBody($comp3);
+                    const $priorityInput = getVisiblePriorityInput($pb3);
 
-                const $priorityInput = $pb3
-                    .find('input[formcontrolname="priority"]')
-                    .filter((_i, el) => {
-                        return (
-                            Cypress.$(el).parentsUntil($pb3[0]).filter('[hidden]').length === 0 &&
-                            Cypress.$(el).is(':visible')
-                        );
-                    })
-                    .first();
+                    expect(
+                        $priorityInput.length,
+                        `[row ${rowIdx + 1}] sub-form priority input ควร render แล้วหลังคลิก Edit`
+                    ).to.be.greaterThan(0);
+                })
+                .then(($comp3) => {
+                    const $pb3 = getInternetDetailPanelBody($comp3);
+                    const $priorityInput = getVisiblePriorityInput($pb3).first();
 
-                if (!$priorityInput.length) {
-                    cy.log(`ℹ️ [row ${rowIdx + 1}] ไม่พบ priority input ที่ visible — ข้าม sub-form fill`);
-                    return;
-                }
+                    const val = randomPriority();
+                    cy.wrap($priorityInput)
+                        .scrollIntoView()
+                        .clear({ force: true })
+                        .type(val, { force: true, delay: 30 })
+                        .trigger('input', { force: true, bubbles: true })
+                        .trigger('change', { force: true, bubbles: true })
+                        .blur({ force: true });
 
-                const val = randomPriority();
-                cy.wrap($priorityInput)
-                    .scrollIntoView()
-                    .clear({ force: true })
-                    .type(val, { force: true, delay: 30 })
-                    .trigger('input', { force: true, bubbles: true })
-                    .trigger('change', { force: true, bubbles: true })
-                    .blur({ force: true });
+                    cy.log(`✅ [row ${rowIdx + 1}] กรอก priority (sub-form) = ${val}`);
+                });
 
-                cy.log(`✅ [row ${rowIdx + 1}] กรอก priority (sub-form) = ${val}`);
-            });
+            cy.get(INTERNET_COMPONENT, { timeout: 15000 })
+                .should(($comp4) => {
+                    const $pb4 = getInternetDetailPanelBody($comp4);
+                    const $priorityInput2 = getVisiblePriorityInput($pb4);
+                    const $innerUpdateBtn = getVisibleInnerUpdateBtn($pb4);
 
-            // -- กด inner Update ของแถวนี้ --
-            cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should('exist').then(($comp4) => {
-                const $pb4 = getInternetDetailPanelBody($comp4);
-                if (!$pb4.length) {
-                    cy.log(`ℹ️ [row ${rowIdx + 1}] ไม่พบ panel-body — ข้าม inner Update`);
-                    return;
-                }
+                    expect(
+                        $priorityInput2.length,
+                        `[row ${rowIdx + 1}] priority input ควรยังอยู่ก่อนกด inner Update`
+                    ).to.be.greaterThan(0);
 
-                const $priorityInput2 = $pb4
-                    .find('input[formcontrolname="priority"]')
-                    .filter((_i, el) => {
-                        return (
-                            Cypress.$(el).parentsUntil($pb4[0]).filter('[hidden]').length === 0 &&
-                            Cypress.$(el).is(':visible')
-                        );
-                    })
-                    .first();
+                    expect(
+                        $innerUpdateBtn.length,
+                        `[row ${rowIdx + 1}] inner Update button ควร render แล้ว`
+                    ).to.be.greaterThan(0);
+                })
+                .then(($comp4) => {
+                    const $pb4 = getInternetDetailPanelBody($comp4);
+                    const $innerUpdateBtn = getVisibleInnerUpdateBtn($pb4).first();
 
-                if (!$priorityInput2.length) {
-                    cy.log(`ℹ️ [row ${rowIdx + 1}] ไม่พบ priority input — ข้าม inner Update`);
-                    return;
-                }
+                    cy.wrap($innerUpdateBtn)
+                        .scrollIntoView()
+                        .click({ force: true });
 
-                const $innerUpdateBtn = $pb4
-                    .find('form button')
-                    .filter((_i, btn) => {
-                        const text = (btn.textContent || '').trim();
-                        return (
-                            /^Update$/i.test(text) &&
-                            Cypress.$(btn).is(':visible') &&
-                            Cypress.$(btn).parentsUntil($pb4[0]).filter('[hidden]').length === 0
-                        );
-                    })
-                    .first();
-
-                if (!$innerUpdateBtn.length) {
-                    cy.log(`⚠️ [row ${rowIdx + 1}] ไม่พบ inner Update button — ข้าม`);
-                    return;
-                }
-
-                cy.wrap($innerUpdateBtn)
-                    .scrollIntoView()
-                    .click({ force: true });
-
-                cy.log(`✅ [row ${rowIdx + 1}] คลิก inner Update`);
-            });
+                    cy.log(`✅ [row ${rowIdx + 1}] คลิก inner Update`);
+                });
 
             // -- confirm sub-form ปิดแล้วก่อนไปแถวถัดไป (กัน race condition) --
             cy.get(INTERNET_COMPONENT, { timeout: 12000 }).should(($comp5) => {
                 const $pb5 = getInternetDetailPanelBody($comp5);
                 if (!$pb5.length) return;
 
-                const $stillOpenPriorityInput = $pb5
-                    .find('input[formcontrolname="priority"]')
-                    .filter((_i, el) => {
-                        return (
-                            Cypress.$(el).parentsUntil($pb5[0]).filter('[hidden]').length === 0 &&
-                            Cypress.$(el).is(':visible')
-                        );
-                    });
+                const $stillOpenPriorityInput = getVisiblePriorityInput($pb5);
 
                 expect(
                     $stillOpenPriorityInput.length,

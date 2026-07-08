@@ -99,20 +99,12 @@ export const RandomFixedDates = () => {
                 cy.log(`🔍 hasFixedStart=${hasFixedStart}, hasFixedEnd=${hasFixedEnd}`);
 
                 // =============================
-                // Step 2: Fixed Start Date — 50/50
+                // Step 2: Fixed Start Date — กรอกเสมอ (ตัดการสุ่ม 50% ออกแล้ว)
                 // =============================
                 if (!hasFixedStart) {
                     cy.log('⏭️ Skipped: fixedStartDate not found');
                     if (hasFixedEnd) {
                         cy.log('⏭️ fixedEndDate: ข้าม เพราะ fixedStartDate ไม่มีใน DOM');
-                    }
-                    return cy.wrap(null);
-                }
-
-                if (Math.random() >= 0.5) {
-                    cy.log('🎲 fixedStartDate: ข้าม (50% chance)');
-                    if (hasFixedEnd) {
-                        cy.log('⏭️ fixedEndDate: ข้าม เพราะ fixedStartDate ไม่ได้ถูก set');
                     }
                     return cy.wrap(null);
                 }
@@ -138,17 +130,13 @@ export const RandomFixedDates = () => {
                     return cy.wrap(null);
                 }
 
-                // ไม่มี 50/50 อีกต่อไป เพราะ Start ถูกกรอกแล้วจึงต้องกรอก End ด้วยเสมอ
                 const pickedEnd = randomDateBetween(pickedStart, exp);
 
                 if (!pickedEnd) {
-                    // ถ้าสุ่มไม่ได้ (เช่น pickedStart >= exp พอดี) ให้ fallback เป็น pickedStart เอง
-                    // เพื่อการันตีว่า End >= Start เสมอ และฟอร์มยังคง valid
                     cy.log(`⚠️ fixedEndDate: ช่วงไม่ valid (${formatDate(pickedStart)} → ${formatDate(exp)}) — ใช้ fallback = fixedStartDate`);
                     typeDatePicker('fixedEndDate', pickedStart);
                     cy.log(`🎲 fixedEndDate (fallback): ${formatDate(pickedStart)}`);
                 } else {
-                    // การันตีอีกชั้นว่า pickedEnd >= pickedStart (กันกรณี randomDateBetween มีบั๊ก)
                     const safeEnd = pickedEnd.getTime() < pickedStart.getTime() ? pickedStart : pickedEnd;
 
                     cy.log(`🎲 fixedEndDate: ${formatDate(safeEnd)} (ช่วง fixedStart (${formatDate(pickedStart)}) → ${formatDate(exp)})`);
@@ -619,7 +607,11 @@ export const diyflagCKS = (): void => {
 // ========================
 
 export const Tariff = (): void => {
-    cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount').scrollIntoView().should('be.visible').click();
+    cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount')
+    .scrollIntoView({ offset: { top: -100, left: 0 } })
+    .should('be.visible')
+    .click();
+
     cy.contains('.panel-heading', 'Tariff Plan')
         .scrollIntoView()
         .should('be.visible');
@@ -827,22 +819,51 @@ export const selectTargetGroup = (type:
     };
 
     let value: string;
+    let selectedType: string;
 
     if (type === 'random') {
         const availableTypes = Object.keys(targetGroupMap).filter(
-            key => key !== 'netGift' && key !== 'traveller' && key !== 'fbb'
+            key => key !== 'fbb' && key !== 'traveller' && key !== 'netGift'
         ) as Array<keyof typeof targetGroupMap>;
 
-        const randomType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
-        value = targetGroupMap[randomType];
+        selectedType = availableTypes[Math.floor(Math.random() * availableTypes.length)];
+        value = targetGroupMap[selectedType as keyof typeof targetGroupMap];
     } else {
+        selectedType = type;
         value = targetGroupMap[type as keyof typeof targetGroupMap];
     }
 
     cy.get('select[formcontrolname="targetGroup"]')
         .select(value)
         .should('have.value', value);
+
+    // if (selectedType === 'traveller') {
+    //     const firstUseYes = Math.random() < 0.5;
+
+    //     cy.get('input[formcontrolname="firstUseFeature"]')
+    //         .eq(firstUseYes ? 0 : 1) // 0 = Yes, 1 = No
+    //         .check({ force: true });
+
+    //     if (firstUseYes) {
+    //         const randomDuration = Math.floor(Math.random() * 99999) + 1;
+
+    //         cy.get('input[formcontrolname="durationFirstUse"]')
+    //             .clear()
+    //             .type(randomDuration.toString());
+    //     }
+    // }
+
+    // if (selectedType === 'netGift') {
+    //     const useExisting = Math.random() < 0.5;
+
+    //     if (useExisting) {
+    //         selectRandomExistingCostCode();
+    //     } else {
+    //         addNewCostCode();
+    //     }
+    // }
 };
+
 
 // ========================
 // DROPDOWN PROMOTION GROUP
@@ -917,6 +938,7 @@ export const targetgroup = (): void => {
         });
 };
 
+
 // ========================
 // RETRY PATTERN
 // ========================
@@ -960,13 +982,11 @@ export const RetryPattern = (): void => {
             }
         });
 };
-
 // ========================
 // Top up
 // ========================
 export const Topup = (): void => {
     cy.get('body').then(($body) => {
-        // ✅ ระดับ 2: เช็คว่ามี select "topupPlanType" ไหม
         if ($body.find('select[formcontrolname="topupPlanType"]').length > 0) {
             cy.get('select[formcontrolname="topupPlanType"]').then(($select) => {
                 const selectedValue = $select.val() as string;

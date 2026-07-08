@@ -34,6 +34,7 @@ export const RandomProductSpecification = (
         'TV Plus',
         'Youtube Premium',
         'Internet',
+        // 'Content VDO'
         // 'Vertical App'
     ];
 

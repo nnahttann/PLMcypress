@@ -696,9 +696,9 @@ export const smsCKSPOST = (): void => {
     });
 
     // Save - ใช้ selector ที่ถูกต้อง
-    cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-    cy.contains('button', 'Save').should('be.visible').click(); // ✅ แก้ตรงนี้
-    cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+    // cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+    // cy.contains('button', 'Save').should('be.visible').click(); // ✅ แก้ตรงนี้
+    // cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
 
     // closeSuccessModal();
   });

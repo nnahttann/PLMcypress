@@ -13,11 +13,6 @@ const TIMEOUT = {
 } as const;
 
 // ========================
-// ROLE TYPE
-// ========================
-export type NavRole = 'SPAD' | 'CGMD';
-
-// ========================
 // SHARED UTILS
 // ========================
 const stripLabel = (raw: string): string =>
@@ -292,25 +287,18 @@ export const createFullPageApprovalFlow = (
     cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
 
     if (!options?.alreadyOnPage) {
-        cy.get('h3').contains(taskListHeader).parent().within(() => {
-            cy.get('tbody tr').then(($rows) => {
-                $rows.each((index, row) => {
-                    const text = Cypress.$(row).text().trim();
-                    cy.log(`Row ${index}: ${text.substring(0, 100)}`);
-                    if (text.includes(projectName)) cy.log(`✅✅✅ MATCH at row ${index}`);
-                });
+        retryFindRowInTable(taskListHeader, projectName).then((found) => {
+            if (!found) {
+                throw new Error(`❌ "${projectName}" not found in "${taskListHeader}" after retries`);
+            }
+
+            cy.get('h3').contains(taskListHeader).parent().within(() => {
+                cy.contains('tbody tr', projectName, { timeout: TIMEOUT.NAV })
+                    .should('be.visible')
+                    .as('approveRowTarget');
             });
-            // ✅ FIX: ใช้ .as() แทนการ nested .within() ซ้ำอีกชั้นบน <tr>
-            //    เพราะคลิก "Approve" ทำให้ Angular navigate ออกจากหน้าทันที
-            //    ถ้ายังอยู่ใน .within() ของแถวเดิม Cypress จะพยายาม requery <tr>
-            //    ที่ถูกลบออกจาก DOM ไปแล้ว -> "subject no longer attached to the DOM"
-            cy.contains('tbody tr', projectName, { timeout: TIMEOUT.NAV })
-                .should('be.visible')
-                .as('approveRowTarget');
         });
 
-        // ✅ คลิกเป็นคำสั่งแยกนอก .within() เดิม — ใช้ alias requery สดใหม่
-        //    ก่อนคลิก แล้วปล่อยให้ navigate ไปได้เลยโดยไม่มี command ค้างต่อท้ายบน context เก่า
         cy.get('@approveRowTarget')
             .find('span')
             .contains('Approve')
@@ -335,9 +323,7 @@ export const createFullPageApprovalFlow = (
         case 'AlertAndLogout':
         case 'ComplexLogout':
             cy.url({ timeout: TIMEOUT.LONG }).should('include', '/#/workspace-home/workspace');
-            cy.contains('button', 'Logout')
-                .should('be.visible')
-                .click();
+            cy.contains('button', 'Logout').should('be.visible').click();
             break;
         case 'StopAfterCore':
             cy.log('Core task finished. Stopping as requested.');
@@ -349,7 +335,8 @@ export const createSimplePageApprovalFlow = (
     projectName: string,
     taskListHeader: TaskListHeader,
     expectedUrl: string,
-    coreTaskCallback: CoreTaskCallback
+    coreTaskCallback: CoreTaskCallback,
+    finalAction: FinalAction = 'AlertAndLogout' 
 ): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
@@ -364,8 +351,18 @@ export const createSimplePageApprovalFlow = (
 
     cy.url({ timeout: TIMEOUT.LONG }).should('include', expectedUrl);
     coreTaskCallback();
-    cy.url({ timeout: TIMEOUT.LONG }).should('include', '/#/workspace-home/workspace');
-    cy.contains('button', 'Logout').click();
+
+    // ✅ แทนที่ hardcode logout ด้วย switch เหมือน createFullPageApprovalFlow
+    switch (finalAction) {
+        case 'AlertAndLogout':
+        case 'ComplexLogout':
+            cy.url({ timeout: TIMEOUT.LONG }).should('include', '/#/workspace-home/workspace');
+            cy.contains('button', 'Logout').click();
+            break;
+        case 'StopAfterCore':
+            cy.log('Core task finished. Stopping as requested.');
+            break;
+    }
 };
 
 // ========================
@@ -403,24 +400,33 @@ function assignTaskViaTracking(
 
     assignTeamTask(projectName, assignee, billingSystem);
 }
-
 // ========================
 // NAVIGATE TO WORKSPACE
 // ========================
+export type NavRole = 'SPAD' | 'CGMD' | 'ACTM' | 'OPER' | 'APO';
+const AUTO_REDIRECT_ROLES: readonly NavRole[] = ['SPAD', 'ACTM', 'OPER', 'APO'];
+
+const EXPECTED_HEADER: Record<NavRole, TaskListHeader> = {
+    SPAD: 'To Do List',
+    CGMD: 'To Do List',
+    ACTM: 'Unassigned Task',
+    OPER: 'Unassigned Task',
+    APO:  'Unassigned Task',
+};
 
 export const navigateToWorkspace = (options?: { role?: NavRole }): void => {
     const role: NavRole = options?.role ?? 'CGMD';
+    const isAutoRedirect = AUTO_REDIRECT_ROLES.includes(role);
 
-    if (role === 'SPAD') {
-        cy.log('🎯 [SPAD] รอ auto-redirect เข้า workspace-home (ไม่ click Menu, ไม่ intercept loadTracking)');
+    if (isAutoRedirect) {
+        cy.log(`🎯 [${role}] รอ auto-redirect เข้า workspace-home (ไม่ click Menu, ไม่ intercept loadTracking)`);
         cy.url({ timeout: TIMEOUT.LONG }).should('include', '/workspace-home/workspace');
     } else {
         cy.url().then((currentUrl) => {
             if (currentUrl.includes('/workspace-home/workspace')) {
-                cy.log('⏭️ [CGMD] Already on workspace-home — skip Menu click');
+                cy.log(`⏭️ [${role}] Already on workspace-home — skip Menu click`);
             } else {
-                cy.log('🎯 [CGMD] Click Menu -> workspace-home (รอ URL + table ready แทน network intercept)');
-
+                cy.log(`🎯 [${role}] Click Menu -> workspace-home (รอ URL + table ready แทน network intercept)`);
                 cy.contains('span', 'Menu', { timeout: TIMEOUT.LONG }).click();
                 cy.get('a[href="#/workspace-home/workspace"]', { timeout: TIMEOUT.LONG }).click();
                 cy.url({ timeout: TIMEOUT.LONG }).should('include', '/workspace-home/workspace');
@@ -428,7 +434,7 @@ export const navigateToWorkspace = (options?: { role?: NavRole }): void => {
         });
     }
 
-    waitForTableReady('To Do List', TIMEOUT.NAV);
+    waitForTableReady(EXPECTED_HEADER[role], TIMEOUT.NAV);
 };
 
 const performApprovalRole = (
@@ -449,11 +455,13 @@ const performApprovalRole = (
     const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
     const searchBy = options?.searchBy ?? 'po';
     const navRole: NavRole = options?.role ?? 'CGMD';
+    const taskHeader: TaskListHeader = EXPECTED_HEADER[navRole]; // ✅ ใช้ header ตาม role จริง
 
     cy.log(`📋 Project: ${projectNamePONAME}`);
     cy.log(`🔁 Total PO to process: ${poCount}`);
     cy.log(`🔍 Search mode: ${searchBy}`);
     cy.log(`🎭 Nav role: ${navRole}`);
+    cy.log(`📑 Task list header: "${taskHeader}"`);
 
     const getKeyword = (index: number): string =>
         searchBy === 'project'
@@ -461,27 +469,22 @@ const performApprovalRole = (
             : allPoNames[index] ?? `${projectNamePONAME}_PO${index + 1}`;
 
     // ================================================
-    // PHASE 2: Approve ทีละ PO (เรียกหลัง assign ครบแล้ว)
+    // PHASE 2: Approve (เรียกหลัง assign ครบแล้ว)
     // ================================================
-    const approveNextPO = (index: number): void => {
-        if (index >= poCount) {
-            cy.log('✅ All POs approved');
-            return;
-        }
+    const approveAllPOs = (): void => {
+        const firstKeyword = getKeyword(0);
+        cy.log(`📦 [Approve 1/${poCount}] "${firstKeyword}"`);
 
-        const currentUniqueKeyword = getKeyword(index);
-        cy.log(`📦 [Approve ${index + 1}/${poCount}] "${currentUniqueKeyword}"`);
-
-        waitForTableReady('To Do List', TIMEOUT.NAV);
+        waitForTableReady(taskHeader, TIMEOUT.NAV); // ✅ ไม่ hardcode 'To Do List' แล้ว
 
         searchInTableWithPagination(
-            'To Do List',
-            currentUniqueKeyword,
+            taskHeader,
+            firstKeyword,
             () => {
-                cy.get('h3:contains("To Do List")')
+                cy.get(`h3:contains("${taskHeader}")`)
                     .parent()
                     .find('tbody tr.cursor-point')
-                    .filter((_i, el) => Cypress.$(el).text().includes(currentUniqueKeyword))
+                    .filter((_i, el) => Cypress.$(el).text().includes(firstKeyword))
                     .first()
                     .as('targetRow');
             },
@@ -489,27 +492,22 @@ const performApprovalRole = (
                 waitAfterNext: 2000,
                 filterCallback: ($row) => {
                     const rowText = $row.text().trim();
-                    return rowText.includes(currentUniqueKeyword) && !rowText.includes('Fetching data');
+                    return rowText.includes(firstKeyword) && !rowText.includes('Fetching data');
                 }
             }
         );
 
-        cy.get('@targetRow').should('be.visible').click();
-        cy.log(`✅ [${index + 1}/${poCount}] Entered PO approval page`);
+        // ✅ register intercept ก่อน click เสมอ — กัน race condition (ข้อ 1)
+        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
+        cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
+        cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
 
-        // ✅ FIX: คลิกแถวใน To Do List พา navigate เข้าไปหน้า approve (เช่น cgmd-configure)
-        //    ให้เสร็จภายในตัว ไม่ได้ค้างอยู่หน้า To Do List แล้ว
-        //    ต้องส่ง alreadyOnPage: true ไปให้ approveFunction (createFullPageApprovalFlow)
-        //    ไม่งั้นมันจะพยายามไปหา <h3>To Do List</h3> ซ้ำอีกรอบทั้งที่ย้ายหน้าไปแล้ว → timeout
-        //    (เหมือน pattern ที่ใช้อยู่แล้วใน performSimpleClaimAndApprovalRole)
+        cy.get('@targetRow').should('be.visible').click();
+        cy.log(`✅ [1/${poCount}] Entered PO approval page`);
+
         approveFunction(projectNamePONAME, { alreadyOnPage: true, role: navRole } as any);
 
-        if (index < poCount - 1) {
-            navigateToWorkspace({ role: navRole });
-            approveNextPO(index + 1);
-        } else {
-            cy.log('✅ All POs approved — flow complete');
-        }
+        cy.log('✅ All POs approved — flow complete');
     };
 
     // ================================================
@@ -519,7 +517,7 @@ const performApprovalRole = (
         if (index >= poCount) {
             cy.log('✅ All POs assigned — กลับไป workspace เพื่อเริ่ม approve');
             navigateToWorkspace({ role: navRole });
-            approveNextPO(0); // เริ่ม phase 2
+            approveAllPOs();
             return;
         }
 
@@ -538,44 +536,8 @@ const performApprovalRole = (
     if (options?.assignee) {
         assignNextPO(0);
     } else {
-        approveNextPO(0);
+        approveAllPOs();
     }
-};
-
-const selectAssigneeAndSet = (
-    assignee: string,
-    billingSystem: string = ''
-): void => {
-    cy.get('body').then(($body) => {
-        const $rows = billingSystem
-            ? $body.find('tr').filter((_, el) => Cypress.$(el).text().includes(billingSystem))
-            : $body.find('select.form-control.input-sm');
-
-        const $dropdown = billingSystem
-            ? $rows.find('select.form-control.input-sm').first()
-            : $body.find('select.form-control.input-sm').first();
-
-        cy.wrap($dropdown)
-            .as('assigneeDropdown')
-            .scrollIntoView();
-
-        cy.get('@assigneeDropdown')
-            .find('option')
-            .its('length')
-            .should('be.gt', 1);
-
-        cy.get('@assigneeDropdown')
-            .select(assignee, { force: true })
-            .trigger('change')
-            .trigger('input');
-
-        cy.get('@assigneeDropdown')
-            .closest('tr')
-            .find('button.btn-info.pull-right')
-            .contains('Set')
-            .should('not.be.disabled')
-            .click({ force: true });
-    });
 };
 
 export const performRoleTaskWithAssignment = (
@@ -592,7 +554,6 @@ export const performRoleTaskWithAssignment = (
         searchBy: options?.searchBy,
         role: options?.role,
     });
-    selectAssigneeAndSet(assignee, billingSystem);
 };
 
 export const performSimpleApprovalRole = (

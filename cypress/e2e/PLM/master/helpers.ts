@@ -18,25 +18,46 @@ export const handleAddToUSMP = (): void => {
             cy.log('🟢 Found Add to USMP button, clicking...');
             cy.contains('button', 'Add to USMP').click();
 
-            cy.get('body').then(($b) => {
-                if ($b.find('.modal.fade.in').length > 0) {
-                    cy.log('📦 Bootstrap modal detected');
-                    cy.get('.modal.fade.in')
-                        .first()
+            // ⏳ Don't inspect DOM synchronously right after click.
+            // Give Angular time to render the modal, then assert on it.
+            cy.get('body', { timeout: 10000 }).then(($b) => {
+                const hasBootstrapModal = $b.find('.modal.fade.in').length > 0;
+                const hasAngularDialog = $b.find('.mat-dialog-container').length > 0;
+
+                if (hasBootstrapModal || hasAngularDialog) {
+                    const selector = hasBootstrapModal ? '.modal.fade.in' : '.mat-dialog-container';
+                    cy.log(hasBootstrapModal ? '📦 Bootstrap modal detected' : '📦 Angular dialog detected');
+
+                    // Wait for it to actually be visible (handles animation delay)
+                    cy.get(selector, { timeout: 10000 })
+                        .last() // in case a stale modal is still in DOM, grab the most recent
                         .should('be.visible')
                         .within(() => {
-                            cy.contains('button', /Close|OK|ปิด/i).click();
+                            cy.contains('button', /Close|OK|ปิด/i, { timeout: 10000 })
+                                .should('be.visible')
+                                .click();
                         });
-                } else if ($b.find('.mat-dialog-container').length > 0) {
-                    cy.log('📦 Angular dialog detected');
-                    cy.get('.mat-dialog-container')
-                        .first()
-                        .should('be.visible')
-                        .within(() => {
-                            cy.contains('button', /Close|OK|ปิด/i).click();
-                        });
+
+                    // Confirm it actually closed, to catch silent failures
+                    cy.get(selector, { timeout: 10000 }).should('not.exist');
                 } else {
-                    cy.log('⚠️ ไม่พบ modal/dialog — ข้ามการปิด');
+                    cy.log('⚠️ ไม่พบ modal/dialog ทันที — รอเช็คอีกครั้ง...');
+
+                    // Fallback: give it one more chance with cy.get's built-in retry,
+                    // in case the modal appeared slightly after our first check.
+                    cy.get('body').then(($b2) => {
+                        if ($b2.find('.modal.fade.in, .mat-dialog-container').length > 0) {
+                            cy.log('📦 Modal appeared on second check');
+                            cy.get('.modal.fade.in, .mat-dialog-container')
+                                .last()
+                                .should('be.visible')
+                                .within(() => {
+                                    cy.contains('button', /Close|OK|ปิด/i).click();
+                                });
+                        } else {
+                            cy.log('⚪ ยืนยันว่าไม่มี modal/dialog — ข้ามการปิด');
+                        }
+                    });
                 }
             });
         } else {

@@ -4,7 +4,7 @@ import { ClaimProject, approveProject, performRoleTaskWithAssignment, performSim
 import { getStandardProjectName } from './project-manager';
 import { approveProjectCGMD, approveProjectCGMDPRE, approveProjectCGMDtester, approveProjectCGMDtesterPRE, approveProjectCGMDtesterPREPlugin, approveProjectCGMDPREMainNotComplex, approveProjectSPADSup, approveProjectSPADSupCGMDPlugin, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectACTM, approveProjectAPO, approveProjectOPER } from './approval-flows';
 import { checkAndUpdatePriority, checkAndUpdateVerticalAppPriority, CopyDeductFail, checkAndFillContentType } from './priority-updaters';
-import { Tariff, dropdownRecurringCKSMain, dropdownRecurringCKS, unregister, addauto5gCKS, diyflagCKS,Topup } from './dropdowns-randomizers';
+import { Tariff, dropdownRecurringCKSMain, dropdownRecurringCKS, unregister, addauto5gCKS, diyflagCKS, Topup } from './dropdowns-randomizers';
 import { loginAndWaitReady } from './helpers';
 import { smsCKSPOST, smsCKSPRE } from './sms-wording';
 
@@ -149,18 +149,26 @@ const declareRoleTests = (tests: TestEntry[]): void => {
 
         case 'RANDOM': {
             const mixed = shuffleArray([...cgmd, ...spad]);
-            // lock Spadsup before Spaddoer
-            const si = mixed.findIndex(t => t.name.includes('Spadsup'));
-            const di = mixed.findIndex(t => t.name.includes('Spaddoer'));
-            if (si !== -1 && di !== -1 && di < si) {
-                [mixed[si], mixed[di]] = [mixed[di], mixed[si]];
-            }
-            // lock Config before Tester
-            const ci = mixed.findIndex(t => t.name.includes('Config'));
-            const ti = mixed.findIndex(t => t.name.includes('Tester'));
-            if (ci !== -1 && ti !== -1 && ti < ci) {
+            const spadPositions = mixed
+                .map((t, i) => ({ t, i }))
+                .filter(({ t }) => t.group === 'SPAD')
+                .map(({ i }) => i);
+            const spadSorted = sortSpad(mixed.filter(t => t.group === 'SPAD'));
+            spadPositions.forEach((pos, idx) => {
+                mixed[pos] = spadSorted[idx];
+            });
+            const cgmdPositions = mixed
+                .map((t, i) => ({ t, i }))
+                .filter(({ t }) => t.group === 'CGMD')
+                .map(({ i }) => i);
+
+            const ci = cgmdPositions.find(i => mixed[i].name.includes('Config'));
+            const ti = cgmdPositions.find(i => mixed[i].name.includes('Tester'));
+
+            if (ci !== undefined && ti !== undefined && ti < ci) {
                 [mixed[ci], mixed[ti]] = [mixed[ti], mixed[ci]];
             }
+
             ordered = [...mixed, ...other];
             break;
         }
@@ -176,16 +184,10 @@ const declarePluginTests = (tests: TestEntry[]): void => {
     const baseCgmd = sortCgmd(tests.filter(t => t.group === 'CGMD' && !t.name.includes('Plugin')));
     const spads = sortSpad(tests.filter(t => t.group === 'SPAD'));
     const pluginCgmd = sortCgmd(tests.filter(t => t.group === 'CGMD' && t.name.includes('Plugin')));
-    const other = tests.filter(t => t.group === 'OTHER');
 
-    const ordered: TestEntry[] = [
-        ...baseCgmd, 
-        ...spads,      
-        ...pluginCgmd, 
-        ...other,
-    ];
+    const ordered: TestEntry[] = [...baseCgmd, ...spads, ...pluginCgmd];
 
-    cy.log(`🔌 [PLUGIN FLOW] order: ${ordered.map(t => t.name).join(' → ')}`);
+    cy.log(`🔌 [PLUGIN FLOW] order: ${ordered.map(t => t.name).join(' → ')}`);   // ← ตัวนี้
     ordered.forEach(t => declareTest(t.name, t.fn));
 };
 
@@ -195,20 +197,20 @@ const declarePluginTests = (tests: TestEntry[]): void => {
 const STANDARD_TESTS: TestEntry[] = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS', { searchBy: 'po' }) },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS', { searchBy: 'po' }) },
-    { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup, { searchBy: 'po',role: 'SPAD'}) },
-    { name: 'Spaddoer role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER, { searchBy: 'po',role: 'SPAD'}) },
-    { name: 'Spadtester role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester, { searchBy: 'po',role: 'SPAD'}) },
-    { name: 'Spaddeploy role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy, { searchBy: 'po',role: 'SPAD'}) },
-    { name: 'ACTM role', group: 'OTHER', fn: () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po',role: 'SPAD'}) },
-    { name: 'APO role', group: 'OTHER', fn: () => performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po' ,role: 'SPAD'}) },
+    { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup, { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'Spaddoer role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER, { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'Spadtester role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester, { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'Spaddeploy role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy, { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'ACTM role', group: 'OTHER', fn: () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }) },
+    { name: 'APO role', group: 'OTHER', fn: () => performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po', role: 'APO' }) },
 ];
 
 const PLUGIN_TESTS: TestEntry[] = [
-    { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS',{ searchBy: 'po' }) },
-    { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS',{ searchBy: 'po' }) },
-    { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin, { searchBy: 'po',role: 'SPAD'}) },
-    { name: 'CGMD Config cbs role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN',{ searchBy: 'po',role: 'SPAD'}) },
-    { name: 'CGMD Tester CBS role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN',{ searchBy: 'po',role: 'SPAD'}) },
+    { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS', { searchBy: 'po' }) },
+    { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS', { searchBy: 'po' }) },
+    { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin, { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'CGMD Config cbs role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN', { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'CGMD Tester CBS role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN', { searchBy: 'po', role: 'SPAD' }) },
 ];
 
 // ========================
@@ -269,8 +271,8 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
                 it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB'));
                 it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB'));
                 sasffTest();
-                it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM));
-                it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER));
+                it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
+                it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER, { searchBy: 'po', role: 'OPER' }));
             }
         );
 
@@ -286,8 +288,8 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
                 it('Spaddoer role', () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER, { searchBy: 'po', role: 'SPAD' }));
                 it('Spadtester role', () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester, { searchBy: 'po', role: 'SPAD' }));
                 it('Spaddeploy role', () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy, { searchBy: 'po', role: 'SPAD' }));
-                it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'SPAD' }));
-                it('APO role', () => performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po', role: 'SPAD' }));
+                it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
+                it('APO role', () => performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po', role: 'APO' }));
             }
         );
     }
@@ -318,7 +320,7 @@ export const afterCKSCommonPRE = (Module: string): void => {
 };
 
 export const afterCKSPREPlugin = (Module: string): void => {
-    declareRoleTests(PLUGIN_TESTS);
+    declarePluginTests(PLUGIN_TESTS);
     if (Module === 'MUSIC') performMusicRoles();
 };
 
@@ -361,10 +363,44 @@ const stepsOntopNotComplex = (): void => {
 // MKT Main exports
 // ─────────────────────────────────────────────
 
+export const afterMKTOntop_NotComplex = (): void => {
+    executeCKSRole(
+        'standard',
+        stepsOntopNotComplex,
+        () => declarePluginTests(PLUGIN_TESTS)
+    );
+};
+
+
+const shouldCopyDeductFailEnhancement = (): boolean => {
+    const module = Cypress.env('currentModule');
+    const priceType = Cypress.env('currentPriceType');
+    const productClass = Cypress.env('currentProductClass');
+
+    const result = module === 'PRE' && priceType === 'recurring' && productClass === 'main';
+
+    cy.log(
+        `🔎 [shouldCopyDeductFailEnhancement] module="${module}", priceType="${priceType}", productClass="${productClass}" → ${result}`
+    );
+
+    return result;
+};
+
+const runCopyDeductFailIfNeeded = (): void => {
+    if (shouldCopyDeductFailEnhancement()) {
+        CopyDeductFail('enhancement');
+    } else {
+        cy.log('⚠️ ข้าม CopyDeductFail("enhancement") — เงื่อนไขไม่ตรง (ต้องเป็น Module=PRE, PriceType=recurring, ProductClass=main)');
+    }
+};
+
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
     executeCKSRole(
         'standard',
-        () => { stepsCKSMain(); CopyDeductFail('enhancement'); },
+        () => {
+            stepsCKSMain();
+            runCopyDeductFailIfNeeded();
+        },
         () => declareRoleTests(STANDARD_TESTS)
     );
 };
@@ -372,16 +408,11 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
 export const afterMKTMainPRE_NotComplex = (): void => {
     executeCKSRole(
         'standard',
-        () => { stepsCKSMain(); CopyDeductFail('enhancement'); },
-        () => declareRoleTests(PLUGIN_TESTS)
-    );
-};
-
-export const afterMKTOntop_NotComplex = (): void => {
-    executeCKSRole(
-        'standard',
-        stepsOntopNotComplex,
-        () => declareRoleTests(PLUGIN_TESTS)
+        () => {
+            stepsCKSMain();
+            runCopyDeductFailIfNeeded();
+        },
+        () => declarePluginTests(PLUGIN_TESTS)
     );
 };
 
@@ -546,10 +577,10 @@ const standardBeforeApproveCKS = (): void => {
 // ========================
 
 export const afterCKSPOST = (Module?: string): void => {
-    it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB'));
-    it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB'));
-    it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM));
-    it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER));
+    it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB', { searchBy: 'po' }));
+    it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB', { searchBy: 'po' }));
+    it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
+    it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER, { searchBy: 'po', role: 'OPER' }));
 };
 
 // ========================

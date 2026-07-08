@@ -245,9 +245,6 @@ const _approveSPADTester = (
                         .and('not.be.disabled')
                         .click({ force: true });
 
-                    // ✅ FIX: modal "Do you want to Send API PlugIN ?" เด้งขึ้นมาหลังกดปุ่ม Send PlugIN
-                    // ต้องกด "Yes" ในโมดัลนี้ก่อน API SendPluginMain_v2 ถึงจะถูกยิงออกไปจริง
-                    // (เดิมโค้ดไป cy.wait('@sendPluginApi') ก่อน แล้วค่อยกด Yes ทีหลัง ทำให้ wait ค้าง/timeout)
                     cy.contains('.modal-body', 'Do you want to Send API PlugIN', { timeout: 10000 })
                         .should('be.visible')
                         .within(() => {
@@ -324,12 +321,6 @@ export const approveProjectSPADdeploy = (
 // CGMD APPROVAL FUNCTIONS
 // ========================
 
-// 🐛 FIX: this function previously took only `projectName` and never
-// forwarded `options` into loopApproveAllPOs. That meant `options?.role`
-// was always undefined, so navigateToWorkspace() silently fell back to the
-// CGMD role (clicking "Menu") between POs whenever poCount > 1, regardless
-// of which role the test was actually running as. Now mirrors the pattern
-// used by approveProjectCGMDPRE / approveProjectSPADSup / etc.
 export const approveProjectCGMD = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -453,9 +444,10 @@ export const approveProjectCGMDPRE = (
                 .click({ force: true });
 
             scrollAndWait();
+            handleAddToUSMP();
             cy.contains('button', 'Approve To CGMD', { timeout: 60000 }).should('be.visible').click({ force: true });
             cy.contains('button', 'Yes').should('be.visible').click({ force: true });
-            handleAddToUSMP();
+            
         },
         'AlertAndLogout',
         options
@@ -485,20 +477,11 @@ const _approveProjectCGMDPREMainNotComplex = (
     );
 };
 
-// ⚠️ NOTE (unchanged behavior, flagged for review): all three exports below
-// point at the exact same implementation with no branching on "Main" vs.
-// non-"Main" variants, unlike their SPAD counterparts (_approveSPADSup /
-// _approveSPADDoer / _approveSPADTester all take an isComplex/isMainFlow
-// flag that changes behavior, e.g. which FinalAction is used). If the
-// "Main" flows here are supposed to differ (e.g. use 'StopAfterCore'
-// instead of always 'AlertAndLogout' so a longer chained flow can
-// continue), that distinction appears to have been lost. Left as-is
-// pending confirmation of intended behavior.
 export const approveProjectCGMDPREMainNotComplex = _approveProjectCGMDPREMainNotComplex;
 export const approveProjectCGMDPREPlugin = _approveProjectCGMDPREMainNotComplex;
 export const approveProjectCGMDPREMain = _approveProjectCGMDPREMainNotComplex;
 
-// 🐛 FIX: same missing-options bug as approveProjectCGMD above.
+
 export const approveProjectCGMDtester = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -515,7 +498,6 @@ export const approveProjectCGMDtester = (
         options
     );
 };
-
 export const approveProjectCGMDtesterPRE = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -532,7 +514,6 @@ export const approveProjectCGMDtesterPRE = (
         options
     );
 };
-
 export const approveProjectCGMDtesterPREPlugin = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -611,54 +592,118 @@ export const approveProjectCGMDtesterPREPlugin = (
 // OTHER APPROVAL FUNCTIONS
 // ========================
 
-export const approveProjectACTM = (
-    projectName: string,
+// ========================
+// ACTM / APO / OPER — CUSTOM LOOP
+// (ใช้แทน loopApproveAllPOs เพราะ createFullPageApprovalFlow hardcode "To Do List")
+// ========================
+
+const approveFromUnassignedTask = (
+    expectedUrl: string,
+    role: NavRole,
+    coreAction: (poName: string, poIndex: number) => void,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
 ): void => {
-    loopApproveAllPOs(
-        'Unassigned Task',
-        '/actm/actm-doer',
-        (_poName, _poIndex) => () => {
-            scrollAndWait();
-            // ⚠️ NOTE (unchanged, flagged for review): positional selector
-            // ':nth-child(3) > :nth-child(4)' has no text/attribute anchor.
-            // Any DOM reorder will silently click the wrong element instead
-            // of failing the test loudly. Consider anchoring on button text
-            // or a stable attribute if one exists.
-            cy.get(':nth-child(3) > :nth-child(4)').click();
-        },
-        'AlertAndLogout',
-        options
-    );
-};
-
-export const approveProjectOPER = (projectName: string): void => {
     const poCount: number = Cypress.env('poCount') ?? 1;
     const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
 
     const approveAt = (poIndex: number): void => {
         if (poIndex >= poCount) {
-            cy.log('✅ All POs approved (OPER)');
+            cy.log(`✅ All POs approved (${role})`);
             return;
         }
 
         const poName = allPoNames[poIndex] ?? `PO${poIndex + 1}`;
-        cy.log(`🔄 OPER PO ${poIndex + 1}/${poCount}: "${poName}"`);
+        const isLast = poIndex === poCount - 1;
+        cy.log(`🔄 ${role} PO ${poIndex + 1}/${poCount}: "${poName}"`);
 
-        createSimplePageApprovalFlow(
-            poName,
-            'Unassigned Task',
-            '/oper/oper-doer',
-            () => {
-                scrollAndWait();
-                cy.get('.col-md-6 > :nth-child(3)').click();
-            }
-        );
+        // ✅ ถ้าเป็น PO แรก และ caller บอกว่า "อยู่หน้า detail แล้ว" ให้ข้ามการคลิกจาก listing
+        const skipClick = poIndex === 0 && options?.alreadyOnPage;
+
+        if (skipClick) {
+            cy.log(`⏭️ [${role}] Already on detail page — skip click from Unassigned Task`);
+            cy.url({ timeout: 30000 }).should('include', expectedUrl);
+        } else {
+            cy.contains('td', poName, { timeout: 15000 })
+                .should('be.visible')
+                .parents('tr.cursor-point')
+                .first()
+                .click({ force: true });
+
+            cy.url({ timeout: 30000 }).should('include', expectedUrl);
+            cy.wait(1000);
+        }
+
+        coreAction(poName, poIndex);
+
+        if (!isLast) {
+            navigateToWorkspace({ role: options?.role ?? role });
+            cy.get('h3:contains("Unassigned Task")', { timeout: 30000 }).should('be.visible');
+        }
 
         approveAt(poIndex + 1);
     };
 
     approveAt(0);
+};
+
+// ─────────────────────────────────────────────
+// ACTM
+// ─────────────────────────────────────────────
+
+export const approveProjectACTM = (
+    projectName: string,
+    options?: { alreadyOnPage?: boolean; role?: NavRole }
+): void => {
+    approveFromUnassignedTask(
+        '/actm/actm-doer',
+        'ACTM',
+        (_poName, _poIndex) => {
+            scrollAndWait();
+            cy.get(':nth-child(3) > :nth-child(4)').click();
+        },
+        options
+    );
+};
+
+// ─────────────────────────────────────────────
+// OPER
+// ─────────────────────────────────────────────
+
+export const approveProjectOPER = (
+    projectName: string,
+    options?: { alreadyOnPage?: boolean; role?: NavRole }
+): void => {
+    approveFromUnassignedTask(
+        '/oper/oper-doer',
+        'OPER',
+        (_poName, _poIndex) => {
+            scrollAndWait();
+            // ⚠️ selector เดิม — ถ้าพังให้เปลี่ยนเป็นข้อความที่ชัดเจน
+            cy.get('.col-md-6 > :nth-child(3)').click();
+        },
+        options
+    );
+};
+
+// ─────────────────────────────────────────────
+// APO
+// ─────────────────────────────────────────────
+
+export const approveProjectAPO = (
+    projectName: string,
+    options?: { alreadyOnPage?: boolean; role?: NavRole }
+): void => {
+    approveFromUnassignedTask(
+        '/apo/apo-doer',
+        'APO',
+        (_poName, _poIndex) => {
+            scrollAndWait();
+            cy.contains('button', 'Promote To Pre Go Live', { timeout: 60000 })
+                .should('be.visible')
+                .click();
+        },
+        options
+    );
 };
 
 export const approveProjectTSCenter = (projectName: string): void => {
@@ -676,21 +721,5 @@ export const approveProjectTSCenter = (projectName: string): void => {
             cy.contains('button', 'Approve').should('be.visible').click({ force: true });
             cy.contains('button', 'Yes').should('be.visible').click();
         }
-    );
-};
-
-export const approveProjectAPO = (
-    projectName: string,
-    options?: { alreadyOnPage?: boolean; role?: NavRole }
-): void => {
-    loopApproveAllPOs(
-        'Unassigned Task',
-        '/apo/apo-doer',
-        (_poName, _poIndex) => () => {
-            scrollAndWait();
-            cy.contains('button', 'Promote To Pre Go Live').click();
-        },
-        'AlertAndLogout',
-        options
     );
 };
