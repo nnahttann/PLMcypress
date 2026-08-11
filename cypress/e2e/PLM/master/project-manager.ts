@@ -102,4 +102,17 @@ export const getStandardProjectName = (): string => {
     return projectManager.get(projectManager.getCurrentIndex());
 };
 
-export const getOntopProjectName = (): string => (Cypress.env('formattedDateOntop') as string) || '';
+export const getOntopProjectName = (): string =>
+    (Cypress.env('formattedDate') as string) ||             // ✅ FIX: writer จริงเขียนที่ 'formattedDate' เมื่อ ProductClass = 'ontop'/'ontopextra'
+    (Cypress.env('formattedDateOntopPONAME') as string) ||  // fallback: env key ของ PO name (ontop)
+    getProjectNameByIndex(1) ||                              // fallback: ProjectManager index 1 (ontop ถูก register ไว้ที่นี่)
+    '';
+
+export const getCurrentProjectIndex = (): number => {
+    return projectManager.getCurrentIndex();
+};
+
+export const updateProjectName = (name: string, index?: number): void => {
+    const idx = index ?? projectManager.getCurrentIndex();
+    projectManager.register(name, idx);
+};

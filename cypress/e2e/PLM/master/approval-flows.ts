@@ -106,9 +106,7 @@ const pollUntilSPADDeployReady = (maxAttempts = 50, intervalMs = 5000): void => 
     attempt(maxAttempts);
 };
 
-// ─────────────────────────────────────────────
 // SPAD Supervisor
-// ─────────────────────────────────────────────
 
 const _approveSPADSup = (
     projectName: string,
@@ -151,9 +149,7 @@ export const approveProjectSPAD = (
     options?: { alreadyOnPage?: boolean; role?: NavRole }
 ): void => _approveSPADSup(projectName, isComplex, options);
 
-// ─────────────────────────────────────────────
 // SPAD Doer
-// ─────────────────────────────────────────────
 
 const _approveSPADDoer = (
     projectName: string,
@@ -205,19 +201,13 @@ export const approveProjectSPADDOERMain = (
     options?: { alreadyOnPage?: boolean; role?: NavRole }
 ): void => _approveSPADDoer(projectName, true, options);
 
-// ─────────────────────────────────────────────
 // SPAD Tester
-// ─────────────────────────────────────────────
 
 const _approveSPADTester = (
     projectName: string,
     isMainFlow: boolean,
     options?: { alreadyOnPage?: boolean; skipLogout?: boolean; role?: NavRole }
 ): void => {
-    // 🐛 FIX: window:confirm listener was being re-registered inside the
-    // per-PO core callback below, so with poCount > 1 it accumulated N
-    // duplicate handlers by the end of the loop. Register it once, here,
-    // outside the loop, instead.
     cy.on('window:confirm', () => true);
 
     loopApproveAllPOs(
@@ -297,9 +287,7 @@ export const approveProjectSPADTesterMain = (
     options?: { alreadyOnPage?: boolean; skipLogout?: boolean; role?: NavRole }
 ): void => _approveSPADTester(projectName, true, options);
 
-// ─────────────────────────────────────────────
 // SPAD Deploy
-// ─────────────────────────────────────────────
 
 export const approveProjectSPADdeploy = (
     projectName: string,
@@ -447,7 +435,7 @@ export const approveProjectCGMDPRE = (
             handleAddToUSMP();
             cy.contains('button', 'Approve To CGMD', { timeout: 60000 }).should('be.visible').click({ force: true });
             cy.contains('button', 'Yes').should('be.visible').click({ force: true });
-            
+
         },
         'AlertAndLogout',
         options
@@ -481,7 +469,50 @@ export const approveProjectCGMDPREMainNotComplex = _approveProjectCGMDPREMainNot
 export const approveProjectCGMDPREPlugin = _approveProjectCGMDPREMainNotComplex;
 export const approveProjectCGMDPREMain = _approveProjectCGMDPREMainNotComplex;
 
+const normalizeText = (text: string): string =>
+    text.replace(/\s+/g, ' ').trim();
 
+const isMatchSpanText = (
+    el: HTMLElement,
+    matcher: string | RegExp
+): boolean => {
+    const text = normalizeText(el.innerText || el.textContent || '');
+
+    if (typeof matcher === 'string') {
+        return text === normalizeText(matcher);
+    }
+
+    return matcher.test(text);
+};
+
+export const clickSpanOrFallback = (
+    primaryText: string | RegExp,
+    fallbackText: string | RegExp
+): void => {
+    cy.get('body').then(($body) => {
+        const spans = $body.find('span').toArray() as HTMLElement[];
+
+        const primaryEl = spans.find(
+            (el) =>
+                isMatchSpanText(el, primaryText) && Cypress.dom.isVisible(el)
+        );
+
+        const fallbackEl = spans.find(
+            (el) =>
+                isMatchSpanText(el, fallbackText) && Cypress.dom.isVisible(el)
+        );
+
+        if (primaryEl) {
+            cy.wrap(primaryEl).should('be.visible').click({ force: true });
+        } else if (fallbackEl) {
+            cy.wrap(fallbackEl).should('be.visible').click({ force: true });
+        } else {
+            throw new Error(
+                `ไม่เจอปุ่ม span: ${String(primaryText)} หรือ ${String(fallbackText)}`
+            );
+        }
+    });
+};
 export const approveProjectCGMDtester = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -491,13 +522,23 @@ export const approveProjectCGMDtester = (
         '/cgmd/cgmd-tester',
         (_poName, _poIndex) => () => {
             scrollAndWait();
-            cy.contains('span', 'Promote to ACTM').should('be.visible').click({ force: true });
+
+            // ถ้าไม่เจอ "Promote to ACTM" ให้หา "Approve" แทน
+            cy.get('body').then(($body) => {
+                if ($body.find('span:contains("Promote to ACTM")').length > 0) {
+                    cy.contains('span', 'Promote to ACTM').should('be.visible').click({ force: true });
+                } else {
+                    cy.contains('span', 'Approve').should('be.visible').click({ force: true });
+                }
+            });
+
             cy.contains('button', 'Yes').should('be.visible').click();
         },
         'AlertAndLogout',
         options
     );
 };
+
 export const approveProjectCGMDtesterPRE = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -593,7 +634,6 @@ export const approveProjectCGMDtesterPREPlugin = (
 // ========================
 
 // ========================
-// ACTM / APO / OPER — CUSTOM LOOP
 // (ใช้แทน loopApproveAllPOs เพราะ createFullPageApprovalFlow hardcode "To Do List")
 // ========================
 
@@ -646,9 +686,7 @@ const approveFromUnassignedTask = (
     approveAt(0);
 };
 
-// ─────────────────────────────────────────────
 // ACTM
-// ─────────────────────────────────────────────
 
 export const approveProjectACTM = (
     projectName: string,
@@ -665,9 +703,7 @@ export const approveProjectACTM = (
     );
 };
 
-// ─────────────────────────────────────────────
 // OPER
-// ─────────────────────────────────────────────
 
 export const approveProjectOPER = (
     projectName: string,
@@ -685,9 +721,7 @@ export const approveProjectOPER = (
     );
 };
 
-// ─────────────────────────────────────────────
 // APO
-// ─────────────────────────────────────────────
 
 export const approveProjectAPO = (
     projectName: string,

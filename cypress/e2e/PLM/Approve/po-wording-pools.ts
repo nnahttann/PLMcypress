@@ -5,7 +5,6 @@ const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length
 const randomInt = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
 
 // ==========================================
-// Main Function: Full 8-Language Support
 // ==========================================
 export const createPOWordingPools = (
   projectName: string,
@@ -78,7 +77,6 @@ export const createPOWordingPools = (
   // ==========================================
   // Random Variables (Shared across all languages)
   // ==========================================
-  // Helper functions assumption: pickRandom, randomInt are defined elsewhere in your file
   const dataAmount = pickRandom(['10GB', '30GB', '50GB', '100GB', '200GB', 'Unlimited']);
   const speed = pickRandom(['10 Mbps', '30 Mbps', '100 Mbps', '300 Mbps', '500 Mbps', '1 Gbps', '5G Max']);
   const price = randomInt(199, 1999);
@@ -86,60 +84,58 @@ export const createPOWordingPools = (
   const contractMonths = pickRandom([1, 6, 12, 24]);
 
   // ==========================================
-  // RETURN: Full 8-Language Pools
   // ==========================================
   return {
     // ==========================================
-    // 1. SMS Wording & Basic Info Shared Pools
     // ==========================================
     shortPromotionName: {
       EN: [
-        `${p} Value Pack`, `${p} Smart Deal`, `${p} Power Plan`, `${p} Daily Deal`,
-        `${p} Big Save`, `${p} Speed Pack`, `${p} Data King`, `${p} Net Plus`,
-        `${p} Always On`, `${p} Full Power`, `${p} Next Level`, `${p} Super Plan`,
-        `${p} Max Speed`, `${p} Unlimited`, `${p} Pro Pack`, `${p} Monthly Saver`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi Unlimited`, `${p} ZEED 5G`, `${p} Sawasdee Special`, `${p} Max Experience`,
+        `${p} Hot Deal Non-Stop`, `${p} Never Stop Net`, `${p} myAIS Exclusive`, `${p} Play Max`,
+        `${p} Best Deal`, `${p} Go Together`, `${p} Gamer Speed`, `${p} Family Non-Stop`,
       ],
       TH: [
-        `${p} แพ็กคุ้ม`, `${p} ดีลฉลาด`, `${p} แพ็กพาวเวอร์`, `${p} ดีลรายวัน`,
-        `${p} ประหยัดสุด`, `${p} แพ็กเร็ว`, `${p} ดาต้าคิง`, `${p} เน็ตพลัส`,
-        `${p} ออนไลน์`, `${p} พลังเต็ม`, `${p} จัดเต็ม`, `${p} ซูเปอร์แพลน`,
-        `${p} เน็ตแรง`, `${p} ไม่อั้น`, `${p} โปรโปร`, `${p} คุ้ม${smName.TH}`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G ไม่มีสะดุด`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi ไม่จำกัด`, `${p} ZEED 5G`, `${p} สวัสดีสุดพิเศษ`, `${p} Max Experience`,
+        `${p} ฮอตดีล ไม่หยุดไม่พัก`, `${p} เน็ตไม่มีสะดุด`, `${p} myAIS เอ็กซ์คลูซีฟ`, `${p} เพลย์แม็กซ์`,
+        `${p} ดีลสุดคุ้ม`, `${p} ไปด้วยกัน`, `${p} เกมเมอร์สปีด`, `${p} ครอบครัวไม่มีสะดุด`,
       ],
       CHI: [
-        `${p} 超值套餐`, `${p} 智慧优惠`, `${p} 强力方案`, `${p} 每日特惠`,
-        `${p} 大省包`, `${p} 高速包`, `${p} 流量王`, `${p} 网络加`,
-        `${p} 始终在线`, `${p} 全力版`, `${p} 进阶版`, `${p} 超级方案`,
-        `${p} 极速版`, `${p} 无限流量`, `${p} 专业包`, `${p} 月度优惠`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop 不间断`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi 无限畅享`, `${p} ZEED 5G`, `${p} Sawasdee 特别套餐`, `${p} Max Experience`,
+        `${p} 热门礼遇 不间断`, `${p} 永不停止上网`, `${p} myAIS 专享`, `${p} Play Max`,
+        `${p} 最优惠`, `${p} 同行计划`, `${p} 游戏加速`, `${p} 家庭不间断`,
       ],
       JPN: [
-        `${p} バリューパック`, `${p} スマートディール`, `${p} パワープラン`, `${p} デイリーディール`,
-        `${p} ビッグセーブ`, `${p} スピードパック`, `${p} データキング`, `${p} ネットプラス`,
-        `${p} オールウェイズオン`, `${p} フルパワー`, `${p} ネクストレベル`, `${p} スーパープラン`,
-        `${p} マックススピード`, `${p} アンリミテッド`, `${p} プロパック`, `${p} 月額セーバー`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi 無制限`, `${p} ZEED 5G`, `${p} Sawasdee スペシャル`, `${p} Max Experience`,
+        `${p} ホットディール ノンストップ`, `${p} ネバーストップネット`, `${p} myAIS 限定`, `${p} Play Max`,
+        `${p} ベストディール`, `${p} ゴートゥギャザー`, `${p} ゲーマースピード`, `${p} ファミリーノンストップ`,
       ],
       KOR: [
-        `${p} 밸류팩`, `${p} 스마트딜`, `${p} 파워플랜`, `${p} 데일리딜`,
-        `${p} 빅세이브`, `${p} 스피드팩`, `${p} 데이터킹`, `${p} 넷플러스`,
-        `${p} 올웨이즈온`, `${p} 풀파워`, `${p} 넥스트레벨`, `${p} 슈퍼플랜`,
-        `${p} 맥스스피드`, `${p} 무제한`, `${p} 프로팩`, `${p} 월간세이버`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi 무제한`, `${p} ZEED 5G`, `${p} Sawasdee 스페셜`, `${p} Max Experience`,
+        `${p} 핫딜 논스톱`, `${p} 네버스톱 넷`, `${p} myAIS 익스클루시브`, `${p} Play Max`,
+        `${p} 베스트딜`, `${p} 고투게더`, `${p} 게이머 스피드`, `${p} 패밀리 논스톱`,
       ],
       KHM: [
-        `${p} កញ្ចប់តម្លៃ`, `${p} ការផ្សព្វផ្សាយឆ្លាត`, `${p} ផែនការថាមពល`, `${p} ការផ្សព្វផ្សាយប្រចាំថ្ងៃ`,
-        `${p} សន្សំធំ`, `${p} កញ្ចប់ល្បឿន`, `${p} ស្តេចទិន្នន័យ`, `${p} អ៊ិនធឺណិតបូក`,
-        `${p} តែងតែបើក`, `${p} ថាមពលពេញ`, `${p} កម្រិតបន្ទាប់`, `${p} ផែនការពិសេស`,
-        `${p} ល្បឿនអតិបរមា`, `${p} គ្មានដែនកំណត់`, `${p} កញ្ចប់វិជ្ជាជីវៈ`, `${p} សន្សំប្រចាំខែ`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi គ្មានកំណត់`, `${p} ZEED 5G`, `${p} Sawasdee ពិសេស`, `${p} Max Experience`,
+        `${p} ការផ្តល់ជូនក្តៅ Non-Stop`, `${p} មិនដែលឈប់ប្រើប្រាស់`, `${p} myAIS ពិសេស`, `${p} Play Max`,
+        `${p} ការផ្តល់ជូនល្អបំផុត`, `${p} ទៅជាមួយគ្នា`, `${p} ល្បឿនហ្គេមឃ័រ`, `${p} គ្រួសារ Non-Stop`,
       ],
       LAO: [
-        `${p} ແພັກເກັດຄຸ້ມຄ່າ`, `${p} ດີລສະຫຼາດ`, `${p} ແຜນພະລັງ`, `${p} ດີລປະຈຳວັນ`,
-        `${p} ປະຢັດສູງສຸດ`, `${p} ແພັກເກັດໄວ`, `${p} ຂຸນຂອງຂໍ້ມູນ`, `${p} ເນັດບວກ`,
-        `${p} ອອນລາຍຕະຫຼອດ`, `${p} ພະລັງເຕັມ`, `${p} ຈັດເຕັມ`, `${p} ແຜນຊຸບເປີ`,
-        `${p} ຄວາມໄວສູງສຸດ`, `${p} ບໍ່ຈຳກັດ`, `${p} ແພັກໂປຣ`, `${p} ປະຢັດລາຍເດືອນ`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi ບໍ່ຈຳກັດ`, `${p} ZEED 5G`, `${p} Sawasdee ພິເສດ`, `${p} Max Experience`,
+        `${p} ໂປຮ໋ອດດີລ ບໍ່ຢຸດພັກ`, `${p} ເນັດບໍ່ມີສະດຸດ`, `${p} myAIS ສະເພາະ`, `${p} Play Max`,
+        `${p} ດີລສຸດຄຸ້ມ`, `${p} ໄປພ້ອມກັນ`, `${p} ເກມເມີສະປີດ`, `${p} ຄອບຄົວ Non-Stop`,
       ],
       BUR: [
-        `${p} တန်ဖိုးရှိပက်ကေ့ခ်ျ`, `${p} စမတ်ဒီးလ်`, `${p} ပါဝါပလန်`, `${p} နေ့စဉ်ဒီးလ်`,
-        `${p} ကြီးမားသောချွေတာမှု`, `${p} အမြန်နှုန်းပက်`, `${p} ဒေတာဘုရင်`, `${p} နက်ပလပ်စ်`,
-        `${p} အမြဲဖွင့်`, `${p} အပြည့်အဝပါဝါ`, `${p} နောက်တစ်ဆင့်`, `${p} စူပါပလန်`,
-        `${p} အမြင့်ဆုံးအမြန်နှုန်း`, `${p} အကန့်အသတ်မရှိ`, `${p} ပရိုပက်`, `${p} လစဉ်ချွေတာ`,
+        `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
+        `${p} Super WiFi အကန့်အသတ်မရှိ`, `${p} ZEED 5G`, `${p} Sawasdee အထူး`, `${p} Max Experience`,
+        `${p} ဟော့ဒီးလ် Non-Stop`, `${p} ဘယ်တော့မှမရပ်ဘဲအင်တာနက်`, `${p} myAIS အထူး`, `${p} Play Max`,
+        `${p} အကောင်းဆုံးဒီးလ်`, `${p} အတူတကွသွား`, `${p} Gamer အမြန်နှုန်း`, `${p} မိသားစု Non-Stop`,
       ],
     },
 
@@ -442,7 +438,6 @@ export const createPOWordingPools = (
     },
 
     // ==========================================
-    // 2. SMS Wording Specific Pools (Events)
     // ==========================================
     smsPromotePack: {
       EN: [
@@ -746,7 +741,6 @@ export const createPOWordingPools = (
     },
 
     // ==========================================
-    // 3. Basic Info PO Specific Pools
     // ==========================================
     wordingInStatement: {
       EN: [
@@ -1017,7 +1011,6 @@ export const createPOWordingPools = (
     },
 
     // ==========================================
-    // 4. NEW: Notifications, Testing & Errors Specific Pools
     // ==========================================
     otpMessage: {
       EN: [
@@ -1871,7 +1864,6 @@ const buildRemarkText = (ctx: PackageContext): string => {
 
   let template = pickRandom(REMARK_POOLS[lengthType][style][lang]);
 
-  // ✅ Pre-compute all derived values here to avoid Cypress parsing expressions in templates
   const replacements: Record<string, string | number> = {
     '{pName}': ctx.pName,
     '{pO}': ctx.pOName,
@@ -1976,7 +1968,6 @@ const buildDescriptionText = (ctx: PackageContext): string => {
 
   let template = pickRandom(DESCRIPTION_POOLS[lengthType][lang]);
 
-  // ✅ Pre-compute all derived values to prevent Cypress parse errors
   const replacements: Record<string, string | number> = {
     '{pName}': ctx.pName,
     '{pO}': ctx.pOName,
@@ -2055,10 +2046,21 @@ export const RandomRemark = (
   subModule?: string,
   module?: string
 ): void => {
-  cy.get('body').then(($body: JQuery<HTMLBodyElement>) => {
-    if ($body.find('textarea[formcontrolname="remark"]').length === 0) return;
+  // formcontrolname and can be visible at the same time as the PO
+  const EXCLUDE = 'app-mass-mkt-revenue-sharing textarea[formcontrolname="remark"]';
+  const getRemark = () =>
+    cy.get('textarea[formcontrolname="remark"]')
+      .not(EXCLUDE)
+      .filter(':visible');
 
-    scrollToElement('textarea[formcontrolname="remark"]', 'Remark');
+  cy.get('body').then(($body: JQuery<HTMLBodyElement>) => {
+    const $target = $body
+      .find('textarea[formcontrolname="remark"]')
+      .not(EXCLUDE)
+      .filter(':visible');
+    if ($target.length === 0) return;
+
+    scrollToElement('textarea[formcontrolname="remark"]:not(' + EXCLUDE + ')', 'Remark');
 
     if (Math.random() < 0.85) {
       const ctx = buildPackageContext(projectName, poName, priceType, productClass, subModule, module);
@@ -2068,13 +2070,11 @@ export const RandomRemark = (
         text = text.substring(0, MAX_REMARK_LENGTH - 3) + '...';
       }
 
-      cy.get('textarea[formcontrolname="remark"]')
-        .clear({ force: true })
-        .type(text, { delay: 0, force: true });
+      getRemark().first().type(text, { delay: 0, force: true });
 
       cy.log(`✅ Remark: ${text.length}/${MAX_REMARK_LENGTH} chars`);
     } else {
-      cy.get('textarea[formcontrolname="remark"]').clear({ force: true });
+      getRemark().first().clear({ force: true });
       cy.log('⏭️ Remark skipped (15%)');
     }
     cy.wait(WAIT_TIME);

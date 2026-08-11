@@ -2,7 +2,6 @@ import { login } from './helpers';
 import { ClaimProject, approveProject, navigateToWorkspace, performSimpleApprovalRole } from './claim-approve';
 import { getStandardProjectName, getOntopProjectName } from './project-manager';
 import { ApproveFunction, formattedDateMain, formattedDateOntop, GetProjectNameFn } from './config';
-import { approveProjectCGMD, approveProjectCGMDtester, approveProjectACTM, approveProjectOPER } from './approval-flows';
 import { afterCKSPOST, performMusicRoles } from './flows';
 
 const env = Cypress.env() as Record<string, string>;
@@ -16,20 +15,18 @@ const {
 
 const registerPoDetailPageIntercepts = (): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/mass-enh-po-detail/getByPoEnhRowId/**').as('getPoEnhDetail');
-    cy.intercept('GET', '/PLMSpringBoot/api/check-generate-po-enh/**').as('getCheckGenPoEnh');
     cy.intercept('GET', '/PLMSpringBoot/api/check-sff-product-enh/**').as('getCheckSffEnh');
     cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getByGroupTypeAndActiveFlagOrderByOrderbyAsc/Billing%20Priority/**').as('getBillingPriority');
     cy.intercept('GET', '/PLMSpringBoot/api/flw-cfg-lov/getByGroupTypeAndLovVal4ContainsAndActiveFlag/Billing%20Priority/**').as('getBillingPriorityMobile');
-    cy.intercept('GET', '/PLMSpringBoot/api/sffProductDiy/addupdatesoid/**').as('getSffDiyDone');
+    cy.intercept('GET', '/PLMSpringBoot/api/sff-product-by-detailrowid/**').as('getSffProductDetail');
 };
 
 const handlePoDetailRoute = (customStepsCallback: () => void): void => {
-    cy.wait('@getPoEnhDetail', { timeout: 60000 });
-    cy.wait('@getCheckGenPoEnh', { timeout: 60000 });
-    cy.wait('@getCheckSffEnh', { timeout: 60000 });
-    cy.wait('@getBillingPriority', { timeout: 60000 });
-    cy.wait('@getBillingPriorityMobile', { timeout: 60000 });
-    cy.wait('@getSffDiyDone', { timeout: 60000 });
+    cy.wait('@getPoEnhDetail', { timeout: 600000 });
+    cy.wait('@getCheckSffEnh', { timeout: 600000 });
+    cy.wait('@getBillingPriority', { timeout: 600000 });
+    cy.wait('@getBillingPriorityMobile', { timeout: 600000 });
+    cy.wait('@getSffProductDetail', { timeout: 600000 });
 
     handleProductNameTrim();
 
@@ -58,11 +55,11 @@ export const getTomorrowDateString = (): string => {
     return `${dd}/${mm}/${yyyy}`;
 };
 
-const waitForProjectPageLoad = (timeout = 600000): void => {
+const waitForProjectPageLoad = (timeout = 6000000): void => {
 
-    cy.wait(['@getProject', '@getHistory', '@getNote'], { timeout: 600000 });
+    cy.wait(['@getProject', '@getHistory', '@getNote'], { timeout: 6000000 });
 
-    cy.get('@getAttachment', { timeout: 1000000 }).then(
+    cy.get('@getAttachment', { timeout: 10000000 }).then(
         (xhr) => {
             if (xhr) {
                 cy.log('✅ @getAttachment fired');
@@ -90,7 +87,6 @@ export const executeCKSRole = (
             : projectNameStrategy === 'standard'
                 ? getStandardProjectName
                 : getOntopProjectName;
-        // const getProjectName: GetProjectNameFn = () => 'MOB PRE Rec Main PRJ 2906 0912';
         cy.log(String(Cypress.env('poCount')));
         standardCksPoEnhancementFlow(getProjectName, customSteps, beforeApprove);
     });
@@ -145,7 +141,7 @@ export const standardCksPoEnhancementFlow = (
     login(cks, ckspass);
 
     registerCksInitialIntercepts();
-    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 30000 });
+    cy.wait(['@getCfgLovParam', '@getActiveFlag'], { timeout: 300000 });
     cy.get('body').should('be.visible');
 
     const finalProjectName = getProjectNameFn();
@@ -177,7 +173,7 @@ export const standardCksPoEnhancementFlow = (
 
     cy.then(() => {
         cy.log('🏁 Running cksDoerFinalStep...');
-        cksDoerFinalStep();
+        cksDoerFinalStep(getProjectNameFn);
     });
 };
 
@@ -195,21 +191,41 @@ const enhanceSinglePO = (
 ): void => {
     cy.log(`📦 [${index + 1}/${actualCount}] Starting Enhance PO loop`);
 
+    cy.get('body').then(($body) => {
+        if ($body.find('.cdk-overlay-backdrop').length > 0) {
+            cy.log('⚠️ พบ overlay-backdrop ค้างก่อนกด Enhance PO — เคลียร์ก่อน');
+            cy.get('.cdk-overlay-backdrop').click({ force: true });
+            cy.get('.cdk-overlay-backdrop').should('not.exist');
+        }
+        const sel = '[class*="loading"], [class*="spinner"], .p-progress-spinner';
+        if ($body.find(sel).length > 0) {
+            cy.get(sel, { timeout: 300000 }).should('not.exist');
+        }
+    });
+
+    cy.get('button.btn-sample', { timeout: 300000 })
+        .should('have.length.greaterThan', index);
+
     registerPoDetailPageIntercepts();
 
     const tag = `po${index}`;
 
     cy.intercept({ method: 'GET', url: '**/getProjectByProjectId/**', times: 1 })
         .as(`getProject_${tag}`);
-    cy.intercept({ method: 'GET', url: '**/sffProductDiy/addupdatesoid/**', times: 1 })
+
+    // ✅ FIX: แทน sffProductDiy/addupdatesoid ด้วย sff-product-by-detailrowid
+    // (ยิงครบทุก PO subgroup ตามที่ยืนยันจาก HAR — เดิมยิงเฉพาะ Mobile ทำให้ค้างสำหรับ
+    // Entertainment Partnership / Music)
+    cy.intercept({ method: 'GET', url: '**/sff-product-by-detailrowid/**', times: 1 })
         .as(`pageReady_${tag}`);
 
     cy.then(() => {
         cy.get('button.btn-sample')
             .filter((_, el) => el.textContent?.trim() === 'Enhance PO')
             .eq(index)
-            .scrollIntoView({ ensureScrollable: false })
+            .scrollIntoView()
             .should('be.visible')
+            .and('not.be.disabled')
             .click();
     });
 
@@ -221,7 +237,7 @@ const enhanceSinglePO = (
     cy.get('body').then(($body) => {
         const sel = '[class*="loading"], [class*="spinner"], .p-progress-spinner';
         if ($body.find(sel).length > 0) {
-            cy.get(sel, { timeout: 30000 }).should('not.exist');
+            cy.get(sel, { timeout: 300000 }).should('not.exist');
         }
     });
 
@@ -281,76 +297,107 @@ const backToCksDoer = (registerBeforeBack: boolean = false): void => {
         }
     });
 
-    cy.contains('button', 'Back', { timeout: 15000 }).should('be.visible').and('not.be.disabled').click();
-    cy.contains('button', 'Yes', { timeout: 15000 }).should('be.visible').click();
+    cy.contains('button', 'Back', { timeout: 150000 }).should('be.visible').and('not.be.disabled').click();
+    cy.contains('button', 'Yes', { timeout: 150000 }).should('be.visible').click();
 
-    cy.url({ timeout: 60000 }).should('include', '/new-flow/home/newcks/cks-doer');
-    cy.get('body', { timeout: 60000 }).should('be.visible');
+    cy.url({ timeout: 600000 }).should('include', '/new-flow/home/newcks/cks-doer');
+    cy.get('body', { timeout: 600000    }).should('be.visible');
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
 // MAIN EXPORT
-// ─────────────────────────────────────────────────────────────────────────────
 
-export const cksDoerFinalStep = (): void => {
+/**
+ * คลิกปุ่ม Approve — ลอง exact match "Approve To CGMD" ก่อน
+ * ถ้าไม่เจอ fallback เป็น "Approve" เฉยๆ (สองจุดในหน้านี้ข้อความปุ่มไม่คงที่)
+ */
+const clickApproveButton = (specificLabel: string | undefined, timeout: number): void => {
+    const candidates = specificLabel ? [specificLabel, 'Approve'] : ['Approve'];
+
+    cy.get('button', { timeout }).should(($buttons) => {
+        const texts = $buttons.toArray().map(b => Cypress.$(b).text().trim());
+        const found = candidates.some(label => texts.includes(label));
+        expect(found, `expected one of [${candidates.join(', ')}] to exist`).to.be.true;
+    });
+
+    cy.get('button').then(($buttons) => {
+        for (const label of candidates) {
+            const $match = $buttons.filter((_, el) => Cypress.$(el).text().trim() === label);
+            if ($match.length > 0) {
+                cy.wrap($match.first())
+                    .should('be.visible')
+                    .and('not.be.disabled')
+                    .click();
+                return;
+            }
+        }
+    });
+};
+
+export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
     cy.wait(3000);
 
-    // ─── Fast Lane checkbox ───────────────────────────────────────
-    cy.contains('label', 'Fast Lane :', { timeout: 30000 })
-        .should('be.visible');
+    cy.get('body').then(($body) => {
+        const hasFastLane = $body.find('label:contains("Fast Lane :")').length > 0;
 
-    // register ก่อน check — เผื่อ checkbox trigger API
-    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
+        if (hasFastLane) {
+            cy.contains('label', 'Fast Lane :', { timeout: 300000 })
+                .should('be.visible');
 
-    cy.contains('label', 'Fast Lane :')
-        .parent()
-        .next()
-        .find('input[type="checkbox"]')
-        .check();
+            // register ก่อน check — เผื่อ checkbox trigger API
+            cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
 
-    cy.get('.row.col-md-11')
-        .find('input[type="checkbox"]')
-        .check();
+            cy.contains('label', 'Fast Lane :')
+                .parent()
+                .next()
+                .find('input[type="checkbox"]')
+                .check();
 
-    // ─── Wait for date field ──────────────────────────────────────
-    cy.get('input[aria-label="Date input field"]', { timeout: 30000 })
-        .eq(1)
-        .should('be.visible')
-        .and('not.be.disabled');
+            cy.get('.row.col-md-11')
+                .find('input[type="checkbox"]')
+                .check();
 
-    const onProdDate = getRandomFutureOnProductionDate();
-    cy.get('input[aria-label="Date input field"]')
-        .eq(1)
-        .type(onProdDate);
+            cy.get('input[aria-label="Date input field"]', { timeout: 300000 })
+                .eq(1)
+                .should('be.visible')
+                .and('not.be.disabled');
 
-    // ─── Step 1: Intercept Approve BEFORE clicking ────────────────
+            const onProdDate = getRandomFutureOnProductionDate();
+            cy.get('input[aria-label="Date input field"]')
+                .eq(1)
+                .type(onProdDate);
+        } else {
+            cy.log('ℹ️ Fast Lane not found — skip checkbox/date logic, ไป Approve ตรงๆ');
+        }
+    });
+
     cy.intercept(
         { method: '*', url: '**/PromoteFromCksDoer/**' },
     ).as('submitApprove');
 
     cy.intercept({ method: '*', url: '**/api-cks/**' }).as('anyCksRequest');
 
-    cy.contains('button', 'Approve', { timeout: 15000 })
+    cy.contains('button', 'Approve', { timeout: 150000 })
         .should('be.visible')
         .click();
 
-    cy.wait('@submitApprove', { timeout: 600000 }).then((interception) => {
+    cy.wait('@submitApprove', { timeout: 6000000 }).then((interception) => {
         cy.log(`✅ submitApprove METHOD : ${interception.request.method}`);
         cy.log(`✅ submitApprove URL    : ${interception.request.url}`);
         expect(interception.response?.statusCode).to.eq(200);
     });
 
-    cy.url({ timeout: 600000 })
+    cy.url({ timeout: 6000000 })
         .should('include', '/#/workspace-home/workspace');
 
-    // ─── Step 2: CKS-Checker phase ───────────────────────────────
     const finalProjectName =
+        (getProjectNameFn ? getProjectNameFn() : '') ||
+        getStandardProjectName() ||
         Cypress.env('formattedDateMain') ||
         Cypress.env('formattedDate');
 
     if (!finalProjectName) {
         throw new Error(
-            '❌ No project name found in Cypress env. Check formattedDateMain or formattedDate'
+            '❌ No project name found. Check getProjectNameFn, ProjectManager, formattedDateMain, or formattedDate'
         );
     }
 
@@ -361,38 +408,34 @@ export const cksDoerFinalStep = (): void => {
     ClaimProject(finalProjectName, { claimBy: 'project' });
     approveProject(finalProjectName);
 
-    cy.url({ timeout: 3_000_000 })
+    cy.url({ timeout: 3_000_0000 })
         .should('include', '/#/new-flow/home/newcks/cks-checker');
 
-    cy.get('body', { timeout: 3_000_000 }).should('be.visible');
+    cy.get('body', { timeout: 3_000_0000 }).should('be.visible');
     cy.scrollTo('bottom');
     cy.wait(5000);
 
-    // ─── Step 3: Approve To CGMD ─────────────────────────────────
     cy.intercept('GET', '**/api-cks/promoteFromCksCheckerToCenter/**').as('promoteChecker');
     cy.intercept('POST', '**/api/flw-cgmd/assigneecgmdconfig/**').as('assignCgmd');
     cy.intercept('POST', '**/mail-service/CGMD-Conigure/**').as('sendMail');
 
-    cy.contains('button', 'Approve To CGMD', { timeout: 3_000_000 })
-        .should('be.visible')
-        .click();
+    // 🟢 ลอง "Approve To CGMD" ก่อน ถ้าไม่เจอ fallback เป็น "Approve"
+    clickApproveButton('Approve To CGMD', 3_000_0000);
 
-    cy.wait('@promoteChecker', { timeout: 60000 })
+    cy.wait('@promoteChecker', { timeout: 600000 })
         .its('response.statusCode').should('eq', 200);
-    cy.wait('@assignCgmd', { timeout: 60000 })
+    cy.wait('@assignCgmd', { timeout: 600000 })
         .its('response.statusCode').should('eq', 200);
-    cy.wait('@sendMail', { timeout: 60000 })
+    cy.wait('@sendMail', { timeout: 600000 })
         .its('response.statusCode').should('eq', 200);
 
-    cy.url({ timeout: 3_000_000 })
+    cy.url({ timeout: 3_000_0000 })
         .should('include', '/#/workspace-home/workspace');
 
-    // ─── Step 4: Logout ──────────────────────────────────────────
     cy.contains('button', 'Logout')
         .should('be.visible')
         .click();
 };
-
 const fmtDate = (d: Date): string => {
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');

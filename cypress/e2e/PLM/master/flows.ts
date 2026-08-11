@@ -1,12 +1,19 @@
-import { Module, cgccbs, cgccbspass, cgtcbs, cgtcbspass, spadsup, spadsuppass, spaddoer, spaddoerpass, spadtest, spadtestpass, spaddp, spaddppass, actm, actmpass, apo, apopass, oper, operpass, cgcirb, cgcirbpass, cgtirb, cgtirbpass, sasff, sasffpass, tscenter, tscenterpass, csisp, csisppass, aafsp, aafsppass, e2etest, e2etestpass, csidp, csidppass, aafdp, aafdppass, e2edp, e2edppass, music, musicpass } from './config';
-import { executeCKSRole, getTomorrowDateString } from './cks-role';
-import { ClaimProject, approveProject, performRoleTaskWithAssignment, performSimpleApprovalRole, performSimpleClaimAndApprovalRole } from './claim-approve';
-import { getStandardProjectName } from './project-manager';
+import {
+    Module, cgccbs, cgccbspass, cgtcbs, cgtcbspass, spadsup, spadsuppass, spaddoer, spaddoerpass, spadtest, spadtestpass, spaddp, spaddppass, actm, actmpass, apo, apopass, oper, operpass, cgcirb, cgcirbpass, cgtirb, cgtirbpass, sasff, sasffpass, tscenter, tscenterpass, csisp, csisppass, aafsp, aafsppass, e2etest, e2etestpass, csidp, csidppass, aafdp, aafdppass, e2edp, e2edppass, music, musicpass,
+    ssbsp, ssbsppass, ssbdp, ssbdppass,
+    cpcsp, cpcsppass, cpcdp, cpcdppass, rom, rompass,
+    ckseasyapp, ckseasyapppass,
+    aqss, aqsspass
+} from './config';
+import { executeCKSRole, getTomorrowDateString, standardCksPoEnhancementFlow } from './cks-role';
+import { ClaimProject, approveProject, performRoleTaskWithAssignment, performSimpleApprovalRole, performSimpleClaimAndApprovalRole ,projectExistsInTable} from './claim-approve';
+import { getStandardProjectName, getOntopProjectName } from './project-manager';
 import { approveProjectCGMD, approveProjectCGMDPRE, approveProjectCGMDtester, approveProjectCGMDtesterPRE, approveProjectCGMDtesterPREPlugin, approveProjectCGMDPREMainNotComplex, approveProjectSPADSup, approveProjectSPADSupCGMDPlugin, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy, approveProjectACTM, approveProjectAPO, approveProjectOPER } from './approval-flows';
 import { checkAndUpdatePriority, checkAndUpdateVerticalAppPriority, CopyDeductFail, checkAndFillContentType } from './priority-updaters';
-import { Tariff, dropdownRecurringCKSMain, dropdownRecurringCKS, unregister, addauto5gCKS, diyflagCKS, Topup } from './dropdowns-randomizers';
+import { Tariff, dropdownRecurringCKSMain, dropdownRecurringCKS, unregister, addauto5gCKS, diyflagCKS, Topup, RomID, runMassEnhConfigurationIfPresent } from './dropdowns-randomizers';
 import { loginAndWaitReady } from './helpers';
 import { smsCKSPOST, smsCKSPRE } from './sms-wording';
+
 
 // ========================
 // TYPE DEFINITIONS
@@ -81,10 +88,185 @@ const sortCgmd = (arr: TestEntry[]): TestEntry[] => {
 
     return result;
 };
-// ─────────────────────────────────────────────
-// Standard flow — randomisable
-// ─────────────────────────────────────────────
-const declareRoleTests = (tests: TestEntry[]): void => {
+
+const promoteToActmRole = (roleUser: any, rolePass: any, roleLabel: string): void => {
+    loginAndWaitReady(roleUser, rolePass);
+
+    const finalProjectName = Cypress.env('currentPoName') || getStandardProjectName();
+    cy.log(`Project ใช้สำหรับ Claim (${roleLabel}): ${finalProjectName}`);
+
+    ClaimProject(finalProjectName, { claimBy: 'project' });
+    approveProject(finalProjectName);
+
+    cy.get('body', { timeout: 300000 }).should(($body) => {
+        const hasPromote = $body.find('button:contains("Promote to ACTM")').length > 0;
+        const hasApprove = $body.find('button:contains("Approve")').length > 0;
+        expect(hasPromote || hasApprove, 'Promote to ACTM or Approve button should exist').to.be.true;
+    });
+
+    cy.get('body').then(($body) => {
+        if ($body.find('button:contains("Promote to ACTM")').length > 0) {
+            cy.contains('button', 'Promote to ACTM', { timeout: 20000 })
+                .should('be.visible')
+                .click({ force: true });
+        } else {
+            cy.contains('button', 'Approve', { timeout: 20000 })
+                .should('be.visible')
+                .click({ force: true });
+        }
+    });
+
+    cy.url({ timeout: 300000 }).should('include', '/#/workspace-home/workspace');
+    cy.contains('button', 'Logout').should('be.visible').click();
+};
+// ✅ ROM / Easy App ROM: เช็ค Env แบบยืดหยุ่น + Debug Log
+const checkEnvFlag = (key: string): boolean => {
+    const val = Cypress.env(key);
+    const isTrue = val === true || String(val).toLowerCase() === 'true';
+    console.log(`🔍 [ENV CHECK] ${key} = ${JSON.stringify(val)} → ${isTrue}`);
+    return isTrue;
+};
+
+const shouldRunRomRole = (): boolean => checkEnvFlag('hasRom') || checkEnvFlag('hasEasyAppRom');
+const shouldRunEasyAppRomRole = (): boolean => checkEnvFlag('hasEasyAppRom');
+
+
+const shouldRunAqssAfterOper = (): boolean => checkEnvFlag('hasRom') || checkEnvFlag('hasEasyAppRom');
+const shouldRunAqssAfterCgmd = (): boolean =>
+    !shouldRunAqssAfterOper() && (checkEnvFlag('hasUssdDirect') || checkEnvFlag('hasUssdInteractive'));
+const shouldRunAqssRole = (): boolean => shouldRunAqssAfterOper() || shouldRunAqssAfterCgmd();
+
+// ✅ ROM / Easy App ROM: อ่านค่า PO จาก currentPoName (ค่าล่าสุดที่ RandomHumanTouchPoint อัปเดต)
+const insertRomEasyAppRomRole = (ordered: TestEntry[]): TestEntry[] => {
+    const result = [...ordered];
+    const cgmdConfigIdx = result.findIndex(t => t.name.includes('CGMD Config'));
+    const insertAt = cgmdConfigIdx === -1 ? 0 : cgmdConfigIdx + 1;
+
+    // คำนวณจำนวนรอบคร่าวๆ เพื่อสร้าง Test ให้ครบ (แต่จะไปเช็คชื่อจริงตอนรันอีกที)
+    const poCount = Number(Cypress.env('poCount')) || 1;
+    const totalRuns = Math.max(poCount, 1); 
+
+    const newEntries: TestEntry[] = [];
+
+    for (let i = 0; i < totalRuns; i++) {
+        const poLabel = totalRuns > 1 ? `[PO ${i + 1}/${totalRuns}]` : '';
+
+        newEntries.push({
+            name: `ROM role ${poLabel}`.trim(),
+            group: 'OTHER',
+            fn: () => {
+                // เช็ค Flag ที่ RandomHumanTouchPoint ตั้งไว้
+                if (!shouldRunRomRole()) {
+                    cy.log('⏭️ ข้าม ROM role — เงื่อนไข hasRom/hasEasyAppRom ไม่ตรงตอน runtime');
+                    return;
+                }
+                
+                // ✅ อ่านค่าชื่อ PO ล่าสุดที่ RandomHumanTouchPoint อัปเดตไว้!
+                const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+
+                // 🛡️ SAFETY CHECK: ถ้าไม่มีชื่อ หรือเป็นชื่อปลอม ให้ข้าม
+                if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                    cy.log(`⏭️ ข้าม ROM role — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                    return;
+                }
+
+                // อัปเดต env ให้ตรงกันก่อนเรียกฟังก์ชัน
+                Cypress.env('poName', activePoName);
+                
+                cy.log(`🚀 Running ROM role for: ${activePoName}`);
+                promoteToActmRole(rom, rompass, 'ROM');
+            },
+        });
+
+        newEntries.push({
+            name: `Easy App ROM role ${poLabel}`.trim(),
+            group: 'OTHER',
+            fn: () => {
+                if (!shouldRunEasyAppRomRole()) {
+                    cy.log('⏭️ ข้าม Easy App ROM role — เงื่อนไข hasEasyAppRom ไม่ตรงตอน runtime');
+                    return;
+                }
+
+                // ✅ อ่านค่าชื่อ PO ล่าสุดที่ RandomHumanTouchPoint อัปเดตไว้!
+                const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+
+                if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                    cy.log(`⏭️ ข้าม Easy App ROM role — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                    return;
+                }
+
+                Cypress.env('poName', activePoName);
+
+                cy.log(`🚀 Running Easy App ROM role for: ${activePoName}`);
+                promoteToActmRole(ckseasyapp, ckseasyapppass, 'Easy App ROM');
+            },
+        });
+    }
+
+    result.splice(insertAt, 0, ...newEntries);
+    console.log(`✅ [SUCCESS] Inserted ${newEntries.length} ROM/Easy App ROM test entries at index ${insertAt}`);
+    
+    return result;
+};
+
+const buildAqssEntries = (labelSuffix: string, guard: () => boolean): TestEntry[] => {
+    const poCount = Number(Cypress.env('poCount')) || 1;
+    const totalRuns = Math.max(poCount, 1);
+    const entries: TestEntry[] = [];
+
+    for (let i = 0; i < totalRuns; i++) {
+        const poLabel = totalRuns > 1 ? `[PO ${i + 1}/${totalRuns}]` : '';
+        entries.push({
+            name: `AQSS role (${labelSuffix}) ${poLabel}`.trim(),
+            group: 'OTHER',
+            fn: () => {
+                if (!guard()) {
+                    cy.log(`⏭️ ข้าม AQSS role (${labelSuffix}) — เงื่อนไขไม่ตรงตอน runtime`);
+                    return;
+                }
+
+                const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+
+                if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                    cy.log(`⏭️ ข้าม AQSS role (${labelSuffix}) — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                    return;
+                }
+
+                Cypress.env('poName', activePoName);
+                cy.log(`🚀 Running AQSS role (${labelSuffix}) for: ${activePoName}`);
+                promoteToActmRole(aqss, aqsspass, 'AQSS');
+            },
+        });
+    }
+
+    return entries;
+};
+
+const insertAqssRole = (ordered: TestEntry[]): TestEntry[] => {
+    let result = [...ordered];
+
+    // 1) AQSS หลัง CGMD Config — เคส "มีแต่ USSD Direct/Interactive" (ไม่มี ROM/Easy App ROM)
+    const cgmdConfigIdx = result.findIndex(t => t.name.includes('CGMD Config'));
+    const cgmdInsertAt = cgmdConfigIdx === -1 ? 0 : cgmdConfigIdx + 1;
+    const afterCgmdEntries = buildAqssEntries('after CGMD Config', shouldRunAqssAfterCgmd);
+    result.splice(cgmdInsertAt, 0, ...afterCgmdEntries);
+
+    // 2) AQSS หลัง OPER/APO (ท้ายสุดของ flow) — เคสมี ROM/Easy App ROM (ไม่ว่าจะมี USSD ด้วยหรือไม่)
+    const afterOperEntries = buildAqssEntries('after OPER/APO', shouldRunAqssAfterOper);
+    result = [...result, ...afterOperEntries];
+
+    console.log(`✅ [SUCCESS] Inserted AQSS entries: ${afterCgmdEntries.length} after CGMD Config, ${afterOperEntries.length} after OPER/APO`);
+
+    return result;
+};
+
+const declareRoleTests = (
+    tests: TestEntry[],
+    opts?: { poLabel?: string; beforeEach?: () => void; musicModule?: string }
+): void => {
+    const poLabel = opts?.poLabel ?? '';
+    const beforeEachFn = opts?.beforeEach;
+
     const byGroup = (g: TestEntry['group']) => tests.filter(t => t.group === g);
     const cgmd = sortCgmd(byGroup('CGMD'));
     const spad = sortSpad(byGroup('SPAD'));
@@ -107,22 +289,19 @@ const declareRoleTests = (tests: TestEntry[]): void => {
         case 'CGMD_FIRST':
             ordered = [...cgmd, ...spad, ...other];
             break;
-
         case 'SPAD_FIRST':
             ordered = [...spad, ...cgmd, ...other];
             break;
-
         case 'INTERLEAVED': {
             const s = [...spad];
             const c = [...cgmd];
             const interleaved: TestEntry[] = [];
-            if (s.length) interleaved.push(s.shift()!); // Spadsup first
+            if (s.length) interleaved.push(s.shift()!);
             interleaved.push(...c);
-            interleaved.push(...s); // Spaddoer, Spadtester, Spaddeploy
+            interleaved.push(...s);
             ordered = [...interleaved, ...other];
             break;
         }
-
         case 'CGMD_SPAD_ALTERNATE_C':
             ordered = [
                 ...(cgmdConfig ? [cgmdConfig] : []),
@@ -134,7 +313,6 @@ const declareRoleTests = (tests: TestEntry[]): void => {
                 ...other,
             ];
             break;
-
         case 'CGMD_SPAD_ALTERNATE_S':
             ordered = [
                 ...(spadsup ? [spadsup] : []),
@@ -146,7 +324,6 @@ const declareRoleTests = (tests: TestEntry[]): void => {
                 ...other,
             ];
             break;
-
         case 'RANDOM': {
             const mixed = shuffleArray([...cgmd, ...spad]);
             const spadPositions = mixed
@@ -172,28 +349,81 @@ const declareRoleTests = (tests: TestEntry[]): void => {
             ordered = [...mixed, ...other];
             break;
         }
-
         default:
             ordered = [...cgmd, ...spad, ...other];
     }
 
-    ordered.forEach(t => declareTest(t.name, t.fn));
+    ordered = insertRomEasyAppRomRole(ordered);
+    ordered = insertAqssRole(ordered);
+    const musicFn = opts?.musicModule !== undefined ? buildMusicInsertFn(opts.musicModule) : null;
+    let musicInsertPos = -1;
+    if (musicFn) {
+        const cgmdConfigIdx = ordered.findIndex(t => t.name.includes('CGMD Config'));
+        const minPos = cgmdConfigIdx === -1 ? 0 : cgmdConfigIdx + 1;
+        musicInsertPos = minPos + Math.floor(Math.random() * (ordered.length - minPos + 1));
+        console.log(`🎵 [Music] จะแทรก Music/TSCENTER block ที่ index ${musicInsertPos} (min=${minPos}, total=${ordered.length})`);
+    }
+
+    ordered.forEach((t, idx) => {
+        if (musicFn && idx === musicInsertPos) {
+            musicFn();
+        }
+        const testName = poLabel ? `${t.name} ${poLabel}` : t.name;
+        declareTest(testName, () => {
+            if (beforeEachFn) beforeEachFn();
+            t.fn();
+        });
+    });
+    if (musicFn && musicInsertPos === ordered.length) {
+        musicFn();
+    }
 };
 
-const declarePluginTests = (tests: TestEntry[]): void => {
+const declarePluginTests = (
+    tests: TestEntry[],
+    opts?: { poLabel?: string; beforeEach?: () => void; musicModule?: string }
+): void => {
+    const poLabel = opts?.poLabel ?? '';
+    const beforeEachFn = opts?.beforeEach;
+
     const baseCgmd = sortCgmd(tests.filter(t => t.group === 'CGMD' && !t.name.includes('Plugin')));
     const spads = sortSpad(tests.filter(t => t.group === 'SPAD'));
     const pluginCgmd = sortCgmd(tests.filter(t => t.group === 'CGMD' && t.name.includes('Plugin')));
 
-    const ordered: TestEntry[] = [...baseCgmd, ...spads, ...pluginCgmd];
+    let ordered: TestEntry[] = [...baseCgmd, ...spads, ...pluginCgmd];
 
-    cy.log(`🔌 [PLUGIN FLOW] order: ${ordered.map(t => t.name).join(' → ')}`);   // ← ตัวนี้
-    ordered.forEach(t => declareTest(t.name, t.fn));
+    // ✅ จุดสำคัญ: แทรก ROM + Easy App ROM role เช่นเดียวกัน
+    ordered = insertRomEasyAppRomRole(ordered);
+
+    // ✅ NEW: แทรก AQSS role เช่นเดียวกัน
+    ordered = insertAqssRole(ordered);
+
+    console.log(`🔌 [PLUGIN FLOW] order: ${ordered.map(t => t.name).join(' → ')}`);
+
+    const musicFn = opts?.musicModule !== undefined ? buildMusicInsertFn(opts.musicModule) : null;
+    let musicInsertPos = -1;
+    if (musicFn) {
+        const cgmdConfigIdx = ordered.findIndex(t => t.name.includes('CGMD Config'));
+        const minPos = cgmdConfigIdx === -1 ? 0 : cgmdConfigIdx + 1;
+        musicInsertPos = minPos + Math.floor(Math.random() * (ordered.length - minPos + 1));
+        console.log(`🎵 [Music][Plugin] จะแทรก Music/TSCENTER block ที่ index ${musicInsertPos} (min=${minPos}, total=${ordered.length})`);
+    }
+
+    ordered.forEach((t, idx) => {
+        if (musicFn && idx === musicInsertPos) {
+            musicFn();
+        }
+        const testName = poLabel ? `${t.name} ${poLabel}` : t.name;
+        declareTest(testName, () => {
+            if (beforeEachFn) beforeEachFn();
+            t.fn();
+        });
+    });
+    if (musicFn && musicInsertPos === ordered.length) {
+        musicFn();
+    }
 };
-
-// ─────────────────────────────────────────────
 // Test definitions
-// ─────────────────────────────────────────────
 const STANDARD_TESTS: TestEntry[] = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS', { searchBy: 'po' }) },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS', { searchBy: 'po' }) },
@@ -205,62 +435,118 @@ const STANDARD_TESTS: TestEntry[] = [
     { name: 'APO role', group: 'OTHER', fn: () => performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po', role: 'APO' }) },
 ];
 
+
 const PLUGIN_TESTS: TestEntry[] = [
     { name: 'CGMD Config cbs role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS', { searchBy: 'po' }) },
     { name: 'CGMD Tester CBS role', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS', { searchBy: 'po' }) },
     { name: 'Spadsup role', group: 'SPAD', fn: () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSupCGMDPlugin, { searchBy: 'po', role: 'SPAD' }) },
-    { name: 'CGMD Config cbs role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN', { searchBy: 'po', role: 'SPAD' }) },
-    { name: 'CGMD Tester CBS role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN', { searchBy: 'po', role: 'SPAD' }) },
+    { name: 'CGMD Config cbs role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPREMainNotComplex, 'PlugIN', { searchBy: 'po' }) },
+    { name: 'CGMD Tester CBS role (Plugin)', group: 'CGMD', fn: () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPREPlugin, 'PlugIN', { searchBy: 'po' }) },
 ];
 
 // ========================
 // AFTER MKT ONTOP FUNCTIONS POST
 // ========================
-
 export const afterMKTontopPOST = (): void => _afterMKTontopCommon('POST');
 export const afterMKTontopENTER = (): void => _afterMKTontopCommon('ENTER');
 export const afterMKTontopMUSIC = (): void => _afterMKTontopCommon('MUSIC');
 
-
 const _afterMKTontopCommon = (module: string): void => {
     executeCKSRole('ontop', () => {
+        RomID();
+        runMassEnhConfigurationIfPresent({
+            brandCount: 2,
+            productGroupCount: 2,
+            productPackageCount: 1,
+            classAttributeCount: 5,
+        });
         checkAndFillContentType();
         checkAndUpdatePriority();
         checkAndUpdateVerticalAppPriority();
         smsCKSPOST();
     });
-
     afterCKSCommon(module);
 };
+
 const afterCKSCommon = (Module: string): void => {
-    afterCKSPOST();
-    if (Module === 'MUSIC') {
-        performMusicRoles();
-    }
+    afterCKSPOST(Module, { enableMusicInsert: true });
 };
 
 // ========================
 // AFTER MKT FUNCTIONS
 // ========================
 export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void => {
-    const sasffTest = (): void => {
+    const getPoNamesToProcess = (): string[] => {
+        const allPoNames = Cypress.env('allPoNames') as string[] | undefined;
+        if (allPoNames && allPoNames.length > 0) return allPoNames;
+        const single = Cypress.env('poName') as string | undefined;
+        return single ? [single] : [''];
+    };
+
+    const setCurrentPo = (poName: string): void => {
+        Cypress.env('poName', poName);
+        Cypress.env('currentPoName', poName);
+    };
+
+    const registerSasffTest = (): void => {
         if (PoSubGroup === 'AccountFee' || PoSubGroup === 'OrderFee') {
-            it('SASFF role', () => {
-                loginAndWaitReady(sasff, sasffpass);
-                const finalProjectName = getStandardProjectName();
-                cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-                ClaimProject(finalProjectName);
-                approveProject(finalProjectName);
-                cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-                cy.url({ timeout: 60000 }).should('include', '/cgmd/sasff-tester');
-                cy.wait(500);
-                cy.scrollTo('bottom');
-                cy.wait(500);
-                cy.contains('button', 'Promote').should('be.visible').click({ force: true });
-                cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-                cy.contains('button', 'Logout').should('be.visible').click();
+            it('SASFF role (all POs)', () => {
+                const poNames = getPoNamesToProcess();
+                cy.log(`🔁 SASFF: Total PO to process: ${poNames.length}`);
+
+                poNames.forEach((poName, idx) => {
+                    const poLabel = poNames.length > 1 ? `[PO ${idx + 1}/${poNames.length}]` : '';
+                    if (!poName) cy.log(`⚠️ WARNING: poName ว่างเปล่าที่ index ${idx} ${poLabel}`);
+
+                    setCurrentPo(poName);
+                    loginAndWaitReady(sasff, sasffpass);
+
+                    cy.log(`Project ใช้สำหรับ Claim (PO mode) ${poLabel}: ${poName}`);
+                    ClaimProject(poName, { specificPoName: poName });
+                    approveProject(poName);
+
+                    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+                    cy.url({ timeout: 60000 }).should('include', '/cgmd/sasff-tester');
+                    cy.wait(500);
+                    cy.scrollTo('bottom');
+                    cy.wait(500);
+                    cy.contains('button', 'Promote').should('be.visible').click({ force: true });
+                    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+                    cy.contains('button', 'Logout').should('be.visible').click();
+                });
             });
         }
+    };
+
+    const runAqssIfNeeded = (poName: string, guard: () => boolean, labelSuffix: string): void => {
+        if (!guard()) {
+            cy.log(`⏭️ ข้าม AQSS role (${labelSuffix}) — เงื่อนไขไม่ตรงตอน runtime`);
+            return;
+        }
+        if (!poName || poName === 'Default_PO' || poName.startsWith('PO_')) {
+            cy.log(`⏭️ ข้าม AQSS role (${labelSuffix}) — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${poName})`);
+            return;
+        }
+        setCurrentPo(poName);
+        cy.log(`🚀 [afterMKTothersubgroup] Running AQSS role (${labelSuffix}) for: ${poName}`);
+        promoteToActmRole(aqss, aqsspass, 'AQSS');
+    };
+
+    const runRoleForAllPos = (
+        label: string,
+        getPoNames: () => string[],
+        action: (poName: string, idx: number, poLabel: string) => void
+    ): void => {
+        it(label, () => {
+            const poNames = getPoNames();
+            cy.log(`🔁 ${label}: Total PO to process: ${poNames.length}`);
+            poNames.forEach((poName, idx) => {
+                const poLabel = poNames.length > 1 ? `[PO ${idx + 1}/${poNames.length}]` : '';
+                if (!poName) cy.log(`⚠️ WARNING: poName ว่างเปล่าที่ index ${idx} ${poLabel}`);
+                setCurrentPo(poName);
+                action(poName, idx, poLabel);
+            });
+        });
     };
 
     if (Module === 'POST') {
@@ -268,28 +554,87 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
             'standard',
             () => { },
             () => {
-                it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB'));
-                it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB'));
-                sasffTest();
-                it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
-                it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER, { searchBy: 'po', role: 'OPER' }));
+                // ✅ CGMD Config IRB — เรียกครั้งเดียว, performRoleTaskWithAssignment จัดการครบทุก PO เอง
+                it('CGMD Config IRB role (all POs)', () => {
+                    performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB');
+                });
+
+                // ✅ AQSS (after CGMD Config) — ต้องเป็น per-PO จริง ใช้ runRoleForAllPos ต่อไป
+                runRoleForAllPos('AQSS role (after CGMD Config, all POs)', getPoNamesToProcess, (poName, idx, poLabel) => {
+                    runAqssIfNeeded(poName, shouldRunAqssAfterCgmd, `after CGMD Config ${poLabel}`);
+                });
+
+                // ✅ CGMD Tester IRB — เรียกครั้งเดียว
+                it('CGMD Tester IRB role (all POs)', () => {
+                    performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB');
+                });
+
+                registerSasffTest();
+
+                // ✅ ACTM — เรียกครั้งเดียว, performSimpleApprovalRole จัดการครบทุก PO เอง
+                it('ACTM role (all POs)', () => {
+                    performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' });
+                });
+
+                // ✅ OPER — เรียกครั้งเดียว
+                it('OPER role (all POs)', () => {
+                    performSimpleApprovalRole(oper, operpass, approveProjectOPER, { searchBy: 'po', role: 'OPER' });
+                });
+
+                runRoleForAllPos('AQSS role (after OPER/APO, all POs)', getPoNamesToProcess, (poName, idx, poLabel) => {
+                    runAqssIfNeeded(poName, shouldRunAqssAfterOper, `after OPER/APO ${poLabel}`);
+                });
             }
         );
-
     } else if (Module === 'PRE') {
         executeCKSRole(
             'standard',
             () => { },
             () => {
-                it('CGMD Config cbs role', () => performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS', { searchBy: 'po' }));
-                it('CGMD Tester CBS role', () => performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS', { searchBy: 'po' }));
-                sasffTest();
-                it('Spadsup role', () => performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup, { searchBy: 'po', role: 'SPAD' }));
-                it('Spaddoer role', () => performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER, { searchBy: 'po', role: 'SPAD' }));
-                it('Spadtester role', () => performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester, { searchBy: 'po', role: 'SPAD' }));
-                it('Spaddeploy role', () => performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy, { searchBy: 'po', role: 'SPAD' }));
-                it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
-                it('APO role', () => performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po', role: 'APO' }));
+                // ✅ CGMD Config cbs — เรียกครั้งเดียว
+                it('CGMD Config cbs role (all POs)', () => {
+                    performRoleTaskWithAssignment(cgccbs, cgccbspass, 'cgccbs', approveProjectCGMDPRE, 'CBS', { searchBy: 'po' });
+                });
+
+                runRoleForAllPos('AQSS role (after CGMD Config, all POs)', getPoNamesToProcess, (poName, idx, poLabel) => {
+                    runAqssIfNeeded(poName, shouldRunAqssAfterCgmd, `after CGMD Config ${poLabel}`);
+                });
+
+                // ✅ CGMD Tester CBS — เรียกครั้งเดียว
+                it('CGMD Tester CBS role (all POs)', () => {
+                    performRoleTaskWithAssignment(cgtcbs, cgtcbspass, 'cgtcbs', approveProjectCGMDtesterPRE, 'CBS', { searchBy: 'po' });
+                });
+
+                registerSasffTest();
+
+                // ✅ Spadsup — เรียกครั้งเดียว, performSimpleClaimAndApprovalRole จัดการครบทุก PO เอง
+                it('Spadsup role (all POs)', () => {
+                    performSimpleClaimAndApprovalRole(spadsup, spadsuppass, approveProjectSPADSup, { searchBy: 'po', role: 'SPAD' });
+                });
+
+                it('Spaddoer role (all POs)', () => {
+                    performSimpleClaimAndApprovalRole(spaddoer, spaddoerpass, approveProjectSPADDOER, { searchBy: 'po', role: 'SPAD' });
+                });
+
+                it('Spadtester role (all POs)', () => {
+                    performSimpleClaimAndApprovalRole(spadtest, spadtestpass, approveProjectSPADTester, { searchBy: 'po', role: 'SPAD' });
+                });
+
+                it('Spaddeploy role (all POs)', () => {
+                    performSimpleClaimAndApprovalRole(spaddp, spaddppass, approveProjectSPADdeploy, { searchBy: 'po', role: 'SPAD' });
+                });
+
+                it('ACTM role (all POs)', () => {
+                    performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' });
+                });
+
+                it('APO role (all POs)', () => {
+                    performSimpleApprovalRole(apo, apopass, approveProjectAPO, { searchBy: 'po', role: 'APO' });
+                });
+
+                runRoleForAllPos('AQSS role (after OPER/APO, all POs)', getPoNamesToProcess, (poName, idx, poLabel) => {
+                    runAqssIfNeeded(poName, shouldRunAqssAfterOper, `after OPER/APO ${poLabel}`);
+                });
             }
         );
     }
@@ -299,40 +644,35 @@ export const afterMKTMAINPOST = (): void => {
     executeCKSRole(
         'standard',
         () => {
+            RomID();
             checkAndFillContentType();
             checkAndUpdatePriority();
             checkAndUpdateVerticalAppPriority();
             smsCKSPOST();
             Tariff();
         },
-        () => afterCKSPOST()
+        () => afterCKSPOST(undefined, { enableMusicInsert: true })
     );
 };
 
 export const afterMKTMainUsagePOST = afterMKTMAINPOST;
-// ─────────────────────────────────────────────
-// CKS-level exports
-// ─────────────────────────────────────────────
+
 
 export const afterCKSCommonPRE = (Module: string): void => {
-    declareRoleTests(STANDARD_TESTS);
-    if (Module === 'MUSIC') performMusicRoles();
+    declareRoleTests(STANDARD_TESTS, { musicModule: Module });
 };
 
 export const afterCKSPREPlugin = (Module: string): void => {
-    declarePluginTests(PLUGIN_TESTS);
-    if (Module === 'MUSIC') performMusicRoles();
+    declarePluginTests(PLUGIN_TESTS, { musicModule: Module });
 };
 
-// ─────────────────────────────────────────────
 // Shared CKS step blocks PRE
-// ─────────────────────────────────────────────
-
 const stepsCKSMain = (): void => {
     dropdownRecurringCKSMain();
     unregister();
     addauto5gCKS();
     Topup();
+    RomID();
     checkAndFillContentType();
     checkAndUpdatePriority();
     checkAndUpdateVerticalAppPriority();
@@ -343,6 +683,7 @@ const stepsOntopPRE = (): void => {
     addauto5gCKS();
     dropdownRecurringCKS();
     diyflagCKS();
+    RomID();
     checkAndFillContentType();
     checkAndUpdatePriority();
     checkAndUpdateVerticalAppPriority();
@@ -359,30 +700,21 @@ const stepsOntopNotComplex = (): void => {
     checkAndUpdateVerticalAppPriority();
 };
 
-// ─────────────────────────────────────────────
 // MKT Main exports
-// ─────────────────────────────────────────────
-
 export const afterMKTOntop_NotComplex = (): void => {
     executeCKSRole(
         'standard',
         stepsOntopNotComplex,
-        () => declarePluginTests(PLUGIN_TESTS)
+        () => declarePluginTests(PLUGIN_TESTS, { musicModule: 'PRE' })
     );
 };
-
 
 const shouldCopyDeductFailEnhancement = (): boolean => {
     const module = Cypress.env('currentModule');
     const priceType = Cypress.env('currentPriceType');
     const productClass = Cypress.env('currentProductClass');
-
     const result = module === 'PRE' && priceType === 'recurring' && productClass === 'main';
-
-    cy.log(
-        `🔎 [shouldCopyDeductFailEnhancement] module="${module}", priceType="${priceType}", productClass="${productClass}" → ${result}`
-    );
-
+    cy.log(`🔎 [shouldCopyDeductFailEnhancement] module="${module}", priceType="${priceType}", productClass="${productClass}" → ${result}`);
     return result;
 };
 
@@ -393,7 +725,6 @@ const runCopyDeductFailIfNeeded = (): void => {
         cy.log('⚠️ ข้าม CopyDeductFail("enhancement") — เงื่อนไขไม่ตรง (ต้องเป็น Module=PRE, PriceType=recurring, ProductClass=main)');
     }
 };
-
 export const afterMKTMainPRE_FullSpadFlow = (): void => {
     executeCKSRole(
         'standard',
@@ -401,7 +732,7 @@ export const afterMKTMainPRE_FullSpadFlow = (): void => {
             stepsCKSMain();
             runCopyDeductFailIfNeeded();
         },
-        () => declareRoleTests(STANDARD_TESTS)
+        () => declareRoleTests(STANDARD_TESTS, { musicModule: 'PRE' })
     );
 };
 
@@ -412,15 +743,11 @@ export const afterMKTMainPRE_NotComplex = (): void => {
             stepsCKSMain();
             runCopyDeductFailIfNeeded();
         },
-        () => declarePluginTests(PLUGIN_TESTS)
+        () => declarePluginTests(PLUGIN_TESTS, { musicModule: 'PRE' })
     );
 };
 
-
-// ─────────────────────────────────────────────
 // MKT Ontop exports
-// ─────────────────────────────────────────────
-
 const _runOntop = (afterFn: (module: string) => void, module: string): void => {
     executeCKSRole(
         'ontop',
@@ -431,6 +758,7 @@ const _runOntop = (afterFn: (module: string) => void, module: string): void => {
 
 export const afterMKTontopPRE = (): void => _runOntop(afterCKSCommonPRE, 'PRE');
 export const afterMKTontopPREENTER = (): void => _runOntop(afterCKSCommonPRE, 'ENTER');
+export const afterMKTontopPREPlugin = (): void => _runOntop(afterCKSPREPlugin, 'PRE');
 export const afterMKTontopPREENTERPlugin = (): void => _runOntop(afterCKSPREPlugin, 'ENTER');
 export const afterMKTontopPREMusicPlugin = (): void => _runOntop(afterCKSPREPlugin, 'MUSIC');
 export const afterMKTontopPREMUSIC = (): void => _runOntop(afterCKSCommonPRE, 'MUSIC');
@@ -441,29 +769,16 @@ export const afterMKTontopPREUsageMusic = (): void => _runOntop(afterCKSCommonPR
 // ========================
 // BEFORE APPROVE MKT
 // ========================
-
 export const beforeapproveMKT = (): void => {
-
     const semiEN = [
-        'File description for this offering',
-        'Attached file for product team review',
-        'File description updated for this PO',
-        'Supporting file for internal reference',
-        'File description submitted for team review',
-        'Updated file attached for consideration',
-        'File pending sign-off and confirmation',
-        'File description included for this submission',
+        'File description for this offering', 'Attached file for product team review', 'File description updated for this PO',
+        'Supporting file for internal reference', 'File description submitted for team review', 'Updated file attached for consideration',
+        'File pending sign-off and confirmation', 'File description included for this submission',
     ];
-
     const semiTH = [
-        'คำอธิบายไฟล์สำหรับข้อเสนอนี้',
-        'ไฟล์แนบสำหรับทีมผลิตภัณฑ์',
-        'อัปเดตคำอธิบายไฟล์สำหรับ PO นี้',
-        'ไฟล์ประกอบสำหรับอ้างอิงภายใน',
-        'คำอธิบายไฟล์ส่งให้ทีมตรวจสอบ',
-        'แนบไฟล์ที่อัปเดตแล้วเพื่อประกอบการพิจารณา',
-        'ไฟล์รอการลงนามและยืนยัน',
-        'คำอธิบายไฟล์สำหรับการส่งมอบนี้',
+        'คำอธิบายไฟล์สำหรับข้อเสนอนี้', 'ไฟล์แนบสำหรับทีมผลิตภัณฑ์', 'อัปเดตคำอธิบายไฟล์สำหรับ PO นี้',
+        'ไฟล์ประกอบสำหรับอ้างอิงภายใน', 'คำอธิบายไฟล์ส่งให้ทีมตรวจสอบ', 'แนบไฟล์ที่อัปเดตแล้วเพื่อประกอบการพิจารณา',
+        'ไฟล์รอการลงนามและยืนยัน', 'คำอธิบายไฟล์สำหรับการส่งมอบนี้',
     ];
 
     const useThai = Math.random() < 0.5;
@@ -475,122 +790,198 @@ export const beforeapproveMKT = (): void => {
 
     cy.log(`📎 Attachment Description: ${attachmentDesc}`);
     cy.get('textarea[formcontrolname="fileDescription"]', { timeout: 10000 })
-        .should('be.visible')
-        .focus()
-        .clear({ force: true })
-        .type(attachmentDesc, { delay: 30 })
-        .trigger('input', { bubbles: true, force: true })
-        .trigger('change', { bubbles: true, force: true })
-        .blur({ force: true });
+        .should('be.visible').focus().clear({ force: true }).type(attachmentDesc, { delay: 30 })
+        .trigger('input', { bubbles: true, force: true }).trigger('change', { bubbles: true, force: true }).blur({ force: true });
 
     cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
     cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
 
     cy.get(':nth-child(3) > :nth-child(1) > .btn').click();
-    cy.contains('.row', 'Approve memo')
-        .find('input[type="checkbox"]')
-        .check({ force: true });
+    cy.contains('.row', 'Approve memo').find('input[type="checkbox"]').check({ force: true });
 
     cy.intercept('POST', '**/api-mkt/promoteFromMktDoer').as('submitApprove');
-    cy.get('button.btn.btn-primary.btn-xs.ng-star-inserted')
-        .contains('Submit')
-        .click();
+    cy.get('button.btn.btn-primary.btn-xs.ng-star-inserted').contains('Submit').click();
+    cy.wait(5000);
 
     cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@submitApprove', { timeout: 120000 }).its('response.statusCode').should('eq', 200);
 
-    // ===== 🔄 3. NAVIGATION & PROJECT WORKFLOW =====
     cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
 
-    // cy.wait(3000); // ⚠️ Hard wait ไม่แนะนำ ใช้ cy.get('...').should('exist') แทนถ้าเป็นไปได้
     const finalProjectName = getStandardProjectName();
     cy.log(`✅ Project ใช้สำหรับ Claim: ${finalProjectName}`);
-
     ClaimProject(finalProjectName, { claimBy: 'project' });
     approveProject(finalProjectName);
 
-    // ===== 📥 4. FINAL CHECK & SCROLL =====
     cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
     cy.scrollTo('bottom');
-    // cy.wait(500); // ⚠️ แทนที่ด้วย assertion ของ element ที่โผล่มาหลัง scroll จะเสถียรกว่า
-
     cy.url({ timeout: 120000 }).should('include', '/mkt/mktchecker');
     cy.get('button.btn.btn-xs.btn-primary').should('be.visible').click();
     cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
 
-    // ===== 🚪 5. LOGOUT =====
-    cy.contains('button', 'Logout').should('be.visible').click();
+    // cy.contains('button', 'Logout').should('be.visible').click();
 };
 
 // ========================
-// BEFORE APPROVE CKS (moved from cks-role)
+// BEFORE APPROVE CKS
 // ========================
 
-export const beforeapproveCKS = (): void => standardBeforeApproveCKS();
-export const beforeapproveCKSontop = (): void => standardBeforeApproveCKS();
-
-const standardBeforeApproveCKS = (): void => {
-    // backToCksDoer();
-
-    cy.contains('label', 'Fast Lane :').parent().next().find('input[type="checkbox"]').check();
-    cy.get('.row.col-md-11').find('input[type="checkbox"]').check();
-
-    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    cy.wait(['@getRequest'], { timeout: 30000 });
-
-    cy.get('input[aria-label="Date input field"]').eq(1).type(getTomorrowDateString());
-
-    cy.intercept('GET', '**/api-cks/PromoteFromCksDoer/**').as('submitApprove');
-    cy.contains('button', 'Approve').click();
-    cy.wait('@submitApprove', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-
-    cy.url({ timeout: 60000 }).should('include', '/#/workspace-home/workspace');
-    cy.wait(3000);
-
-    const finalProjectName = getStandardProjectName();
-    ClaimProject(finalProjectName, { claimBy: 'project' });
-    approveProject(finalProjectName);
-
-    cy.url({ timeout: 60000 }).should('include', '/#/new-flow/home/newcks/cks-checker');
-    cy.get('body', { timeout: 60000 }).should('be.visible');
-    cy.scrollTo('bottom');
-    cy.wait(500);
-
-    cy.intercept('GET', '**/api-cks/promoteFromCksCheckerToCenter/**').as('promoteChecker');
-    cy.intercept('POST', '**/api/flw-cgmd/assigneecgmdconfig/**').as('assignCgmd');
-
-    cy.contains('button', 'Approve To CGMD', { timeout: 60000 }).should('be.visible').click();
-
-    cy.wait('@promoteChecker', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@assignCgmd', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-
-    cy.url({ timeout: 60000 }).should('include', '/#/workspace-home/workspace');
-    cy.wait(500);
-    cy.contains('button', 'Logout').should('be.visible').click();
+export const beforeapproveCKS = (): void => {
+    executeCKSRole('standard', () => { });
 };
 
+export const beforeapproveCKSontop = (): void => {
+    executeCKSRole('ontop', () => { });
+};
 // ========================
-// AFTER CKS POST (moved from cks-role)
+// ✅ AFTER CKS POST (รองรับ ROM ราย PO + AQSS + Debug Log)
 // ========================
 
-export const afterCKSPOST = (Module?: string): void => {
+export const afterCKSPOST = (Module?: string, opts?: { enableMusicInsert?: boolean }): void => {
+    const poCount = Number(Cypress.env('poCount')) || 1;
+    const totalRuns = Math.max(poCount, 1);
+    const enableMusicInsert = opts?.enableMusicInsert ?? false;
+
     it('CGMD Config IRB role', () => performRoleTaskWithAssignment(cgcirb, cgcirbpass, 'cgcirb', approveProjectCGMD, 'IRB', { searchBy: 'po' }));
-    it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB', { searchBy: 'po' }));
-    it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
-    it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER, { searchBy: 'po', role: 'OPER' }));
+
+    const restSteps: (() => void)[] = [];
+
+    restSteps.push(() => {
+        it('AQSS role (after CGMD Config)', () => {
+            if (!shouldRunAqssAfterCgmd()) {
+                cy.log('⏭️ ข้าม AQSS role (after CGMD Config) — เงื่อนไขไม่ตรงตอน runtime');
+                return;
+            }
+            const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+            if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                cy.log(`⏭️ ข้าม AQSS role — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                return;
+            }
+            Cypress.env('poName', activePoName);
+            cy.log(`🚀 [afterCKSPOST] Running AQSS role (after CGMD Config) for: ${activePoName}`);
+            promoteToActmRole(aqss, aqsspass, 'AQSS');
+        });
+    });
+
+    restSteps.push(() => {
+        it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB', { searchBy: 'po' }));
+    });
+
+    for (let i = 0; i < totalRuns; i++) {
+        const poLabel = totalRuns > 1 ? `[PO ${i + 1}/${totalRuns}]` : '';
+
+        restSteps.push(() => {
+            it(`ROM role ${poLabel}`.trim(), () => {
+                if (!shouldRunRomRole()) {
+                    cy.log('⏭️ ข้าม ROM role — เงื่อนไข hasRom/hasEasyAppRom ไม่ตรงตอน runtime');
+                    return;
+                }
+
+                const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+
+                if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                    cy.log(`⏭️ ข้าม ROM role — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                    return;
+                }
+
+                Cypress.env('poName', activePoName);
+                cy.log(`🚀 [afterCKSPOST] Running ROM role for: ${activePoName}`);
+                promoteToActmRole(rom, rompass, 'ROM');
+            });
+        });
+
+        restSteps.push(() => {
+            it(`Easy App ROM role ${poLabel}`.trim(), () => {
+                if (!shouldRunEasyAppRomRole()) {
+                    cy.log('⏭️ ข้าม Easy App ROM role — เงื่อนไข hasEasyAppRom ไม่ตรงตอน runtime');
+                    return;
+                }
+
+                const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+
+                if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                    cy.log(`⏭️ ข้าม Easy App ROM role — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                    return;
+                }
+
+                Cypress.env('poName', activePoName);
+                cy.log(`🚀 [afterCKSPOST] Running Easy App ROM role for: ${activePoName}`);
+                promoteToActmRole(ckseasyapp, ckseasyapppass, 'Easy App ROM');
+            });
+        });
+    }
+
+    restSteps.push(() => {
+        it('ACTM role', () => performSimpleApprovalRole(actm, actmpass, approveProjectACTM, { searchBy: 'po', role: 'ACTM' }));
+    });
+    restSteps.push(() => {
+        it('OPER role', () => performSimpleApprovalRole(oper, operpass, approveProjectOPER, { searchBy: 'po', role: 'OPER' }));
+    });
+
+    restSteps.push(() => {
+        it('AQSS role (after OPER/APO)', () => {
+            if (!shouldRunAqssAfterOper()) {
+                cy.log('⏭️ ข้าม AQSS role (after OPER/APO) — เงื่อนไขไม่ตรงตอน runtime');
+                return;
+            }
+            const activePoName = Cypress.env('currentPoName') || Cypress.env('poName');
+            if (!activePoName || activePoName === 'Default_PO' || activePoName.startsWith('PO_')) {
+                cy.log(`⏭️ ข้าม AQSS role — ไม่พบชื่อ PO ที่ถูกต้อง (ค่าปัจจุบัน: ${activePoName})`);
+                return;
+            }
+            Cypress.env('poName', activePoName);
+            cy.log(`🚀 [afterCKSPOST] Running AQSS role (after OPER/APO) for: ${activePoName}`);
+            promoteToActmRole(aqss, aqsspass, 'AQSS');
+        });
+    });
+
+    if (enableMusicInsert) {
+        const musicFn = buildMusicInsertFn(Module);
+        if (musicFn) {
+            const insertPos = Math.floor(Math.random() * (restSteps.length + 1));
+            console.log(`🎵 [afterCKSPOST] จะแทรก Music/TSCENTER block ที่ index ${insertPos} / ${restSteps.length}`);
+            restSteps.splice(insertPos, 0, musicFn);
+        }
+    }
+
+    restSteps.forEach(step => step());
 };
 
 // ========================
-// MUSIC ROLES (moved from cks-role)
+// MUSIC ROLES
 // ========================
+const shouldRunMusicFullChain = (Module?: string): boolean =>
+    Module === 'MUSIC' || Cypress.env('hasYoutubePremium') === true;
 
-export const performMusicRoles = (): void => {
+const shouldRunTscenterOnly = (): boolean =>
+    Cypress.env('hasCloudGame') === true;
+
+const buildMusicInsertFn = (Module?: string): (() => void) | null => {
+    if (shouldRunMusicFullChain(Module)) {
+        return () => {
+            console.log('🎬 [Dispatcher] Running FULL performMusicRoles() chain (random position, after CGMD Config)');
+            performMusicRoles();
+        };
+    }
+    if (shouldRunTscenterOnly()) {
+        return () => {
+            console.log('☁️ [Dispatcher] Running TSCENTER role only (Cloud Game) (random position, after CGMD Config)');
+            performTscenterRoleOnly();
+        };
+    }
+    return null;
+};
+
+export const runMusicOrTscenterIfNeeded = (Module?: string): void => {
+    const fn = buildMusicInsertFn(Module);
+    if (fn) fn();
+};
+export const performTscenterRoleOnly = (): void => {
     it('TSCENTER role', () => {
         loginAndWaitReady(tscenter, tscenterpass);
-
         const finalProjectName = getStandardProjectName();
         cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
         ClaimProject(finalProjectName, { claimBy: 'project' });
@@ -607,41 +998,59 @@ export const performMusicRoles = (): void => {
         cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
         cy.contains('button', 'Logout').should('be.visible').click();
     });
+};
+export const performMusicRoles = (): void => {
+    performTscenterRoleOnly();
 
     const performSupportRole = (roleUser: any, rolePass: any, urlPart: string, btnText: string) => {
         it(`${urlPart} role`, () => {
             loginAndWaitReady(roleUser, rolePass);
             const finalProjectName = getStandardProjectName();
             cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-            ClaimProject(finalProjectName);
-            approveProject(finalProjectName);
-            cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
 
             let checkUrl = '';
-            if (urlPart === 'csisp') checkUrl = '/zenon/csi-support';
-            else if (urlPart === 'aafsp') checkUrl = '/zenon/aaf-support';
-            else if (urlPart === 'csidp') checkUrl = '/zenon/csi-support';
-            else if (urlPart === 'aafdp') checkUrl = '/zenon/aaf-support';
+            if (urlPart === 'csisp' || urlPart === 'csidp') checkUrl = '/zenon/csi-support';
+            else if (urlPart === 'aafsp' || urlPart === 'aafdp') checkUrl = '/zenon/aaf-support';
+            else if (urlPart === 'ssbsp' || urlPart === 'ssbdp') checkUrl = '/zenon/ssb-support';
+            else if (urlPart === 'cpcsp' || urlPart === 'cpcdp') checkUrl = '/zenon/cpc-support';
             else checkUrl = urlPart;
 
-            cy.url({ timeout: 60000 }).should('include', checkUrl);
-            cy.wait(500);
-            cy.scrollTo('bottom');
-            cy.wait(500);
-            cy.contains('button', btnText).should('be.visible').click({ force: true });
-            cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-            cy.contains('button', 'Logout').should('be.visible').click();
+            projectExistsInTable('Unassigned Task', finalProjectName).then((projectFound) => {
+                if (!projectFound) {
+                    cy.log(`⚠️ ไม่พบ Project "${finalProjectName}" สำหรับ role ${urlPart} — ข้ามไปทำ role ถัดไป`);
+                    cy.get('body').then(($b2) => {
+                        if ($b2.find('button:contains("Logout")').length > 0) {
+                            cy.contains('button', 'Logout').click({ force: true });
+                        }
+                    });
+                    return;
+                }
+
+                ClaimProject(finalProjectName, { claimBy: 'project' });
+                approveProject(finalProjectName);
+                cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+
+                cy.url({ timeout: 60000 }).should('include', checkUrl);
+                cy.wait(500);
+                cy.scrollTo('bottom');
+                cy.wait(500);
+                cy.contains('button', btnText).should('be.visible').click({ force: true });
+                cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+                cy.contains('button', 'Logout').should('be.visible').click();
+            });
         });
     };
 
     performSupportRole(csisp, csisppass, 'csisp', 'Promote To E2E Tester');
     performSupportRole(aafsp, aafsppass, 'aafsp', 'Promote To E2E Tester');
+    performSupportRole(ssbsp, ssbsppass, 'ssbsp', 'Promote To E2E Tester');
+    performSupportRole(cpcsp, cpcsppass, 'cpcsp', 'Promote To E2E Tester');
 
     it('e2etest role', () => {
         loginAndWaitReady(e2etest, e2etestpass);
         const finalProjectName = getStandardProjectName();
         cy.log('🎯 Project ใช้สำหรับ Claim: ' + finalProjectName);
-        ClaimProject(finalProjectName);
+        ClaimProject(finalProjectName, { claimBy: 'project' });
         approveProject(finalProjectName);
         cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
         cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
@@ -679,18 +1088,19 @@ export const performMusicRoles = (): void => {
 
     performSupportRole(csidp, csidppass, 'csidp', 'Promote To E2E Deploy');
     performSupportRole(aafdp, aafdppass, 'aafdp', 'Promote To E2E Deploy');
+    performSupportRole(ssbdp, ssbdppass, 'ssbdpp', 'Promote To E2E Deploy');
+    performSupportRole(cpcdp, cpcdppass, 'cpcdp', 'Promote To E2E Deploy');
 
     it('e2edp role', () => {
         loginAndWaitReady(e2edp, e2edppass);
         const finalProjectName = getStandardProjectName();
         cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-        ClaimProject(finalProjectName);
+        ClaimProject(finalProjectName, { claimBy: 'project' });
         approveProject(finalProjectName);
         cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
         cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
         cy.wait(500);
         cy.scrollTo('bottom');
-        cy.wait(500);
         cy.contains('button', 'Approve to Pre Go live').should('be.visible').click({ force: true });
         cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
         cy.contains('button', 'Logout').should('be.visible').click();

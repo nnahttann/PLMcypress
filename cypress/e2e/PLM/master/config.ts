@@ -19,6 +19,13 @@ export const {
     tscenter, tscenterpass,
     aafsp, aafsppass,
     csisp, csisppass,
+    ssbsp, ssbsppass,
+    ssbdp, ssbdppass,
+    cpcsp, cpcsppass,
+    cpcdp, cpcdppass,
+    rom, rompass,
+    ckseasyapp, ckseasyapppass,
+    aqss, aqsspass,
     e2etest, e2etestpass,
     aafdp, aafdppass,
     csidp, csidppass,
@@ -54,4 +61,6 @@ export interface ProjectBasicOptions {
     subModule?: 'POST' | 'PRE';
     autoSetDuration?: boolean;
     Plugin?: string;
+    runHumanTouchPoint?: boolean;
+    runNonHumanTouchPoint?: boolean;
 }

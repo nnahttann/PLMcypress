@@ -5,11 +5,17 @@ import { Module } from './config';
 // ========================
 
 export const selectRandomOption = (labelName: string): void => {
-    cy.contains('label', labelName).parent().next('div').find('mat-select').click();
-    cy.get('mat-option').then($options => {
-        const randomIndex = Math.floor(Math.random() * $options.length);
-        cy.wrap($options[randomIndex]).click({ force: true });
-    });
+    cy.contains('label', labelName)
+        .parent()
+        .next('div')
+        .find('mat-select')
+        .click()
+        .then(() => {
+            cy.get('mat-option').then($options => {
+                const randomIndex = Math.floor(Math.random() * $options.length);
+                cy.wrap($options[randomIndex]).click({ force: true });
+            });
+        });
 };
 
 export const handleAddToUSMP = (): void => {
@@ -17,49 +23,20 @@ export const handleAddToUSMP = (): void => {
         if ($body.find('button:contains("Add to USMP")').length > 0) {
             cy.log('🟢 Found Add to USMP button, clicking...');
             cy.contains('button', 'Add to USMP').click();
-
-            // ⏳ Don't inspect DOM synchronously right after click.
-            // Give Angular time to render the modal, then assert on it.
-            cy.get('body', { timeout: 10000 }).then(($b) => {
-                const hasBootstrapModal = $b.find('.modal.fade.in').length > 0;
-                const hasAngularDialog = $b.find('.mat-dialog-container').length > 0;
-
-                if (hasBootstrapModal || hasAngularDialog) {
-                    const selector = hasBootstrapModal ? '.modal.fade.in' : '.mat-dialog-container';
-                    cy.log(hasBootstrapModal ? '📦 Bootstrap modal detected' : '📦 Angular dialog detected');
-
-                    // Wait for it to actually be visible (handles animation delay)
-                    cy.get(selector, { timeout: 10000 })
-                        .last() // in case a stale modal is still in DOM, grab the most recent
+            cy.wait(5000);
+            
+            // Single combined selector query instead of multiple checks
+            cy.get('.modal.fade.in, .mat-dialog-container', { timeout: 10000 })
+                .last()
+                .should('be.visible')
+                .within(() => {
+                    cy.contains('button', /Close|OK|ปิด/i, { timeout: 10000 })
                         .should('be.visible')
-                        .within(() => {
-                            cy.contains('button', /Close|OK|ปิด/i, { timeout: 10000 })
-                                .should('be.visible')
-                                .click();
-                        });
-
-                    // Confirm it actually closed, to catch silent failures
-                    cy.get(selector, { timeout: 10000 }).should('not.exist');
-                } else {
-                    cy.log('⚠️ ไม่พบ modal/dialog ทันที — รอเช็คอีกครั้ง...');
-
-                    // Fallback: give it one more chance with cy.get's built-in retry,
-                    // in case the modal appeared slightly after our first check.
-                    cy.get('body').then(($b2) => {
-                        if ($b2.find('.modal.fade.in, .mat-dialog-container').length > 0) {
-                            cy.log('📦 Modal appeared on second check');
-                            cy.get('.modal.fade.in, .mat-dialog-container')
-                                .last()
-                                .should('be.visible')
-                                .within(() => {
-                                    cy.contains('button', /Close|OK|ปิด/i).click();
-                                });
-                        } else {
-                            cy.log('⚪ ยืนยันว่าไม่มี modal/dialog — ข้ามการปิด');
-                        }
-                    });
-                }
-            });
+                        .click();
+                })
+                .then(() => {
+                    cy.get('.modal.fade.in, .mat-dialog-container', { timeout: 10000 }).should('not.exist');
+                });
         } else {
             cy.log('⚪ Add to USMP button not found, skipping...');
         }
@@ -74,15 +51,11 @@ export const scrollAndWait = (ms: number = 2000): void => {
 export const clickYesIfExists = (timeout: number = 10000, position: 'first' | 'last' = 'last'): void => {
     cy.get('body').then(($body) => {
         if ($body.find('button:contains("Yes")').length > 0) {
-            cy.get('button').contains('Yes', { timeout }).eq(position === 'first' ? 0 : -1).click();
-        }
-    });
-};
-
-export const clickButtonIfExists = (buttonText: string, timeout: number = 10000): void => {
-    cy.get('body').then(($body) => {
-        if ($body.find(`button:contains("${buttonText}")`).length > 0) {
-            cy.contains('button', buttonText, { timeout }).click();
+            cy.get('button')
+                .contains('Yes', { timeout })
+                .then(($btn) => {
+                    cy.wrap($btn).eq(position === 'first' ? 0 : -1).click();
+                });
         }
     });
 };
@@ -95,7 +68,14 @@ export const getRandomPhone = (): string => {
 // LOGIN FUNCTIONS
 // ========================
 
-export const login = (username: string, password: string): void => {
+export const login = (username: string | undefined, password: string | undefined): void => {
+    const safeUsername = String(username ?? '').trim();
+    const safePassword = String(password ?? '').trim();
+
+    if (!safeUsername || !safePassword) {
+        cy.log('⚠️ Login credentials missing; typing empty values to avoid Cypress type() failures.');
+    }
+
     cy.get('app-login', { timeout: 60000 }).should('be.visible');
     cy.get('form', { timeout: 30000 }).should('be.visible');
 
@@ -103,13 +83,15 @@ export const login = (username: string, password: string): void => {
         .should('exist')
         .should('be.visible')
         .should('not.be.disabled')
-        .clear()
-        .type(username, { delay: 50 });
+        .clear({ force: true })
+        .type(safeUsername, { delay: 0, force: true });
 
-    cy.get('input[name="pwd"]')
+    cy.get('input[name="pwd"]', { timeout: 30000 })
+        .should('exist')
         .should('be.visible')
-        .clear()
-        .type(password, { delay: 50 });
+        .should('not.be.disabled')
+        .clear({ force: true })
+        .type(safePassword, { delay: 0, force: true });
 
     cy.intercept('GET', '/PLMSpringBoot/api/plm-error-code/getAll').as('getErrorCodes');
 
@@ -125,8 +107,6 @@ export const login = (username: string, password: string): void => {
 
 export const loginAndWaitReady = (username: string, password: string): void => {
     login(username, password);
-//     cy.intercept('GET', '**/api/plm-error-code/getAll').as('getErrorCodes');
-//     cy.wait('@getErrorCodes', { timeout: 20000 }).its('response.statusCode').should('eq', 200);
 };
 
 // ========================
@@ -142,12 +122,13 @@ export const searchInTableWithPagination = (
         filterCallback?: ($row: JQuery<HTMLElement>, index: number) => boolean;
     } = {}
 ): void => {
-    const { waitAfterNext = 4000, filterCallback } = options;
+    const { waitAfterNext = 2000, filterCallback } = options;
 
     const searchInCurrentPage = (): Cypress.Chainable<boolean> => {
-        return cy.get('h3').contains(sectionHeader, { timeout: 100000 })
+        return cy.get('h3')
+            .contains(sectionHeader, { timeout: 100000 })
             .parent()
-            .find('tbody tr')
+            .find('tbody tr', { timeout: 10000 })
             .should(($rows) => {
                 expect($rows.text()).not.to.contain('Fetching data');
             })
@@ -157,10 +138,9 @@ export const searchInTableWithPagination = (
                 let found = false;
                 let matchingIndex = -1;
 
-                $rows.each((index: number, row: HTMLElement) => {
-                    if (found) return;
-
-                    const $row = Cypress.$(row);
+                // Early exit loop for performance
+                for (let index = 0; index < $rows.length && !found; index++) {
+                    const $row = Cypress.$($rows[index]);
                     const rowText = $row.text().trim();
 
                     const matches = filterCallback
@@ -172,7 +152,7 @@ export const searchInTableWithPagination = (
                         found = true;
                         cy.log(`✅ Found match at row ${index}`);
                     }
-                });
+                }
 
                 if (found && matchingIndex >= 0) {
                     rowCallback(Cypress.$(), matchingIndex);
@@ -183,30 +163,32 @@ export const searchInTableWithPagination = (
     };
 
     const clickNextAndWait = (): Cypress.Chainable<boolean> => {
-        return cy.get('body').then(($body) => {
-            const $section = $body.find(`h3:contains("${sectionHeader}")`).parent();
-            const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+        return cy.get('h3')
+            .contains(sectionHeader, { timeout: 100000 })
+            .parent()
+            .then(($section) => {
+                const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
 
-            if ($nextBtn.length > 0) {
-                cy.log(`➡️ ${sectionHeader} - Going to next page...`);
+                if ($nextBtn.length > 0) {
+                    cy.log(`➡️ ${sectionHeader} - Going to next page...`);
 
-                const firstRowTextBefore = $section.find('tbody tr').first().text().trim();
+                    const firstRowTextBefore = $section.find('tbody tr').first().text().trim();
 
-                cy.wrap($nextBtn).click();
+                    cy.wrap($nextBtn).click();
 
-                cy.get('h3').contains(sectionHeader, { timeout: 100000 })
-                    .parent()
-                    .find('tbody tr')
-                    .should(($rows) => {
-                        expect($rows.first().text().trim()).not.to.equal(firstRowTextBefore);
-                        expect($rows.text()).not.to.contain('Fetching data');
-                    });
+                    cy.get('h3').contains(sectionHeader, { timeout: 100000 })
+                        .parent()
+                        .find('tbody tr')
+                        .should(($rows) => {
+                            expect($rows.first().text().trim()).not.to.equal(firstRowTextBefore);
+                            expect($rows.text()).not.to.contain('Fetching data');
+                        });
 
-                cy.wait(waitAfterNext);
-                return cy.wrap(true);
-            }
-            return cy.wrap(false);
-        });
+                    cy.wait(waitAfterNext);
+                    return cy.wrap(true);
+                }
+                return cy.wrap(false);
+            });
     };
 
     const searchPage = (pageNum: number = 1): void => {

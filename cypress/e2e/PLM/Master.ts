@@ -1,10 +1,7 @@
 // ========================
 // BARREL RE-EXPORT FILE
-// Master.ts - Re-exports all functions from modular files
-// All existing imports (import * as Master from '../../Master') continue to work unchanged
 // ========================
 
-// Config: env vars, types, date helpers
 export {
     urlsit,
     MKTpre, MKTpre1, MKTpost, MKTpost1,
@@ -46,13 +43,11 @@ export {
     getOntopProjectName,
 } from './master/project-manager';
 
-// Helpers
 export {
     selectRandomOption,
     handleAddToUSMP,
     scrollAndWait,
     clickYesIfExists,
-    clickButtonIfExists,
     getRandomPhone,
     login,
     loginAndWaitReady,
@@ -122,6 +117,7 @@ export {
     afterMKTOntop_NotComplex,
     afterMKTontopPRE,
     afterMKTontopPREENTER,
+    afterMKTontopPREPlugin,
     afterMKTontopPREENTERPlugin,
     afterMKTontopPREMusicPlugin,
     afterMKTontopPREMUSIC,
@@ -137,6 +133,7 @@ export {
     ProjectBasicInformationCompleteOtherPOSub,
     backBacicInfo,
     addFile,
+    ProjectBasicInformationCompleteModify
 } from './master/project-creation';
 
 // Product Specs
@@ -199,3 +196,17 @@ export {
     RandomRemark,
     RandomProjectDescription,
 } from './Approve/po-wording-pools';
+
+export * from './master/reject_flow';
+
+export {
+    performRoleTaskWithAssignment,
+} from './master/claim-approve';
+
+// Modify Section
+export {
+    selectModifySections,
+    fillSelectedModifySections,
+    fillProductDefinitionSection,
+    fillSmsWordingSection,
+} from './master/modify';

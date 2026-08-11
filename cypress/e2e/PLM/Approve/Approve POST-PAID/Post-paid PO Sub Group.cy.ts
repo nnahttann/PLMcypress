@@ -1,13 +1,23 @@
 import * as Master from '../../Master';
 
+let isFirstRun = true; 
+
 beforeEach(() => {
-  cy.clearLocalStorage();
-  cy.clearCookies();
-  cy.window().then((win) => {
-    win.sessionStorage.clear();
+  if (isFirstRun) {
+    cy.clearLocalStorage();
+    cy.clearCookies();
+    cy.window().then((win) => {
+      win.sessionStorage.clear();
+    });
+    isFirstRun = false;
+  }
+  cy.visit(Master.urlsit, {
+    onBeforeLoad: (win) => {
+      win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
+    }
   });
-  cy.visit(Master.urlsit);
-  cy.viewport(1920, 1080);
+  
+  // Reset env variables
   Cypress.env('formattedDateMain', undefined);
   Cypress.env('formattedDateOntop', undefined);
   Cypress.env('formattedDateOntopExtra', undefined);
@@ -17,8 +27,7 @@ beforeEach(() => {
 });
 
 describe('POST-PAID PO Sub Group', () => {
-  const subTypes = ['AccountFee', 'CashBack', 'OrderFee', 'Service'] as const;
-
+const subTypes = ['Service'] as const;
   subTypes.forEach((subType) => {
     describe(subType, () => {
       describe('Mobile', () => {

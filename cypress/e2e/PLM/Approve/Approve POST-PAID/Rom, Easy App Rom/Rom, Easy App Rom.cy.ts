@@ -1,4 +1,4 @@
-import * as Master from '../../Master';
+import * as Master from '../../../Master';
 
 type PriceType = 'onetime' | 'recurring' | 'usage';
 
@@ -21,11 +21,11 @@ beforeEach(() => {
 });
 
 describe('POST-PAID Main', () => {
-  const priceTypes: PriceType[] = ['onetime'];
+const priceTypes: PriceType[] = ['recurring'];
   priceTypes.forEach((priceType) => {
     describe(`MKT POSTPAID ${priceType}`, () => {
       it('MKT POSTPAID role', () => {
-        Master.ProjectBasicInformationComplete(priceType, 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
+        Master.ProjectBasicInformationComplete(priceType, 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true,runHumanTouchPoint: true });
       });
       if (priceType === 'usage') {
         Master.afterMKTMainUsagePOST();

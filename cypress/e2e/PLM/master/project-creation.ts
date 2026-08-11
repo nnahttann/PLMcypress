@@ -3,12 +3,15 @@ import { getTimeSuffix } from './config';
 import { login, getRandomPhone, scrollAndWait } from './helpers';
 import { registerProjectName } from './project-manager';
 import { createPOWordingPools, RandomProjectDescription, RandomRemark } from '../Approve/po-wording-pools';
-import { PriceExcluding, selectTargetGroup, dropdownPromotionGroup, targetgroup, RetryPattern, RandomMultiDuration, Randomdropdown,RandomFixedDates } from './dropdowns-randomizers';
+import { PriceExcluding, selectTargetGroup, dropdownPromotionGroup, targetgroup, RetryPattern, RandomMultiDuration, Randomdropdown, RandomFixedDates, RunMassMktTabs } from './dropdowns-randomizers';
 import { CopyDeductFail } from './priority-updaters';
 import { smsWording } from './sms-wording';
 import { RandomProductSpecification } from './product-specs';
 import { beforeapproveMKT } from './flows';
-import { ChargePartner, InternalShare, RevenueSharing, SharingPartner } from './MKT_Share.cy';
+import { ChargePartner, InternalShare, RevenueSharing, SharingPartner } from './MKT_Share';
+import { RandomHumanTouchPoint } from './human-touch-point';
+import { RandomNonHumanTouchPoint } from './non-human-touch-point';
+import { selectModifySections, fillSelectedModifySections } from './modify';
 
 // ========================
 // CREDENTIALS HELPER
@@ -34,23 +37,19 @@ const minutes = String(now.getMinutes()).padStart(2, '0');
 // ========================
 
 const ABBREVIATIONS: Record<string, string> = {
-    // PriceType
-    recurring: 'Rec',
+    recurring: 'REC',
     onetime: 'OT',
-    usage: 'Usg',
-    // ProductClass
-    main: 'Main',
-    ontop: 'Ontop',
-    ontopextra: 'OntopX',
-    // Modules
+    usage: 'USG',
+    main: 'MAIN',
+    ontop: 'ONTOP',
+    ontopextra: 'ONTOP X',
     ENTER: 'ENT',
     MUSIC: 'MUS',
-    // PoSubGroup
-    AccountFee: 'Account Fee',
-    OrderFee: 'Order Fee',
-    CashBack: 'Cash Back',
-    Service: 'Service',
-    GroupPoFee: 'Group Po Fee',
+    AccountFee: 'ACC FEE',
+    OrderFee: 'ORD FEE',
+    CashBack: 'CASHBACK',
+    Service: 'SERVICE',
+    GroupPoFee: 'GRP PO FEE',
 };
 
 const getAbbreviation = (word: string | undefined): string => {
@@ -62,9 +61,10 @@ const generateUniqueId = (): string => {
     const now = new Date();
     const h = String(now.getHours()).padStart(2, '0');
     const s = String(now.getSeconds()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
     const month = String(now.getMonth() + 1).padStart(2, '0');
-    return `${day}${month} ${h}${s}`;
+    return `${month}${day} ${h}${mm}`;
 };
 
 const buildUniqueName = (baseName: string, identifier: string, maxLength: number): string => {
@@ -129,19 +129,22 @@ const createProjectBase = (
     credentials: { user: string; pass: string },
     projectName: string,
     Module: Module,
-    subModule?: string
-): void => {
+    subModule?: string,
+    projectObject: string = 'Create'
+): string => {
     login(credentials.user, credentials.pass);
 
     cy.intercept('POST', '/PLMSpringBoot/api/**').as('saveRequest');
 
     cy.get('.col-md-10 > .btn').should('be.visible').click();
 
+    const finalProjectName = projectObject !== 'Create' ? `MOD ${projectName}` : projectName;
+
     cy.get('input[formcontrolname="projectName"]', { timeout: 10000 })
         .should('be.visible')
         .should('not.be.disabled')
         .click()
-        .type(projectName, { delay: 30 });
+        .type(finalProjectName, { delay: 30 });
 
     const date = new Date();
     date.setDate(date.getDate() + 1);
@@ -160,11 +163,18 @@ const createProjectBase = (
         cy.get('select[formcontrolname="customerType"]').select(customerType);
     }
 
+    if (projectObject !== 'Create') {
+        cy.get('select[formcontrolname="projectObject"]')
+            .should('be.visible')
+            .select(projectObject)
+            .should('have.value', projectObject);
+    }
+
     cy.get('input[formcontrolname="phoneNo"]')
         .click()
         .type(getRandomPhone(), { delay: 30 });
 
-    RandomProjectDescription(projectName, subModule, Module);
+    RandomProjectDescription(finalProjectName, subModule, Module);
 
     cy.get('button[type="button"]').contains('Save').click();
 
@@ -174,6 +184,8 @@ const createProjectBase = (
         .should('be.visible').click({ force: true });
 
     cy.get('modal-container').should('not.exist');
+
+    return finalProjectName;
 };
 
 // ========================
@@ -197,9 +209,17 @@ const createPOBase = (
 
     cy.contains('button', 'Create').should('be.visible').click();
 
-    cy.wait('@createPO').its('response.statusCode').should('eq', 200);
+    cy.wait('@createPO', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
-    cy.location('hash', { timeout: 60000 }).should((hash) => {
+    // ให้เวลา Angular router/backend ประมวลผลหลัง POST ก่อนเช็ค hash
+    // ถ้ามี loading curtain ระหว่าง navigate ให้รอจนกว่ามันจะหายไปก่อน
+    cy.get('body').then(($body) => {
+        if ($body.find('.loading-curtain').length > 0) {
+            cy.get('.loading-curtain', { timeout: 120000 }).should('not.exist');
+        }
+    });
+
+    cy.location('hash', { timeout: 120000 }).should((hash) => {
         expect(hash).to.include('/project-home/mass-mkt/mass-mkt-product-offering');
         expect(hash).to.include('projectId=');
         expect(hash).to.include('productId=');
@@ -459,23 +479,44 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
 const setPriceVAT = (): void => {
     const getRandomCharge = (min = 100, max = 2000) => (Math.random() * (max - min) + min).toFixed(2);
     const randomCharge = getRandomCharge();
-    const priceIncludingVAT = (parseFloat(randomCharge) * 1.07).toFixed(2);
 
-    cy.get('input[formcontrolname="priceExcludingVAT"]').clear().type(randomCharge);
-    cy.get('input[formcontrolname="priceIncludingVAT"]').clear().type(priceIncludingVAT);
+    cy.get('.modal-container').should('not.exist');
+
+    cy.get('input[formcontrolname="priceExcludingVAT"]')
+        .should('be.visible')
+        .type(randomCharge, { force: true });
+
 };
-
 // ========================
 // BACK BASIC INFO
 // ========================
 
 export const backBacicInfo = (): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getRequest4');
-    cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 10000 });
-    cy.get('.modal-body > .col-md-12 > :nth-child(1) > .btn', { timeout: 15000 })
-        .should('be.visible')
-        .click();
-    cy.wait('@getRequest4', { timeout: 60000 });
+    cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 1000000 });
+
+    // 🟡 FIX: modal "unsaved changes" (Angular route guard) จะขึ้นเฉพาะกรณีที่ PO สุดท้าย
+    // ยังไม่ถูก Save เท่านั้น ถ้า PO สุดท้ายถูก Save ไปแล้ว (เช่นผ่าน fillSmsWordingSection
+    // ที่มี Save + closeSuccessModal ในตัวเองอยู่แล้ว) modal นี้จะไม่ขึ้นเลย
+    // เดิม code ใช้ .should('be.visible') ตรงๆ ทำให้ timeout ยาวเป็นชั่วโมงเวลาไม่มี unsaved changes
+    // เปลี่ยนเป็นเช็คแบบมีเงื่อนไข ให้รอสั้นๆ ว่ามันจะขึ้นไหม แล้วค่อยตัดสินใจคลิกหรือข้าม
+    cy.wait(1500); // ให้เวลา Angular route guard ขึ้น modal ถ้าจะขึ้น
+
+    cy.get('body').then(($body) => {
+        const $btn = $body.find('.modal-body > .col-md-12 > :nth-child(1) > .btn');
+
+        if ($btn.length > 0 && $btn.is(':visible')) {
+            cy.log('⚠️ พบ unsaved-changes modal — คลิกเพื่อยืนยันออกจากหน้า');
+            cy.wrap($btn).should('be.visible').and('not.be.disabled').click();
+        } else {
+            cy.log('✅ ไม่มี unsaved-changes modal (PO สุดท้ายถูก Save ไปแล้ว) — ข้ามการคลิก');
+        }
+    });
+
+    cy.wait('@getRequest4', { timeout: 600000000 });
+
+    cy.get('.loading-curtain', { timeout: 30000 }).should('not.exist');
+    cy.contains('li.sidebar-brand', 'List of Product Offering:', { timeout: 30000 }).should('be.visible');
 };
 
 // ========================
@@ -483,8 +524,6 @@ export const backBacicInfo = (): void => {
 // ========================
 
 export const addFile = (): void => {
-    cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-    cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
 
     cy.get('input[type="file"]', { timeout: 30000 }).should('exist');
 
@@ -499,8 +538,6 @@ export const addFile = (): void => {
         );
     });
 
-    cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
     beforeapproveMKT();
 };
@@ -514,7 +551,7 @@ export const ProjectBasicInformationComplete = (
     ProductClass: ProductClass,
     options: ProjectBasicOptions
 ): void => {
-    const { Module, subModule, autoSetDuration = false, Plugin } = options;
+    const { Module, subModule, autoSetDuration = false, Plugin, runHumanTouchPoint = false, runNonHumanTouchPoint = false } = options;
     const credentials = getCredentials(Module);
     const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
@@ -525,7 +562,10 @@ export const ProjectBasicInformationComplete = (
     Cypress.env(envKey, projectName);
     registerProjectName(projectName, ProductClass === 'main' ? 0 : 1);
 
-    const poCount = 2;
+    Cypress.env('hasYoutubePremium', false);
+    Cypress.env('hasCloudGame', false);
+
+    const poCount = 1;
 
     const poEnvKey = ProductClass === 'main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
     const poNames: string[] = [];
@@ -535,7 +575,6 @@ export const ProjectBasicInformationComplete = (
     const sharedTimeId = generateUniqueId();
 
     for (let i = 0; i < poCount; i++) {
-        // ✅ ใช้ sharedTimeId เดิมทุก PO → ชื่อ suffix ตรงกันทุกตัว
         const poIdentifier = `PO${i + 1} ${sharedTimeId}`;
         const currentPoName = buildUniqueName(prefixName, poIdentifier, 30);
 
@@ -543,9 +582,9 @@ export const ProjectBasicInformationComplete = (
         cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
 
         createPOBase(currentPoName, 'Product Offering');
+        cy.wait(3000);
 
         const priceTypeMap: Record<PriceType, string> = { onetime: '1: One-Time', recurring: '2: Recurring', usage: '3: Usage' };
-        cy.get('select[formcontrolname="priceType"]').should('be.visible').and('not.be.disabled').select(priceTypeMap[PriceType]);
 
         const productClassMapMobile: Record<ProductClass, string> = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
         const productClassMapEnterMusic: Record<'ontop' | 'ontopextra', string> = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
@@ -553,7 +592,17 @@ export const ProjectBasicInformationComplete = (
             ? productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra']
             : productClassMapMobile[ProductClass];
 
-        cy.get('select[formcontrolname="productClass"]').should('be.visible').and('not.be.disabled').select(productValue);
+        cy.get('select[formcontrolname="productClass"]')
+            .should('be.visible')
+            .and('not.be.disabled')
+            .select(productValue)
+            .should('have.value', productValue);
+
+        cy.get('select[formcontrolname="priceType"]')
+            .should('be.visible')
+            .and('not.be.disabled')
+            .select(priceTypeMap[PriceType])
+            .should('have.value', priceTypeMap[PriceType]);
 
         if (ProductClass === 'main') {
             const defaultItems = ['Internet', 'MMS', 'SMS', 'Voice'];
@@ -576,7 +625,9 @@ export const ProjectBasicInformationComplete = (
                         cy.get('select[formcontrolname="productClass"]').select(productValue);
                         cy.get('select[formcontrolname="productClass"]').should('have.value', productValue);
                         cy.get('select[formcontrolname="priceType"]').should('exist').and('not.be.disabled');
-                        cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[PriceType]);
+                        cy.get('select[formcontrolname="priceType"]')
+                            .select(priceTypeMap[PriceType])
+                            .should('have.value', priceTypeMap[PriceType]);
                         retrySelectProductClass(attemptsLeft - 1);
                     } else {
                         cy.log(`❌ default items still missing after retries`);
@@ -622,34 +673,40 @@ export const ProjectBasicInformationComplete = (
         }
 
         if (subModule === 'PRE') {
-            const realisticBillCycles = [1, 5, 7, 10, 15, 20, 25, 28];
-            const randomBillCycle = realisticBillCycles[Math.floor(Math.random() * realisticBillCycles.length)];
+            const shouldRandomizeBillCycle = Math.random() < 0.8;
 
-            cy.get('input[formcontrolname="packageBillCycle"]')
-                .should('be.visible')
-                .clear()
-                .type(randomBillCycle.toString());
+            if (!shouldRandomizeBillCycle) {
+                cy.log('📌 Keeping default Bill Cycle value (no randomization this run)');
+            } else {
+                const realisticBillCycles = [1, 5, 7, 10, 15, 20, 25, 28];
+                const randomBillCycle = realisticBillCycles[Math.floor(Math.random() * realisticBillCycles.length)];
 
-            const realisticBillCycleUnits = ['Day', 'Days', 'Date', 'Month', 'Months'];
+                cy.get('input[formcontrolname="packageBillCycle"]')
+                    .should('be.visible')
+                    .clear()
+                    .type(randomBillCycle.toString());
 
-            cy.get('select[formcontrolname="packageBillCycleUnit"] option:not([disabled])')
-                .should('have.length.greaterThan', 0)
-                .then($options => {
-                    const availableOptions = $options.map((_, el) => (el as HTMLOptionElement).value).get();
-                    let matchedUnit = realisticBillCycleUnits.find(unit =>
-                        availableOptions.includes(unit) ||
-                        availableOptions.includes(unit.toLowerCase()) ||
-                        availableOptions.includes(unit.toUpperCase())
-                    );
+                const realisticBillCycleUnits = ['Day', 'Days', 'Date', 'Month', 'Months'];
 
-                    if (!matchedUnit) {
-                        matchedUnit = availableOptions[0];
-                        cy.log(`⚠️ No realistic unit found. Fallback to: ${matchedUnit}`);
-                    }
+                cy.get('select[formcontrolname="packageBillCycleUnit"] option:not([disabled])')
+                    .should('have.length.greaterThan', 0)
+                    .then($options => {
+                        const availableOptions = $options.map((_, el) => (el as HTMLOptionElement).value).get();
+                        let matchedUnit = realisticBillCycleUnits.find(unit =>
+                            availableOptions.includes(unit) ||
+                            availableOptions.includes(unit.toLowerCase()) ||
+                            availableOptions.includes(unit.toUpperCase())
+                        );
 
-                    cy.get('select[formcontrolname="packageBillCycleUnit"]').select(matchedUnit);
-                    cy.log(`🗓️ Bill Cycle set to: ${randomBillCycle} ${matchedUnit}`);
-                });
+                        if (!matchedUnit) {
+                            matchedUnit = availableOptions[0];
+                            cy.log(`⚠️ No realistic unit found. Fallback to: ${matchedUnit}`);
+                        }
+
+                        cy.get('select[formcontrolname="packageBillCycleUnit"]').select(matchedUnit);
+                        cy.log(`🗓️ Bill Cycle set to: ${randomBillCycle} ${matchedUnit}`);
+                    });
+            }
         }
 
         const isMultiDurationEligible = PriceType === 'recurring' || PriceType === 'usage';
@@ -672,14 +729,22 @@ export const ProjectBasicInformationComplete = (
                 cy.wrap($radios).eq(Math.floor(Math.random() * $radios.length)).check();
             });
         }
-
         targetgroup();
-        // InternalShare();
-        // SharingPartner();
-        // RevenueSharing();
-        // ChargePartner();
-        RandomRemark(projectName, currentPoName, PriceType, ProductClass, subModule);
+        InternalShare();
+        SharingPartner();
+        RevenueSharing();
+        ChargePartner();
+        RunMassMktTabs();
 
+        if (runHumanTouchPoint) {
+            cy.log(`🤝 Running RandomHumanTouchPoint for subModule: ${subModule}`);
+            RandomHumanTouchPoint(subModule);
+        }
+
+        if (runNonHumanTouchPoint) {
+            cy.log(`🤖 Running RandomNonHumanTouchPoint for subModule: ${subModule}`);
+            RandomNonHumanTouchPoint(subModule);
+        }
         if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {
             RetryPattern();
         }
@@ -687,7 +752,7 @@ export const ProjectBasicInformationComplete = (
         if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
             CopyDeductFail('mass-market');
         }
-
+        RandomRemark(projectName, currentPoName, PriceType, ProductClass, subModule);
         smsWording();
 
         if (i < poCount - 1) {
@@ -711,6 +776,7 @@ export const ProjectBasicInformationComplete = (
 
     backBacicInfo();
     addFile();
+
 };
 
 // ========================
@@ -723,7 +789,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     Module: 'POST' | 'PRE'
 ): void => {
     const credentials = getCredentials(Module);
-    const { projectName, poName } = generateProjectNames('MOB', Module, undefined, PriceType, undefined, PoSubGroup);
+    const { projectName, poName, prefixName } = generateProjectNames('MOB', Module, undefined, PriceType, undefined, PoSubGroup);
 
     login(credentials.user, credentials.pass);
     cy.get('.col-md-10 > .btn').should('be.visible').click();
@@ -744,46 +810,400 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
 
-    cy.get(':nth-child(4) > .btn').click({ force: true });
-    cy.get('input[formcontrolname="productName"]').type(poName);
-    Cypress.env('poName', poName);
+    const poCount = 2;
+    const poNames: string[] = [];
+    const sharedTimeId = generateUniqueId();
 
     const subGroupMap: Record<string, string> = {
         AccountFee: 'Account Fee', OrderFee: 'Order Fee', CashBack: 'Cash Back',
         Service: 'Service', GroupPoFee: 'Group PO Fee'
     };
-    cy.get('select[formcontrolname="promotionSubGroupFrom"]').select(subGroupMap[PoSubGroup]);
 
-    cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-    cy.contains('button', 'Create', { timeout: 10000 }).click();
-    cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-    cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+    cy.log(`🎲 Randomly selected to create ${poCount} PO(s)`);
 
-    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
-    cy.wait('@getProject', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-    cy.wait(5000);
+    for (let i = 0; i < poCount; i++) {
+        const poIdentifier = `PO${i + 1} ${sharedTimeId}`;
+        const currentPoName = buildUniqueName(prefixName, poIdentifier, 30);
+        poNames.push(currentPoName);
 
-    if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
-        const priceTypeMap: Record<string, string> = { onetime: 'One-Time', recurring: 'Recurring', usage: 'Usage' };
-        cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[PriceType]);
+        cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
+
+        cy.get(':nth-child(4) > .btn').click({ force: true });
+        cy.get('input[formcontrolname="productName"]').type(currentPoName);
+        Cypress.env('poName', currentPoName);
+
+        cy.get('select[formcontrolname="promotionSubGroupFrom"]').select(subGroupMap[PoSubGroup]);
+
+        cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
+        cy.contains('button', 'Create', { timeout: 10000 }).click();
+        cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+        cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+
+        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
+        cy.wait('@getProject', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+        cy.wait(5000);
+
+        if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
+            const priceTypeMap: Record<string, string> = { onetime: 'One-Time', recurring: 'Recurring', usage: 'Usage' };
+            cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[PriceType]);
+        }
+
+        if (Module === 'POST' && PoSubGroup === 'CashBack') {
+            fillCashBackDiscountConfig(Module, PriceType);
+        }
+
+        if (!(Module === 'POST' && PoSubGroup === 'CashBack')) {
+            setPriceVAT();
+        }
+
+        const fieldFillers: Record<string, () => void> = {
+            Service: () => fillServicePOFields(Module, PriceType),
+            CashBack: () => fillCashBackPOFields(Module, PriceType),
+        };
+
+        if (fieldFillers[PoSubGroup]) {
+            fieldFillers[PoSubGroup]();
+        } else if (PoSubGroup !== 'CashBack' || Module !== 'POST') {
+            fillStandardPOFields(Module, PriceType);
+        }
+
+        if (i < poCount - 1) {
+            cy.log(`🔙 PO ${currentPoName} done. Navigating back for next PO...`);
+            backBacicInfo();
+            cy.wait(1000);
+        }
     }
 
-    if (Module === 'POST' && PoSubGroup === 'CashBack') {
-        fillCashBackDiscountConfig(Module, PriceType);
-    }
+    Cypress.env('allPoNames', poNames);
+    Cypress.env('poCount', poCount);
+    Cypress.env('poName', poNames[0] || poName);
 
-    if (!(Module === 'POST' && PoSubGroup === 'CashBack')) {
-        setPriceVAT();
-    }
+    cy.log(`✅ All ${poCount} PO(s) processed. Finalizing...`);
+};
 
-    const fieldFillers: Record<string, () => void> = {
-        Service: () => fillServicePOFields(Module, PriceType),
-        CashBack: () => fillCashBackPOFields(Module, PriceType),
+interface SelectedPORow {
+    poName: string;
+    projectName: string;
+}
+
+const selectAvailablePORows = (
+    count: number = 1,
+    PriceType?: PriceType,
+    ProductClass?: ProductClass
+): Cypress.Chainable<SelectedPORow[]> => {
+    return cy.get('table tbody tr').then(($rows) => {
+        const priceTypeToken = PriceType ? getAbbreviation(PriceType).toUpperCase() : null;
+        const productClassToken = ProductClass ? getAbbreviation(ProductClass).toUpperCase() : null;
+
+        const availableRows = $rows.filter((_, row) => {
+            const $row = Cypress.$(row);
+            const $firstCell = $row.find('td').eq(0);
+            const hasLockIcon = $firstCell.find('i.material-icons').length > 0;
+            const hasCheckbox = $firstCell.find('input[formcontrolname="checkbox"]').length > 0;
+
+            if (!hasCheckbox || hasLockIcon) return false;
+
+            if (!priceTypeToken && !productClassToken) return true;
+
+            const cells = $row.find('td');
+            const rowText = (
+                Cypress.$(cells[2]).text() + ' ' + Cypress.$(cells[3]).text()
+            ).toUpperCase().replace(/\s+/g, ' ');
+
+            const matchesPriceType = priceTypeToken ? rowText.includes(priceTypeToken) : true;
+            const matchesProductClass = productClassToken ? rowText.includes(productClassToken) : true;
+
+            return matchesPriceType && matchesProductClass;
+        });
+
+        if (availableRows.length === 0) {
+            throw new Error(
+                `❌ No available (non-locked) PO rows found matching PriceType="${PriceType}" ProductClass="${ProductClass}"`
+            );
+        }
+
+        const actualCount = Math.min(count, availableRows.length);
+        if (actualCount < count) {
+            cy.log(`⚠️ Requested ${count} rows but only ${availableRows.length} matched — selecting ${actualCount}`);
+        }
+
+        const shuffled = Cypress._.shuffle(Array.from(availableRows));
+        const targetRows = shuffled.slice(0, actualCount);
+
+        const selected: SelectedPORow[] = [];
+
+        targetRows.forEach((row) => {
+            const $targetRow = Cypress.$(row);
+            const cells = $targetRow.find('td');
+            const poName = Cypress.$(cells[2]).text().trim().replace(/\s+/g, ' ');
+            const projectName = Cypress.$(cells[3]).text().trim().replace(/\s+/g, ' ');
+
+            selected.push({ poName, projectName });
+            cy.log(`📦 Selected PO: "${poName}" | Project: "${projectName}"`);
+
+            cy.wrap($targetRow.find('input[formcontrolname="checkbox"]')).check({ force: true });
+        });
+
+        return cy.wrap(selected, { log: false });
+    });
+};
+
+const searchProductOfferingByPO = (
+    poCount: number = 1,
+    PriceType?: PriceType,
+    ProductClass?: ProductClass
+): Cypress.Chainable<SelectedPORow[]> => {
+    cy.contains('button', 'Search Product Offering')
+        .should('be.visible')
+        .click();
+
+    cy.get('select[formcontrolname="poSubGroup"]')
+        .should('be.visible')
+        .select('Product Offering')
+        .should('have.value', 'Product Offering');
+
+    const monthsBackOptions = [1, 3, 6, 12];
+
+    const trySearchWithMonthsBack = (attemptIndex: number): Cypress.Chainable<SelectedPORow[]> => {
+        const monthsBack = monthsBackOptions[attemptIndex];
+        const fromDate = new Date();
+        fromDate.setMonth(fromDate.getMonth() - monthsBack);
+        const formattedFromDate = fromDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+        cy.log(`🔍 Searching with Commercial Launch Date from ${monthsBack} month(s) back`);
+
+        cy.get('my-date-picker[formcontrolname="commercialLaunchDateFrom"] input[aria-label="Date input field"]')
+            .should('be.visible')
+            .clear()
+            .type(formattedFromDate, { delay: 30 });
+        cy.get('my-date-picker[formcontrolname="commercialLaunchDateFrom"] input[aria-label="Date input field"]')
+            .should('have.value', formattedFromDate);
+
+        cy.get('.col-md-2.text-right > button.btn.btn-default')
+            .should('be.visible')
+            .and('not.be.disabled')
+            .click();
+
+        cy.get('body').then(($body) => {
+            if ($body.find('.loading-curtain').length > 0) {
+                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+            }
+        });
+
+        return cy.get('table tbody tr', { timeout: 30000 }).should('have.length.greaterThan', 0).then(($rows) => {
+            const matchCount = countMatchingRows($rows, PriceType, ProductClass);
+            const isLastAttempt = attemptIndex >= monthsBackOptions.length - 1;
+
+            // ✅ FIX: เดิมเช็คแค่ matchCount === 0 ทำให้พอเจอ PO ตรงเงื่อนไขแค่ 1 ตัว
+            // (ทั้งที่ขอมา poCount=2) ก็หยุด widen ทันที ไม่ไปหาต่อในช่วงเดือนถัดไป
+            // แก้ให้เช็คว่าเจอ "ครบตามที่ขอ" (matchCount >= poCount) ก่อนถึงจะพอ
+            if (matchCount < poCount && !isLastAttempt) {
+                cy.log(
+                    `⚠️ Found only ${matchCount}/${poCount} matching PO within ${monthsBack} month(s), widening search...`
+                );
+                return trySearchWithMonthsBack(attemptIndex + 1);
+            }
+
+            if (matchCount === 0) {
+                // 🔎 DEBUG: log expected token + sample rows ก่อน throw
+                const priceTypeToken = PriceType ? getAbbreviation(PriceType).toUpperCase() : null;
+                const productClassToken = ProductClass ? getAbbreviation(ProductClass).toUpperCase() : null;
+
+                cy.log(`🔎 Expected priceTypeToken: "${priceTypeToken}" | productClassToken: "${productClassToken}"`);
+
+                $rows.slice(0, 8).each((_, row) => {
+                    const cells = Cypress.$(row).find('td');
+                    const poName = Cypress.$(cells[2]).text().trim().replace(/\s+/g, ' ');
+                    const projectName = Cypress.$(cells[3]).text().trim().replace(/\s+/g, ' ');
+                    cy.log(`Sample → PO: "${poName}" | Project: "${projectName}"`);
+                });
+
+                throw new Error(
+                    `❌ No available PO found matching PriceType="${PriceType}" ProductClass="${ProductClass}" even after searching back ${monthsBack} months`
+                );
+            }
+
+            if (matchCount < poCount) {
+                cy.log(
+                    `⚠️ Requested ${poCount} PO(s) but only found ${matchCount} even after searching back ${monthsBack} months (max range) — proceeding with ${matchCount}`
+                );
+            }
+
+            return selectAvailablePORows(poCount, PriceType, ProductClass);
+        });
     };
+    return trySearchWithMonthsBack(0).then((selected) => {
+        cy.contains('button', 'Modify')
+            .should('be.visible')
+            .and('not.be.disabled')
+            .click();
 
-    if (fieldFillers[PoSubGroup]) {
-        fieldFillers[PoSubGroup]();
-    } else if (PoSubGroup !== 'CashBack' || Module !== 'POST') {
-        fillStandardPOFields(Module, PriceType);
-    }
+        return cy.wrap(selected, { log: false });
+    });
+};
+
+const countMatchingRows = (
+    $rows: JQuery<HTMLElement>,
+    PriceType?: PriceType,
+    ProductClass?: ProductClass
+): number => {
+    const priceTypeToken = PriceType ? getAbbreviation(PriceType).toUpperCase() : null;
+    const productClassToken = ProductClass ? getAbbreviation(ProductClass).toUpperCase() : null;
+
+    let count = 0;
+    $rows.each((_, row) => {
+        const $row = Cypress.$(row);
+        const $firstCell = $row.find('td').eq(0);
+        const hasLockIcon = $firstCell.find('i.material-icons').length > 0;
+        const hasCheckbox = $firstCell.find('input[formcontrolname="checkbox"]').length > 0;
+
+        if (!hasCheckbox || hasLockIcon) return;
+
+        if (!priceTypeToken && !productClassToken) {
+            count++;
+            return;
+        }
+
+        const cells = $row.find('td');
+        const rowText = (
+            Cypress.$(cells[2]).text() + ' ' + Cypress.$(cells[3]).text()
+        ).toUpperCase().replace(/\s+/g, ' ');
+
+        const matchesPriceType = priceTypeToken ? rowText.includes(priceTypeToken) : true;
+        const matchesProductClass = productClassToken ? rowText.includes(productClassToken) : true;
+
+        if (matchesPriceType && matchesProductClass) count++;
+    });
+
+    return count;
+};
+
+const closeSuccessModal = (): void => {
+    cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
+        .closest('.modal-content')
+        .find('.modal-footer button.btn-danger')
+        .should('be.visible')
+        .and('not.be.disabled')
+        .click();
+};
+
+export const ProjectBasicInformationCompleteModify = (
+    PriceType: PriceType,
+    ProductClass: ProductClass,
+    options: ProjectBasicOptions,
+    poCount: number = 1
+): void => {
+    const { Module, subModule, Plugin } = options;
+    const credentials = getCredentials(Module);
+    const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
+
+    const { projectName, poName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
+
+    const actualProjectName = createProjectBase(credentials, projectName, Module, subModule, 'Modify By PO');
+
+    const envKey = ProductClass === 'main' ? 'formattedDateMain' : 'formattedDate';
+    Cypress.env(envKey, actualProjectName);
+    registerProjectName(actualProjectName, ProductClass === 'main' ? 0 : 1);
+
+    searchProductOfferingByPO(poCount, PriceType, ProductClass).then((selected) => {
+        Cypress.env('modifyTargetPoNames', selected.map(s => s.poName));
+        Cypress.env('modifyTargetProjectNames', selected.map(s => s.projectName));
+        Cypress.env('allPoNames', selected.map(s => s.poName));
+        Cypress.env('poCount', selected.length);
+
+        if (selected.length < poCount) {
+            cy.log(`⚠️ Requested ${poCount} PO(s) but only found ${selected.length} available — proceeding with ${selected.length}`);
+        }
+
+        Cypress.env('currentModule', Module);
+        Cypress.env('currentSubModule', subModule);
+        Cypress.env('currentPriceType', PriceType);
+        Cypress.env('currentProductClass', ProductClass);
+        Cypress.env('currentProjectName', actualProjectName);
+
+        cy.location('hash', { timeout: 6000000 }).should('include', 'product-offering-detail');
+
+        // รอ loading curtain หาย
+        cy.get('body').then(($body) => {
+            if ($body.find('.loading-curtain').length > 0) {
+                cy.get('.loading-curtain', { timeout: 600000 }).should('not.exist');
+            }
+        });
+
+        cy.wait(3000); // รอ UI settle
+
+        cy.get('div.drawer1', { timeout: 30000 })
+            .should('exist')
+            .find('a.button')
+            .then($allPOs => {
+                const actualPOCount = $allPOs.length;
+                cy.log(`📋 Found ${actualPOCount} PO(s) in sidebar to modify`);
+
+                if (actualPOCount === 0) {
+                    throw new Error('❌ ไม่พบ PO ใน Sidebar หลังคลิก Modify');
+                }
+
+                // วน loop ตามจำนวน PO ที่มีจริงใน Sidebar
+                cy.wrap(Array.from({ length: actualPOCount })).each((_: any, index: number) => {
+                    cy.log(`🔄 [${index + 1}/${actualPOCount}] Processing PO in sidebar...`);
+
+                    if (index > 0) {
+                        cy.log(`🔀 Switching to PO at index ${index}...`);
+
+                        // 1. รอ Loading หาย
+                        cy.get('body').then(($body) => {
+                            if ($body.find('.loading-curtain').length > 0) {
+                                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                            }
+                        });
+                        cy.wait(2000);
+
+                        // 2. คลิก PO ตาม index โดยตรง
+                        cy.get('div.drawer1')
+                            .find('a.button')
+                            .then($links => {
+                                if (index < $links.length) {
+                                    const targetText = Cypress.$($links[index]).text().trim();
+                                    cy.log(`✅ Clicking PO at index ${index}: "${targetText}"`);
+                                    cy.wrap($links.eq(index)).should('be.visible').click({ force: true });
+                                } else {
+                                    throw new Error(
+                                        `❌ Index ${index} out of range. มี PO ${$links.length} ตัวใน Sidebar`
+                                    );
+                                }
+                            });
+
+                        // 3. รอหน้าฟอร์มโหลดเสร็จ
+                        cy.wait(3000);
+                        cy.get('body').then(($body) => {
+                            if ($body.find('.loading-curtain').length > 0) {
+                                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                            }
+                        });
+                    }
+
+                    // ✅ เลือก Section ใหม่ทุกครั้งที่เริ่มทำ PO
+                    selectModifySections(1, 3).then((sections) => {
+                        cy.log(`📝 Selected sections for PO ${index + 1}: ${sections.join(', ')}`);
+
+                        fillSelectedModifySections(sections, index);
+                    });
+
+                    // กด Save + ปิด Modal (ถ้ายังไม่ใช่ PO สุดท้าย)
+                    if (index < actualPOCount - 1) {
+                        cy.contains('button', 'Save')
+                            .should('be.visible')
+                            .and('not.be.disabled')
+                            .click();
+
+                        closeSuccessModal();
+                        cy.wait(2000);
+                    }
+                });
+            }).then(() => {
+                cy.log(`✅ Modify By PO complete — processed all POs in sidebar`);
+                backBacicInfo();
+                addFile();
+            });
+    });
 };

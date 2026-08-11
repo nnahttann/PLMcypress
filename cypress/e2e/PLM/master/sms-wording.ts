@@ -1,66 +1,107 @@
 import { createPOWordingPools } from '../Approve/po-wording-pools';
 
-// ========================
-// SMS WORDING FUNCTIONS
-// ========================
-// const closeSuccessModal = (): void => {
-//     cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
-//         .closest('.modal-content')
-//         .find('.modal-footer button.btn-danger')
-//         .should('be.visible')
-//         .and('not.be.disabled')
-//         .click();
-// };
+const isVisible = ($el: JQuery<HTMLElement>): boolean => {
+  if (!$el || !$el.length) return false;
+  if ($el.is(':hidden') || $el.prop('hidden')) return false;
+  if ($el.parents(':hidden').length > 0) return false;
+  return true;
+};
+
+const cleanMulti = (s: string) => s ? s.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/\s+/g, ' ').trim() : '';
+
+const limit = (s: string, max: number) => {
+  if (!s) return '';
+  let r = s.length > max ? s.substring(0, max).trimEnd() : s;
+  if (r.length === max && r.includes(' ')) {
+    const ls = r.lastIndexOf(' ');
+    if (ls > max * 0.7) r = r.substring(0, ls);
+  }
+  return r;
+};
+
+const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] || '' as unknown as T;
+const flag = (): 'Send' | "Don't Send" => Math.random() < 0.8 ? 'Send' : "Don't Send";
+
+const langKeyMap: Record<string, string> = {
+  'Burmese': 'BUR', 'Chinese': 'CHI', 'Japanese': 'JPN', 'Khmer': 'KHM', 'Korean': 'KOR', 'Lao': 'LAO',
+  'Vietnamese': 'VIE', 'Indonesian': 'IND', 'Malay': 'MAL', 'Filipino': 'FIL', 'Hindi': 'HIN', 'Arabic': 'ARA'
+};
+
+const getLangKey = (lang: string, poolData: Record<string, string[]>): string => {
+  if (langKeyMap[lang]) return langKeyMap[lang];
+  const auto = lang.substring(0, 3).toUpperCase();
+  if (poolData[auto]) { cy.log(`🔑 Auto-derived key "${auto}" for lang "${lang}"`); return auto; }
+  cy.log(`⚠️ [WARN] No pool key for lang "${lang}" (tried "${auto}") → fallback EN`);
+  return 'EN';
+};
+
+const getLangCodeFromLabel = ($el: JQuery<HTMLElement>): string => {
+  const $container = $el.closest('.col-md-6, .col-md-12');
+  const labelText = ($container.find('label').first().text() || '').trim();
+  const match = labelText.match(/([A-Z]{2,4})\s*:?\s*$/);
+  if (match) return match[1];
+  cy.log(`⚠️ [WARN] Cannot detect lang code from label "${labelText}"`);
+  return 'EN';
+};
+
+const SEL = {
+  shortPromo: 'textarea[formcontrolname="shortPromotionName"]',
+  cmsDisplay: 'textarea[formcontrolname="cmsDisplay"]',
+  promoDesc: 'textarea[formcontrolname="promotionDescription"]',
+  checkCurrent: 'textarea[formcontrolname="smsCheckCurrent"]',
+  greetingFlag: 'select[formcontrolname="smsGreetingSendFlag"]',
+  greetingText: 'textarea[formcontrolname="smsGreeting"]',
+  confirmSubFlag: 'select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]',
+  deleteFlag: 'select[formcontrolname="smsDeleteSendFlag"]',
+  deleteText: 'textarea[formcontrolname="smsDelete"]',
+  deleteRadio: 'input[formcontrolname="SmsDeletedefaultWordingFlag"]',
+  promoteFlag: 'select[formcontrolname="smsPromotePackSendFlag"]',
+  promoteText: 'textarea[formcontrolname="smsPromotePack"]',
+  lastMinuteFlag: 'select[formcontrolname="lastMinuteAlertSendFlag"]',
+  lastMinuteRadio: 'input[formcontrolname="lastMinuteAlertDefaultWordingFlag"]',
+  lastMinuteText: 'textarea[formcontrolname="smsNotificationLastMinuteAlert"]',
+  beforeFeeFlag: 'select[formcontrolname="smsBeforeFeeDeductSendFlag"]',
+  beforeFeeDeduct: 'input[formcontrolname="beforeFeeDeduction"]',
+  beforeFeeUnit: 'select[formcontrolname="beforeFeeDeductionUnit"]',
+  beforeFeeRadio: 'input[formcontrolname="defaultWordingFlag"]',
+  beforeFeeText: 'textarea[formcontrolname="smsNotificationBeforeFeeDeduction"]',
+  recSuccessFlag: 'select[formcontrolname="recurringDeductSuccessAlertSendFlag"]',
+  recSuccessRadio: 'input[formcontrolname="recurringDeductSuccessAlertDefaultWordingFlag"]',
+  recSuccessText: 'textarea[formcontrolname="recurringFeeDeductSuccessAlert"]',
+  recFailFlag: 'select[formcontrolname="recurringDeductFailAlertSendFlag"]',
+  recFailRadio: 'input[formcontrolname="recurringDeductFailAlertDefaultWordingFlag"]',
+  recFailText: 'textarea[formcontrolname="recurringFeeDeductFailAlert"]',
+  beforePromoFlag: 'select[formcontrolname="beforePromotionExpAlertSendFlag"]',
+  beforePromoDeduct: 'input[formcontrolname="beforePromotionExpAlertDeduction"]',
+  beforePromoUnit: 'select[formcontrolname="beforePromotionExpAlertDeductionUnit"]',
+  beforePromoRadio: 'input[formcontrolname="beforePromotionExpAlertDefaultWordingFlag"]',
+  beforePromoText: 'textarea[formcontrolname="beforePromotionExpAlert"]',
+  promoExpFlag: 'select[formcontrolname="promotionExpAlertSendFlag"]',
+  promoExpRadio: 'input[formcontrolname="promotionExpAlertDefaultWordingFlag"]',
+  promoExpText: 'textarea[formcontrolname="promotionExpAlert"]',
+  marketingName: 'textarea[formcontrolname="marketingName"]',
+  yourPackage: 'textarea[formcontrolname="yourPackage"]',
+  greetingLetter: 'textarea[formcontrolname="greetingLetter"]',
+  saveBtn: '.container-fluid > :nth-child(3) > .btn',
+  availableListBox: 'app-mass-mkt-sms-wording-detail ng2-dual-list-box select[formcontrolname="availableListBox"]',
+  moveRightBtn: 'app-mass-mkt-sms-wording-detail ng2-dual-list-box button.str',
+  romText: 'textarea[formcontrolname="smsReponseSuccessForROM"]',
+  payText: 'textarea[formcontrolname="smsReponseSuccessForPAY"]',
+  copyFromGreetingBtn: 'app-mass-mkt-sms-wording-detail .panel:not([hidden]) button[title="Copy"]',
+};
+
+const fieldMaxLengths: Record<string, number> = {
+  [SEL.shortPromo]: 50, [SEL.cmsDisplay]: 250, [SEL.promoDesc]: 255, [SEL.checkCurrent]: 50,
+  [SEL.greetingText]: 250,
+  [SEL.deleteText]: 250, [SEL.promoteText]: 250, [SEL.lastMinuteText]: 250, [SEL.beforeFeeText]: 250,
+  [SEL.recSuccessText]: 250, [SEL.recFailText]: 250, [SEL.beforePromoText]: 250, [SEL.promoExpText]: 250,
+  [SEL.marketingName]: 40, [SEL.yourPackage]: 100, [SEL.greetingLetter]: 250,
+  [SEL.romText]: 250, [SEL.payText]: 250,
+};
 
 const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   const WAIT = 500;
   const SCROLL = 500;
-
-
-  // ── Utility Functions ───────────────────────────────────────────────────
-  const cleanMulti = (s: string) => s ? s.replace(/[\x00-\x1F\x7F-\x9F]/g, '').replace(/\s+/g, ' ').trim() : '';
-
-  const limit = (s: string, max: number) => {
-    if (!s) return '';
-    let r = s.length > max ? s.substring(0, max).trimEnd() : s;
-    if (r.length === max && r.includes(' ')) {
-      const ls = r.lastIndexOf(' ');
-      if (ls > max * 0.7) r = r.substring(0, ls);
-    }
-    return r;
-  };
-
-  const pick = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)] || '' as unknown as T;
-  const flag = (): 'Send' | "Don't Send" => Math.random() < 0.8 ? 'Send' : "Don't Send";
-
-  const langKeyMap: Record<string, string> = {
-    'Burmese': 'BUR', 'Chinese': 'CHI', 'Japanese': 'JPN', 'Khmer': 'KHM', 'Korean': 'KOR', 'Lao': 'LAO',
-    'Vietnamese': 'VIE', 'Indonesian': 'IND', 'Malay': 'MAL', 'Filipino': 'FIL', 'Hindi': 'HIN', 'Arabic': 'ARA'
-  };
-
-  const getLangKey = (lang: string, poolData: Record<string, string[]>): string => {
-    if (langKeyMap[lang]) return langKeyMap[lang];
-    const auto = lang.substring(0, 3).toUpperCase();
-    if (poolData[auto]) { cy.log(`🔑 Auto-derived key "${auto}" for lang "${lang}"`); return auto; }
-    cy.log(`⚠️ [WARN] No pool key for lang "${lang}" (tried "${auto}") → fallback EN`);
-    return 'EN';
-  };
-
-  const getLangCodeFromLabel = ($el: JQuery<HTMLElement>): string => {
-    const $container = $el.closest('.col-md-6, .col-md-12');
-    const labelText = ($container.find('label').first().text() || '').trim();
-    const match = labelText.match(/([A-Z]{2,4})\s*:?\s*$/);
-    if (match) return match[1];
-    cy.log(`⚠️ [WARN] Cannot detect lang code from label "${labelText}"`);
-    return 'EN';
-  };
-
-  const isVisible = ($el: JQuery<HTMLElement>): boolean => {
-    if (!$el || !$el.length) return false;
-    if ($el.is(':hidden') || $el.prop('hidden')) return false;
-    if ($el.parents(':hidden').length > 0) return false;
-    return true;
-  };
 
   const waitUntilFieldReady = (selector: string, label: string, timeout = 10000) => {
     cy.get('body').then(($body) => {
@@ -73,62 +114,6 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         expect(isVisible($el), `${label} (${selector}) should be visible`).to.eq(true);
       });
     });
-  };
-
-  const SEL = {
-    shortPromo: 'textarea[formcontrolname="shortPromotionName"]',
-    cmsDisplay: 'textarea[formcontrolname="cmsDisplay"]',
-    promoDesc: 'textarea[formcontrolname="promotionDescription"]',
-    checkCurrent: 'textarea[formcontrolname="smsCheckCurrent"]',
-    greetingFlag: 'select[formcontrolname="smsGreetingSendFlag"]',
-    greetingText: 'textarea[formcontrolname="smsGreeting"]',
-    confirmSubFlag: 'select[formcontrolname="smsConfirmSubSuccessCbsSendFlag"]',
-    deleteFlag: 'select[formcontrolname="smsDeleteSendFlag"]',
-    deleteText: 'textarea[formcontrolname="smsDelete"]',
-    deleteRadio: 'input[formcontrolname="SmsDeletedefaultWordingFlag"]',
-    promoteFlag: 'select[formcontrolname="smsPromotePackSendFlag"]',
-    promoteText: 'textarea[formcontrolname="smsPromotePack"]',
-    lastMinuteFlag: 'select[formcontrolname="lastMinuteAlertSendFlag"]',
-    lastMinuteRadio: 'input[formcontrolname="lastMinuteAlertDefaultWordingFlag"]',
-    lastMinuteText: 'textarea[formcontrolname="smsNotificationLastMinuteAlert"]',
-    beforeFeeFlag: 'select[formcontrolname="smsBeforeFeeDeductSendFlag"]',
-    beforeFeeDeduct: 'input[formcontrolname="beforeFeeDeduction"]',
-    beforeFeeUnit: 'select[formcontrolname="beforeFeeDeductionUnit"]',
-    beforeFeeRadio: 'input[formcontrolname="defaultWordingFlag"]',
-    beforeFeeText: 'textarea[formcontrolname="smsNotificationBeforeFeeDeduction"]',
-    recSuccessFlag: 'select[formcontrolname="recurringDeductSuccessAlertSendFlag"]',
-    recSuccessRadio: 'input[formcontrolname="recurringDeductSuccessAlertDefaultWordingFlag"]',
-    recSuccessText: 'textarea[formcontrolname="recurringFeeDeductSuccessAlert"]',
-    recFailFlag: 'select[formcontrolname="recurringDeductFailAlertSendFlag"]',
-    recFailRadio: 'input[formcontrolname="recurringDeductFailAlertDefaultWordingFlag"]',
-    recFailText: 'textarea[formcontrolname="recurringFeeDeductFailAlert"]',
-    beforePromoFlag: 'select[formcontrolname="beforePromotionExpAlertSendFlag"]',
-    beforePromoDeduct: 'input[formcontrolname="beforePromotionExpAlertDeduction"]',
-    beforePromoUnit: 'select[formcontrolname="beforePromotionExpAlertDeductionUnit"]',
-    beforePromoRadio: 'input[formcontrolname="beforePromotionExpAlertDefaultWordingFlag"]',
-    beforePromoText: 'textarea[formcontrolname="beforePromotionExpAlert"]',
-    promoExpFlag: 'select[formcontrolname="promotionExpAlertSendFlag"]',
-    promoExpRadio: 'input[formcontrolname="promotionExpAlertDefaultWordingFlag"]',
-    promoExpText: 'textarea[formcontrolname="promotionExpAlert"]',
-    marketingName: 'textarea[formcontrolname="marketingName"]',
-    yourPackage: 'textarea[formcontrolname="yourPackage"]',
-    greetingLetter: 'textarea[formcontrolname="greetingLetter"]',
-    saveBtn: '.container-fluid > :nth-child(3) > .btn',
-    availableListBox: 'app-mass-mkt-sms-wording-detail ng2-dual-list-box select[formcontrolname="availableListBox"]',
-    moveRightBtn: 'app-mass-mkt-sms-wording-detail ng2-dual-list-box button.str',
-    romText: 'textarea[formcontrolname="smsReponseSuccessForROM"]',
-    payText: 'textarea[formcontrolname="smsReponseSuccessForPAY"]',
-    copyFromGreetingBtn: 'app-mass-mkt-sms-wording-detail .panel:not([hidden]) button[title="Copy"]',
-  };
-
-  const fieldMaxLengths: Record<string, number> = {
-    [SEL.shortPromo]: 50, [SEL.cmsDisplay]: 250, [SEL.promoDesc]: 255, [SEL.checkCurrent]: 50,
-    // ✅ FIX: เปลี่ยนจาก 400 → 250 ให้ตรงกับ requirement จริง
-    [SEL.greetingText]: 250,
-    [SEL.deleteText]: 250, [SEL.promoteText]: 250, [SEL.lastMinuteText]: 250, [SEL.beforeFeeText]: 250,
-    [SEL.recSuccessText]: 250, [SEL.recFailText]: 250, [SEL.beforePromoText]: 250, [SEL.promoExpText]: 250,
-    [SEL.marketingName]: 40, [SEL.yourPackage]: 100, [SEL.greetingLetter]: 250,
-    [SEL.romText]: 250, [SEL.payText]: 250,
   };
 
   const safeWithSection = (sel: string, label: string, fn: ($el: JQuery<HTMLElement>) => void) => {
@@ -205,7 +190,6 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     });
   };
 
-  // 🛡️ Safety Net Function - บังคับ Type หาก Field ที่ Visible ดันว่างเปล่า
   const enforceNotEmpty = (selector: string, poolData: Record<string, string[]>, maxEn: number, maxTh: number, hasExtraLangs: boolean, extraLangs: string[] = []) => {
     cy.get('body').then(($body) => {
       const $els = $body.find(selector).filter((_, el) => isVisible(Cypress.$(el)));
@@ -249,6 +233,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     });
   };
 
+  const fillAndEnforce = (selector: string, poolData: Record<string, string[]>, maxEn: number, maxTh: number, hasExtraLangs: boolean, extraLangs: string[] = [], forceRetype: boolean = false, protectGenerated: boolean = false) => {
+    processTextFields(selector, poolData, maxEn, maxTh, hasExtraLangs, forceRetype, protectGenerated, extraLangs);
+    enforceNotEmpty(selector, poolData, maxEn, maxTh, hasExtraLangs, extraLangs);
+  };
+
   const safeSelectFlag = (sel: string, label: string): Cypress.Chainable<'Send' | "Don't Send" | null> => {
     return cy.get('body').then(($body) => {
       const $el = $body.find(sel).filter((_, el) => isVisible(Cypress.$(el)));
@@ -263,28 +252,22 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     }) as unknown as Cypress.Chainable<'Send' | "Don't Send" | null>;
   };
 
-  // 🛡️ REFACTORED: handleRadioAndText - แก้ปัญหา POST mode ที่ Radio ถูกซ่อน
   const handleRadioAndText = (radioSel: string, textSel: string, poolData: Record<string, string[]>, maxEn: number, maxTh: number, hasExtraLangs: boolean, forceNo: boolean = false, extraLangs: string[] = []) => {
     cy.get('body').then(($body) => {
       const $allRadios = $body.find(radioSel);
       const $visibleRadios = $allRadios.filter((_, el) => isVisible(Cypress.$(el)));
       const $visibleTextFields = $body.find(textSel).filter((_, el) => isVisible(Cypress.$(el)));
 
-      // 🛑 CRITICAL FIX for POST MODE:
-      // ถ้า Radio ถูกซ่อน/ไม่มีอยู่ แต่ TextField ยัง visible → บังคับ type ค่าทันทีเพื่อป้องกัน "is required" error
       if ($visibleRadios.length === 0) {
         if ($visibleTextFields.length > 0) {
           cy.log(`👻 [WARN] Radio ${radioSel} is hidden/missing but TextFields are visible. Forcing type to prevent "is required" error...`);
-          // บังคับ type ค่าลงไปเลย (ไม่สน defaultVal เพราะ radio ไม่มีให้กด Yes/No)
-          processTextFields(textSel, poolData, maxEn, maxTh, hasExtraLangs, true, false, extraLangs);
-          enforceNotEmpty(textSel, poolData, maxEn, maxTh, hasExtraLangs, extraLangs);
+          fillAndEnforce(textSel, poolData, maxEn, maxTh, hasExtraLangs, extraLangs, true, false);
         } else {
           cy.log(`👻 [SKIP] Both Radio ${radioSel} and TextFields ${textSel} are hidden/missing`);
         }
         return;
       }
 
-      // ถ้า Radio Visible → ทำงานตาม Flow ปกติ
       safeWithSection(radioSel, `Radio(${radioSel})`, ($radios) => {
         const $vRadios = $radios.filter((_, el) => isVisible(Cypress.$(el)));
         let defaultVal: 'Yes' | 'No';
@@ -301,10 +284,40 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         if (defaultVal === 'No') processTextFields(textSel, poolData, maxEn, maxTh, hasExtraLangs, hasExtraLangs, false, extraLangs);
         else cy.log(`✅ Using System Default`);
 
-        // Safety Net: กันกรณี defaultVal === 'Yes' แต่ระบบไม่เจนค่ามาให้
         enforceNotEmpty(textSel, poolData, maxEn, maxTh, hasExtraLangs, extraLangs);
       });
     });
+  };
+
+  const runFlagThenRadioText = (
+    flagSel: string,
+    label: string,
+    radioSel: string,
+    textSel: string,
+    poolData: Record<string, string[]>,
+    hasExtraLangs: boolean,
+    selectedExtraLangs: string[],
+  ) => {
+    safeSelectFlag(flagSel, label).then((v) => {
+      if (v === 'Send') handleRadioAndText(radioSel, textSel, poolData, 250, 250, hasExtraLangs, true, selectedExtraLangs);
+    });
+  };
+
+  const keepOrRetype = ($el: JQuery<HTMLElement>, label: string, isEmpty: (v: string) => boolean, retypeFn: () => void) => {
+    const currentVal = String($el.first().val() ?? '').trim();
+    const hasValue = !isEmpty(currentVal);
+
+    if (hasValue) {
+      const shouldKeep = Math.random() < 0.8; // 80% keep, 20% overwrite
+      if (shouldKeep) {
+        cy.log(`🔒 Keep existing ${label} value: "${currentVal}"`);
+        return;
+      }
+      cy.log(`🎲 Overwrite existing ${label} value (randomly chosen)`);
+    } else {
+      cy.log(`⌨️ ${label} is empty → setting new value`);
+    }
+    retypeFn();
   };
 
   const validateAllFieldLengths = () => {
@@ -341,7 +354,6 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     });
   };
 
-  // ── Main Execution Flow ───────────────────────────────────────────────────
   cy.scrollTo('bottom');
   cy.get('.scrollmenu > .nav').contains('SMS Wording').should('be.visible').click();
   cy.get('textarea, select', { timeout: 15000 }).should('exist');
@@ -407,9 +419,6 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       } else cy.log(`✍️ Skip Generate (Manual Mode)`);
 
       cy.log('📝 SESSION 3: Basic Fields');
-      // `required` = the form actually blocks Save on these (confirmed via validation messages:
-      // Short Promotion Name / CMS Display / Promotion Description). smsCheckCurrent is optional,
-      // so it stays best-effort and won't fail the test if it's genuinely absent for this PO type.
       const basicFields: [string, Record<string, string[]>, number, number, boolean][] = [
         [SEL.shortPromo, pools.shortPromo, 50, 50, true],
         [SEL.cmsDisplay, pools.cmsDisplay, 250, 250, true],
@@ -424,21 +433,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
       cy.log('👋 SESSION 4: SMS Greeting & Delete');
       safeSelectFlag(SEL.greetingFlag, 'Greeting').then((v) => {
-        if (v === 'Send') {
-          // ✅ FIX: เปลี่ยนจาก 400, 400 → 250, 250 ให้ตรงกับ requirement จริง
-          processTextFields(SEL.greetingText, pools.greeting, 250, 250, hasExtraLangs, hasExtraLangs, false, selectedExtraLangs);
-          enforceNotEmpty(SEL.greetingText, pools.greeting, 250, 250, hasExtraLangs, selectedExtraLangs);
-        }
+        if (v === 'Send') fillAndEnforce(SEL.greetingText, pools.greeting, 250, 250, hasExtraLangs, selectedExtraLangs, hasExtraLangs, false);
       });
       safeSelectFlag(SEL.confirmSubFlag, 'Confirm Sub');
-      safeSelectFlag(SEL.deleteFlag, 'Delete').then((v) => {
-        if (v === 'Send') handleRadioAndText(SEL.deleteRadio, SEL.deleteText, pools.delete, 250, 250, hasExtraLangs, true, selectedExtraLangs);
-      });
+      runFlagThenRadioText(SEL.deleteFlag, 'Delete', SEL.deleteRadio, SEL.deleteText, pools.delete, hasExtraLangs, selectedExtraLangs);
 
       cy.log('🔔 SESSION 5: SMS Event Notification');
-      safeSelectFlag(SEL.lastMinuteFlag, 'Last Minute').then((v) => {
-        if (v === 'Send') handleRadioAndText(SEL.lastMinuteRadio, SEL.lastMinuteText, pools.lastMinute, 250, 250, hasExtraLangs, true, selectedExtraLangs);
-      });
+      runFlagThenRadioText(SEL.lastMinuteFlag, 'Last Minute', SEL.lastMinuteRadio, SEL.lastMinuteText, pools.lastMinute, hasExtraLangs, selectedExtraLangs);
 
       safeSelectFlag(SEL.beforeFeeFlag, 'Before Fee').then((v) => {
         if (v === 'Send') {
@@ -448,18 +449,29 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         }
       });
 
-      safeSelectFlag(SEL.recSuccessFlag, 'Rec Success').then((v) => {
-        if (v === 'Send') handleRadioAndText(SEL.recSuccessRadio, SEL.recSuccessText, pools.recSuccess, 250, 250, hasExtraLangs, true, selectedExtraLangs);
-      });
-      safeSelectFlag(SEL.recFailFlag, 'Rec Fail').then((v) => {
-        if (v === 'Send') handleRadioAndText(SEL.recFailRadio, SEL.recFailText, pools.recFail, 250, 250, hasExtraLangs, true, selectedExtraLangs);
-      });
+      runFlagThenRadioText(SEL.recSuccessFlag, 'Rec Success', SEL.recSuccessRadio, SEL.recSuccessText, pools.recSuccess, hasExtraLangs, selectedExtraLangs);
+      runFlagThenRadioText(SEL.recFailFlag, 'Rec Fail', SEL.recFailRadio, SEL.recFailText, pools.recFail, hasExtraLangs, selectedExtraLangs);
 
       const beforeVal: 'Send' | "Don't Send" = flag();
       safeWithSection(SEL.beforePromoFlag, 'Before Promo Exp', ($el) => { cy.wrap($el.first()).select(beforeVal, { force: true }); cy.log(`🎲 Before Promo Flag = ${beforeVal}`); });
       if (beforeVal === 'Send') {
-        safeWithSection(SEL.beforePromoDeduct, 'Before Promo Deduct', ($el) => cy.wrap($el.first()).clear().type(`${Cypress._.random(1, 30)}`, { force: true }));
-        safeWithSection(SEL.beforePromoUnit, 'Before Promo Unit', ($el) => { const opts = ($el.find('option').toArray() as HTMLOptionElement[]).filter(o => o.value && o.value !== 'null' && !o.disabled).map(o => o.value); if (opts.length) cy.wrap($el.first()).select(Cypress._.sample(opts)!, { force: true }); });
+        safeWithSection(SEL.beforePromoDeduct, 'Before Promo Deduct', ($el) => {
+          keepOrRetype($el, 'Before Promo Deduct', (v) => v.length === 0, () => {
+            cy.wrap($el.first()).clear({ force: true }).type(`${Cypress._.random(1, 30)}`, { force: true })
+              .trigger('input', { bubbles: true }).trigger('change', { bubbles: true }).blur({ force: true });
+          });
+        });
+
+        safeWithSection(SEL.beforePromoUnit, 'Before Promo Unit', ($el) => {
+          keepOrRetype($el, 'Before Promo Unit', (v) => v.length === 0 || v === 'null', () => {
+            const opts = ($el.find('option').toArray() as HTMLOptionElement[]).filter(o => o.value && o.value !== 'null' && !o.disabled).map(o => o.value);
+            if (opts.length) {
+              cy.wrap($el.first()).select(Cypress._.sample(opts)!, { force: true })
+                .trigger('change', { force: true }).trigger('input', { force: true });
+            }
+          });
+        });
+
         handleRadioAndText(SEL.beforePromoRadio, SEL.beforePromoText, pools.beforePromoExp, 250, 250, hasExtraLangs, true, selectedExtraLangs);
       }
 
@@ -469,10 +481,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
       cy.log('📢 SESSION 6: SMS Promote Package');
       safeSelectFlag(SEL.promoteFlag, 'Promote Pack').then((v) => {
-        if (v === 'Send') {
-          processTextFields(SEL.promoteText, pools.promotePack, 250, 250, hasExtraLangs, hasExtraLangs, false, selectedExtraLangs);
-          enforceNotEmpty(SEL.promoteText, pools.promotePack, 250, 250, hasExtraLangs, selectedExtraLangs);
-        }
+        if (v === 'Send') fillAndEnforce(SEL.promoteText, pools.promotePack, 250, 250, hasExtraLangs, selectedExtraLangs, hasExtraLangs, false);
       });
 
       if (type === 'POST') {
@@ -481,8 +490,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
           [SEL.marketingName, pools.marketingName, 40, 40], [SEL.yourPackage, pools.yourPackage, 100, 100], [SEL.greetingLetter, pools.greetingLetter, 250, 250],
         ];
         postFields.forEach(([sel, pool, maxEn, maxTh]) => {
-          processTextFields(sel, pool, maxEn, maxTh, hasExtraLangs, false, false, selectedExtraLangs);
-          enforceNotEmpty(sel, pool, maxEn, maxTh, hasExtraLangs, selectedExtraLangs);
+          fillAndEnforce(sel, pool, maxEn, maxTh, hasExtraLangs, selectedExtraLangs, false, false);
         });
       }
 
@@ -531,12 +539,6 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       });
       cy.wait(1000);
 
-      // safeWithSection(SEL.saveBtn, 'Save Button', ($el) => {
-      //   cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-      //   cy.wrap($el.first()).click();
-      //   cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-      //   // closeSuccessModal();
-      // });
     });
   });
 };
@@ -580,13 +582,6 @@ export const testChiFieldsValidation = () => {
     { label: 'Leading Space', input: ' ValidText' },
     { label: 'Trailing Space', input: 'ValidText ' }
   ];
-
-  const isVisible = ($el: JQuery<HTMLElement>): boolean => {
-    if (!$el || !$el.length) return false;
-    if ($el.is(':hidden') || $el.prop('hidden')) return false;
-    if ($el.parents(':hidden').length > 0) return false;
-    return true;
-  };
 
   chiFields.forEach(field => {
     cy.log(`🧪 Testing Validation for: ${field.name}`);
@@ -667,39 +662,60 @@ export const smsCKSPOST = (): void => {
   cy.wait(500);
 
   cy.then(() => {
-    const finalProjectName = Cypress.env('formattedDateMain') ||
-      Cypress.env('formattedDate') ||
-      Cypress.env('projectName') ||
-      Cypress.env('formattedDateMainPONAME') ||
-      Cypress.env('formattedDateOntopPONAME') ||
-      Cypress.env('poName');
+    const randomMessageCode = (): string => `PRO${Math.floor(Math.random() * 10000)}`;
 
-    const p = finalProjectName;
-
-    const randomMessageCode = (): string => {
-      return `PRO${Math.floor(Math.random() * 10000)}`;
+    const findScopedMessageCodeInput = (
+      $select: JQuery<HTMLElement>,
+      maxDepth = 8
+    ): JQuery<HTMLElement> | null => {
+      let $node = $select;
+      for (let i = 0; i < maxDepth; i++) {
+        $node = $node.parent();
+        if ($node.length === 0) break;
+        const $input = $node.find('input[formcontrolname="messageCode"]');
+        if ($input.length > 0) {
+          return $input;
+        }
+      }
+      return null;
     };
 
-    cy.get('select[formcontrolname="smsPromotePackSendFlag"]').first().scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
-    cy.wait(500);
+    const fillMessageCodeIfSend = (selectFormControl: string, label: string) => {
+      cy.get(`select[formcontrolname="${selectFormControl}"]`).first()
+        .scrollIntoView({ duration: 500, offset: { top: -100, left: 0 } });
+      cy.wait(500);
 
-    cy.get('select[formcontrolname="smsPromotePackSendFlag"]').then(($select) => {
-      const currentValue = $select.val() as string;
+      cy.get(`select[formcontrolname="${selectFormControl}"]`).first().then(($select) => {
+        const currentValue = $select.val() as string;
 
-      if (currentValue === 'Send') {
-        cy.log('✅ SMS Promote Package = Send, filling messageCode');
-        cy.get('input[formcontrolname="messageCode"]').first().type(randomMessageCode(), { force: true });
-        cy.wait(500);
-      } else {
-        cy.log('⚠️ SMS Promote Package is not "Send", skipping messageCode');
-      }
-    });
+        if (currentValue === 'Send') {
+          cy.log(`✅ ${label} = Send, filling messageCode`);
 
-    // Save - ใช้ selector ที่ถูกต้อง
-    // cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-    // cy.contains('button', 'Save').should('be.visible').click(); // ✅ แก้ตรงนี้
-    // cy.wait('@postRequest', { timeout: 100000 }).its('response.statusCode').should('eq', 200);
+          const $input = findScopedMessageCodeInput($select);
 
-    // closeSuccessModal();
+          if (!$input || $input.length === 0) {
+            throw new Error(
+              `Could not locate a scoped messageCode input for "${label}" (formcontrolname="${selectFormControl}"). ` +
+              `Walked up ${8} ancestor levels without finding one. Inspect the DOM around this select.`
+            );
+          }
+
+          cy.wrap($input)
+            .should('exist')
+            .clear({ force: true })
+            .type(randomMessageCode(), { force: true });
+
+          cy.wait(500);
+        } else {
+          cy.log(`⚠️ ${label} is not "Send", skipping messageCode`);
+        }
+      });
+    };
+
+    // ---------- 1) SMS Promote Package ----------
+    fillMessageCodeIfSend('smsPromotePackSendFlag', 'SMS Promote Package');
+
+    // ---------- 2) SMS Notification Before Promotion Expired ----------
+    fillMessageCodeIfSend('beforePromotionExpAlertSendFlag', 'Before Promotion Expired Flag');
   });
 };

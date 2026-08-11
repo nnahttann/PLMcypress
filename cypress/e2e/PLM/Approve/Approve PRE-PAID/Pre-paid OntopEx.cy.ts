@@ -2,18 +2,26 @@ import * as Master from '../../Master';
 
 type PriceType = 'onetime' | 'recurring' | 'usage';
 
+let isFirstRun = true; 
+
 beforeEach(() => {
-  cy.clearLocalStorage();
-  cy.clearCookies();
-  cy.window().then((win) => {
-    win.sessionStorage.clear();
+  if (isFirstRun) {
+    cy.clearLocalStorage();
+    cy.clearCookies();
+    cy.window().then((win) => {
+      win.sessionStorage.clear();
+    });
+    isFirstRun = false;
+  }
+  cy.visit(Master.urlsit, {
+    onBeforeLoad: (win) => {
+      win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
+    }
   });
-  cy.visit(Master.urlsit);
-  cy.viewport(1920, 1080);
 });
 
 describe('PRE-PAID OntopEx', () => {
-  const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+    const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
   priceTypes.forEach((priceType) => {
     describe(`Standard ${priceType}`, () => {

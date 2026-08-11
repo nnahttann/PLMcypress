@@ -21,6 +21,13 @@ const users = [
   "csidp",
   "e2edp",
   "sasff",
+  "ssbsp",
+  "ssbdp",
+  "cpcsp",
+  "cpcdp",
+  "rom",
+  "ckseasyapp",
+  "aqss"
 ];
 
 const userEnv = Object.fromEntries(
@@ -44,6 +51,10 @@ export default defineConfig({
   experimentalMemoryManagement: true,
   numTestsKeptInMemory: 0,
 
+  taskTimeout: 30000,
+  screenshotOnRunFailure: false, // Disable screenshots on failures to save time
+  video: false, // Disable video recording for faster test runs
+  
   retries: {
     runMode: 1,
     openMode: 0,
@@ -65,8 +76,8 @@ export default defineConfig({
 
     ...userEnv,
 
-    waitForAnimations:          true,
-    animationDistanceThreshold: 1,
+    waitForAnimations:          false,
+    animationDistanceThreshold: 0,
   },
 
   e2e: {
@@ -75,12 +86,10 @@ export default defineConfig({
     setupNodeEvents(on, config) {
       on("before:browser:launch", (_browser, launchOptions) => {
 
-        // ── Sandbox / stability ──────────────────────────────────────────────
         launchOptions.args.push("--disable-dev-shm-usage");
         launchOptions.args.push("--disable-gpu");
         launchOptions.args.push("--no-sandbox");
 
-        // ── Background noise ─────────────────────────────────────────────────
         launchOptions.args.push("--disable-background-networking");
         launchOptions.args.push("--disable-default-apps");
         launchOptions.args.push("--disable-extensions");
@@ -92,9 +101,13 @@ export default defineConfig({
         launchOptions.args.push("--prerender-from-omnibox=disabled");
         launchOptions.args.push("--disable-component-extensions-with-background-pages");
 
-        // ── Bug #2: DNS-level block for external CDNs ────────────────────────
-        // Belt-and-suspenders with cy.intercept in e2e.ts
-        // cdnjs added with port :1 so TCP connect fails fast (not just DNS redirect)
+        launchOptions.args.push("--disable-extensions-except");
+        launchOptions.args.push("--mute-audio");
+        launchOptions.args.push("--disable-media-session-api");
+        launchOptions.args.push("--disable-default-apps");
+        launchOptions.args.push("--enable-automation");
+        launchOptions.args.push("--disable-popup-blocking");
+
         launchOptions.args.push(
           "--host-rules=" + [
             "MAP fonts.googleapis.com 127.0.0.1",
@@ -103,12 +116,9 @@ export default defineConfig({
           ].join(", ")
         );
 
-        // ── Throttle / scheduler tweaks for Angular SPA ──────────────────────
         launchOptions.args.push("--disable-background-timer-throttling");
         launchOptions.args.push("--disable-renderer-backgrounding");
 
-        // ── Bug #1 (assist): disable WebSocket compression to reduce negotiation ──
-        // Actual socket destruction handled in cy.intercept in e2e.ts
         launchOptions.args.push("--disable-websocket-from-service-worker");
 
         return launchOptions;
