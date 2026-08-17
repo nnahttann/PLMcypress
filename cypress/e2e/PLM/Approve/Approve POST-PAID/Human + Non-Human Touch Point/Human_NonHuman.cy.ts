@@ -26,9 +26,9 @@ beforeEach(() => {
 });
 
 // ========================
-// USSD (Non-Human Touch Point) - Main
+// Rom, Easy App Rom & USSD (Human + Non-Human Touch Point) - Main
 // ========================
-describe('USSD - POST-PAID Main', () => {
+describe('Rom, Easy App Rom & USSD - POST-PAID Main', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
     priceTypes.forEach((priceType) => {
@@ -39,6 +39,7 @@ describe('USSD - POST-PAID Main', () => {
                         Module: 'POST',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
@@ -53,9 +54,9 @@ describe('USSD - POST-PAID Main', () => {
 });
 
 // ========================
-// USSD (Non-Human Touch Point) - Ontop
+// Rom, Easy App Rom & USSD (Human + Non-Human Touch Point) - Ontop
 // ========================
-describe('USSD - POST-PAID Ontop', () => {
+describe('Rom, Easy App Rom & USSD - POST-PAID Ontop', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
     priceTypes.forEach((priceType) => {
@@ -66,6 +67,7 @@ describe('USSD - POST-PAID Ontop', () => {
                         Module: 'POST',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
@@ -77,6 +79,7 @@ describe('USSD - POST-PAID Ontop', () => {
                         Module: 'ENTER',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
@@ -88,6 +91,7 @@ describe('USSD - POST-PAID Ontop', () => {
                         Module: 'MUSIC',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
@@ -98,9 +102,9 @@ describe('USSD - POST-PAID Ontop', () => {
 });
 
 // ========================
-// USSD (Non-Human Touch Point) - OntopExtra
+// Rom, Easy App Rom & USSD (Human + Non-Human Touch Point) - OntopExtra
 // ========================
-describe('USSD - POST-PAID OntopExtra', () => {
+describe('Rom, Easy App Rom & USSD - POST-PAID OntopExtra', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
     priceTypes.forEach((priceType) => {
@@ -111,6 +115,7 @@ describe('USSD - POST-PAID OntopExtra', () => {
                         Module: 'POST',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
@@ -122,6 +127,7 @@ describe('USSD - POST-PAID OntopExtra', () => {
                         Module: 'ENTER',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
@@ -133,6 +139,7 @@ describe('USSD - POST-PAID OntopExtra', () => {
                         Module: 'MUSIC',
                         subModule: 'POST',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });

@@ -2,7 +2,7 @@ import * as Master from '../../../Master';
 
 type PriceType = 'onetime' | 'recurring' | 'usage';
 
-let isFirstRun = true; 
+let isFirstRun = true;
 
 beforeEach(() => {
   if (isFirstRun) {
@@ -13,25 +13,131 @@ beforeEach(() => {
     });
     isFirstRun = false;
   }
+
   cy.visit(Master.urlsit, {
+    timeout: 60000,
     onBeforeLoad: (win) => {
       win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
     }
   });
+
+  cy.get('app-login', { timeout: 60000 }).should('be.visible');
+  cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
 });
 
-describe('POST-PAID Main', () => {
-const priceTypes: PriceType[] = ['recurring'];
+// ========================
+// Rom, Easy App Rom - Main
+// ========================
+describe.only('Rom, Easy App Rom - POST-PAID Main', () => {
+  const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+
   priceTypes.forEach((priceType) => {
-    describe(`MKT POSTPAID ${priceType}`, () => {
-      it('MKT POSTPAID role', () => {
-        Master.ProjectBasicInformationComplete(priceType, 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true,runHumanTouchPoint: true });
+    describe(`Standard ${priceType}`, () => {
+      describe('Mobile', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'main', {
+            Module: 'POST',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        if (priceType === 'usage') {
+          Master.afterMKTMainUsagePOST();
+        } else {
+          Master.afterMKTMAINPOST();
+        }
       });
-      if (priceType === 'usage') {
-        Master.afterMKTMainUsagePOST();
-      } else {
-        Master.afterMKTMAINPOST();
-      }
+    });
+  });
+});
+
+// ========================
+// Rom, Easy App Rom - Ontop
+// ========================
+describe('Rom, Easy App Rom - POST-PAID Ontop', () => {
+  const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+
+  priceTypes.forEach((priceType) => {
+    describe(`${priceType}`, () => {
+      describe('Mobile', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'ontop', {
+            Module: 'POST',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        Master.afterMKTontopPOST();
+      });
+      describe('ENTER', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'ontop', {
+            Module: 'ENTER',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        Master.afterMKTontopENTER();
+      });
+      describe('MUSIC', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'ontop', {
+            Module: 'MUSIC',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        Master.afterMKTontopMUSIC();
+      });
+    });
+  });
+});
+
+// ========================
+// Rom, Easy App Rom - OntopExtra
+// ========================
+describe('Rom, Easy App Rom - POST-PAID OntopExtra', () => {
+  const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+
+  priceTypes.forEach((priceType) => {
+    describe(`${priceType}`, () => {
+      describe('Mobile', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'ontopextra', {
+            Module: 'POST',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        Master.afterMKTontopPOST();
+      });
+      describe('ENTER', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'ontopextra', {
+            Module: 'ENTER',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        Master.afterMKTontopENTER();
+      });
+      describe('MUSIC', () => {
+        it('MKT POSTPAID role', () => {
+          Master.ProjectBasicInformationComplete(priceType, 'ontopextra', {
+            Module: 'MUSIC',
+            subModule: 'POST',
+            autoSetDuration: true,
+            runHumanTouchPoint: true,
+          });
+        });
+        Master.afterMKTontopMUSIC();
+      });
     });
   });
 });

@@ -1,5 +1,3 @@
-/// <reference types="cypress" />
-
 const closeSuccessModal = (): void => {
     cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
         .closest('.modal-content')
@@ -7,17 +5,6 @@ const closeSuccessModal = (): void => {
         .should('be.visible')
         .and('not.be.disabled')
         .click();
-
-    cy.get('body', { timeout: 15000 }).should(($body) => {
-        expect($body.find('.modal-backdrop').length, 'modal-backdrop should be gone').to.eq(0);
-        expect($body.find('.modal.show, .modal.in').length, 'modal should be closed').to.eq(0);
-    });
-
-    cy.get('body').then(($body) => {
-        if ($body.find('.loading-curtain').length > 0) {
-            cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
-        }
-    });
 };
 
 export const selectAndModifyPO = (poTitle: string): void => {

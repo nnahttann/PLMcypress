@@ -2,17 +2,27 @@ import * as Master from '../Master';
 
 type PriceType = 'onetime' | 'recurring' | 'usage';
 
+let isFirstRun = true;
+
 beforeEach(() => {
-    cy.clearLocalStorage();
-    cy.clearCookies();
-    cy.window().then((win) => {
-        win.sessionStorage.clear();
-    });
+    if (isFirstRun) {
+        cy.clearLocalStorage();
+        cy.clearCookies();
+        cy.window().then((win) => {
+            win.sessionStorage.clear();
+        });
+        isFirstRun = false;
+    }
+
     cy.visit(Master.urlsit, {
+        timeout: 60000,
         onBeforeLoad: (win) => {
             win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
         }
     });
+
+    cy.get('app-login', { timeout: 60000 }).should('be.visible');
+    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
 });
 
 describe.only('POST-PAID Main', () => {

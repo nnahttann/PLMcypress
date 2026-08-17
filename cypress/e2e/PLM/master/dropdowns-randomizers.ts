@@ -665,10 +665,20 @@ export const PriceExcluding = (): void => {
 
     function getRandomRealisticCharge(min = 10, max = 2000): string {
         const realisticPrices = [
-            15, 19, 25, 29, 35, 39, 45, 49, 55, 59, 69, 79, 89, 99,
-            129, 149, 159, 199, 249, 259, 299, 349, 399,
-            449, 499, 549, 599, 699, 799, 899, 999,
-            1099, 1199, 1299, 1399, 1499, 1599, 1999
+            10, 12, 15, 19, 20, 25, 29, 30, 35, 39, 40, 45, 49, 50,
+            55, 59, 60, 65, 69, 70, 75, 79, 80, 85, 89, 90, 95, 99,
+            109, 119, 129, 139, 149, 159, 169, 179, 189, 199,
+            219, 229, 239, 249, 259, 269, 279, 289, 299,
+            319, 329, 339, 349, 359, 369, 379, 389, 399,
+            419, 429, 439, 449, 459, 469, 479, 489, 499,
+            519, 529, 539, 549, 559, 569, 579, 589, 599,
+            619, 629, 639, 649, 659, 669, 679, 689, 699,
+            719, 729, 739, 749, 759, 769, 779, 789, 799,
+            819, 829, 839, 849, 859, 869, 879, 889, 899,
+            919, 929, 939, 949, 959, 969, 979, 989, 999,
+            1049, 1099, 1149, 1199, 1249, 1299, 1349, 1399,
+            1449, 1499, 1549, 1599, 1649, 1699, 1749, 1799,
+            1849, 1899, 1949, 1999
         ];
         const validPrices = realisticPrices.filter(p => p >= min && p <= max);
         const price = validPrices.length > 0
@@ -684,7 +694,12 @@ export const PriceExcluding = (): void => {
         .type(randomCharge)
         .should('have.value', randomCharge);
 
-    cy.get('.col-md-6 > .btn').click();
+    cy.get('input[formcontrolname="chargeExcVat"]')
+        .closest('.panel-body')
+        .find('button.btn-primary')
+        .contains('Add')
+        .should('not.be.disabled')
+        .click();
 };
 // ========================
 // PRICE EXCLUDING
@@ -692,9 +707,20 @@ export const PriceExcluding = (): void => {
 export const RandomMultiDuration = (): void => {
     function getRandomRealisticCharge(min = 100, max = 2000): string {
         const realisticPrices = [
-            129, 149, 159, 199, 249, 259, 299, 349, 399,
-            449, 499, 549, 599, 699, 799, 899, 999,
-            1099, 1199, 1299, 1399, 1499, 1599, 1999
+            10, 12, 15, 19, 20, 25, 29, 30, 35, 39, 40, 45, 49, 50,
+            55, 59, 60, 65, 69, 70, 75, 79, 80, 85, 89, 90, 95, 99,
+            109, 119, 129, 139, 149, 159, 169, 179, 189, 199,
+            219, 229, 239, 249, 259, 269, 279, 289, 299,
+            319, 329, 339, 349, 359, 369, 379, 389, 399,
+            419, 429, 439, 449, 459, 469, 479, 489, 499,
+            519, 529, 539, 549, 559, 569, 579, 589, 599,
+            619, 629, 639, 649, 659, 669, 679, 689, 699,
+            719, 729, 739, 749, 759, 769, 779, 789, 799,
+            819, 829, 839, 849, 859, 869, 879, 889, 899,
+            919, 929, 939, 949, 959, 969, 979, 989, 999,
+            1049, 1099, 1149, 1199, 1249, 1299, 1349, 1399,
+            1449, 1499, 1549, 1599, 1649, 1699, 1749, 1799,
+            1849, 1899, 1949, 1999
         ];
         const validPrices = realisticPrices.filter(p => p >= min && p <= max);
         const price = validPrices.length > 0
@@ -793,6 +819,7 @@ export const RandomMultiDuration = (): void => {
             });
         });
 };
+
 // ========================
 // SELECT TARGET GROUP
 // ========================
@@ -864,7 +891,6 @@ export const selectTargetGroup = (type:
     //     }
     // }
 };
-
 
 // ========================
 // DROPDOWN PROMOTION GROUP
@@ -938,8 +964,6 @@ export const targetgroup = (): void => {
             cy.wrap($option).dblclick({ force: true });
         });
 };
-
-
 // ========================
 // RETRY PATTERN
 // ========================
@@ -950,6 +974,28 @@ export const RetryPattern = (): void => {
         .scrollIntoView()
         .should('be.visible')
         .click();
+
+    // Max Retry Period: only type a random value if the field is empty or not a valid integer
+    cy.get('input[formcontrolname="maxRetryPeriod"]')
+        .filter(':visible')
+        .then(($input) => {
+            const currentValue = ($input.val() as string) ?? '';
+            const isValidInteger = /^\d+$/.test(currentValue.trim());
+
+            if (!isValidInteger) {
+                // maxlength="3" on the field -> random 1-999
+                const randomPeriod = String(Math.floor(Math.random() * 999) + 1);
+
+                cy.wrap($input)
+                    .clear()
+                    .type(randomPeriod)
+                    .blur({ force: true });
+
+                cy.log(`Max Retry Period was empty/invalid, typed random value: ${randomPeriod}`);
+            } else {
+                cy.log(`Max Retry Period already has a valid value: ${currentValue}`);
+            }
+        });
 
     cy.get('select[formcontrolname="actionWhenRetryReachMaxPeriod"]')
         .should(($select) => {
@@ -1293,7 +1339,6 @@ export const SpecialCondition = (): void => {
 
 export const MarketSegment = (): void => {
     cy.get('app-mass-mkt-market-segment').within(() => {
-        // Randomly decide whether to move Residential (default selected) back to Available
         const shouldRemoveResidential = Math.random() < 0.5;
 
         if (shouldRemoveResidential) {
@@ -1301,12 +1346,15 @@ export const MarketSegment = (): void => {
                 .contains('Residential')
                 .dblclick();
             cy.log('Residential moved back to Available items (double click)');
+
+            // Wait for Angular to actually move it before continuing
+            cy.get('select[formcontrolname="availableListBox"] option')
+                .contains('Residential')
+                .should('exist');
         } else {
             cy.log('Keeping default Residential in Selected items');
         }
 
-        // If Residential was removed, we MUST add at least one item from Available
-        // to satisfy "must select at least 1 value" — otherwise it's optional.
         const shouldAddExtra = shouldRemoveResidential ? true : Math.random() < 0.5;
 
         if (!shouldAddExtra) {
@@ -1314,12 +1362,11 @@ export const MarketSegment = (): void => {
             return;
         }
 
+        // Decide how many to pick based on a fresh read, but re-query for each pick
         cy.get('select[formcontrolname="availableListBox"] option').then($options => {
-            const options = Array.from($options);
+            const count = $options.length;
 
-            if (options.length === 0) {
-                // Edge case: Residential was removed but nothing is available to replace it —
-                // this would leave the field empty. Log loudly so it's not silently invalid.
+            if (count === 0) {
                 if (shouldRemoveResidential) {
                     cy.log('WARNING: Residential removed but no available items to select — selection will be empty!');
                 } else {
@@ -1328,23 +1375,30 @@ export const MarketSegment = (): void => {
                 return;
             }
 
-            // If Residential was removed, force at least 1 pick (minimum 1);
-            // otherwise keep the original random range.
-            const minPick = shouldRemoveResidential ? 1 : 1;
-            const numToPick = Math.max(minPick, Math.floor(Math.random() * options.length) + 1);
-            const shuffled = [...options].sort(() => 0.5 - Math.random());
-            const chosenLabels = shuffled
-                .slice(0, Math.min(numToPick, options.length))
-                .map(opt => opt.textContent?.trim() || '')
-                .filter(label => label.length > 0);
+            const numToPick = Math.max(1, Math.floor(Math.random() * count) + 1);
+            cy.log(`Adding ${numToPick} extra Market Segment item(s)`);
 
-            cy.log(`Adding extra Market Segment items (double click): ${chosenLabels.join(', ')}`);
+            // Pick one at a time, always re-querying the CURRENT live list,
+            // so we never act on a label that's already moved.
+            const pickOnce = () => {
+                cy.get('select[formcontrolname="availableListBox"] option').then($current => {
+                    if ($current.length === 0) return;
+                    const idx = Math.floor(Math.random() * $current.length);
+                    const label = $current.eq(idx).text().trim();
+                    cy.log(`Double-clicking: ${label}`);
+                    cy.get('select[formcontrolname="availableListBox"] option')
+                        .contains(label)
+                        .dblclick();
+                    // confirm it actually left the available list before moving on
+                    cy.get('select[formcontrolname="availableListBox"] option')
+                        .contains(label)
+                        .should('not.exist');
+                });
+            };
 
-            chosenLabels.forEach(label => {
-                cy.get('select[formcontrolname="availableListBox"] option')
-                    .contains(label)
-                    .dblclick();
-            });
+            for (let i = 0; i < numToPick; i++) {
+                pickOnce();
+            }
         });
     });
 };

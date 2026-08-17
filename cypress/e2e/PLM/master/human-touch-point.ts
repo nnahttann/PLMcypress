@@ -1,7 +1,6 @@
-import { updateProjectName } from './project-manager';
 // ========================
 // RANDOM HUMAN TOUCH POINT
-// ========================X: import เพิ่ม
+// ========================
 
 export const RandomHumanTouchPoint = (subModule?: string): void => {
     // ✅ Reset env ทุกครั้งที่เริ่มประมวลผล PO ใหม่ ป้องกันค่าเก่าจาก PO ก่อนหน้าค้าง
@@ -236,14 +235,29 @@ export const RandomHumanTouchPoint = (subModule?: string): void => {
                     .blur();
 
                 // ✅ สำคัญมาก: อัปเดตทั้ง currentPoName และ poName
+                // — นี่คือ key ที่ promoteToActmRole (ROM / Easy App ROM role) อ่านค่า
+                //   PO ล่าสุดเพื่อ Claim/Approve อยู่แล้ว ไม่ต้อง sync กลับเข้า
+                //   ProjectManager (getStandardProjectName) เพราะ ProjectManager
+                //   เก็บ "ชื่อ Project" (index เดียวกับตอน registerProjectName ใน
+                //   project-creation.ts) — ถ้าเรียก updateProjectName(newName) ที่นี่
+                //   จะเขียนทับชื่อ Project จริงด้วยชื่อ PO (...RM) ทันที ทำให้
+                //   cksDoerFinalStep / ClaimProject(claimBy: 'project') รอบสุดท้าย
+                //   หา Project ไม่เจอ (ดู bugfix note ด้านล่าง)
                 Cypress.env('currentPoName', newName);
                 Cypress.env('poName', newName);
 
-                // ✅ FIX: sync กลับเข้า ProjectManager Map ด้วย
-                // ไม่งั้น getStandardProjectName() (ที่ promoteToActmRole เรียกใช้)
-                // จะยังคืนชื่อเก่าที่ register ไว้ตอนสร้าง PO ครั้งแรก
-                // (ไม่มี suffix RM/ES RM ต่อท้าย → ClaimProject หา PO ไม่เจอ)
-                updateProjectName(newName);
+                // ❌ เดิมมีบรรทัด updateProjectName(newName) ตรงนี้ — ถูกลบออกแล้ว
+                //    เพราะมันเขียนทับชื่อ Project ตัวจริงใน ProjectManager Map
+                //    (index เดียวกับที่ registerProjectName ตั้งไว้ตอนสร้าง Project)
+                //    ด้วยชื่อ PO ที่เพิ่ง rename (มี suffix RM/ES RM) ส่งผลให้
+                //    getStandardProjectName() ที่จุดอื่น (เช่น cksDoerFinalStep,
+                //    performMusicRoles, performTscenterRoleOnly) คืนชื่อ PO แทน
+                //    ชื่อ Project จริง → ClaimProject(claimBy: 'project') หา row
+                //    ไม่เจอใน Unassigned Task แล้ว timeout ตอนกด Next page
+                //
+                //    promoteToActmRole (ที่ใช้กับ ROM / Easy App ROM) อ่านค่าจาก
+                //    Cypress.env('currentPoName') อยู่แล้วเป็นค่าแรก (บรรทัดด้านบน
+                //    set ไว้ครบแล้ว) จึงไม่จำเป็นต้อง sync เข้า ProjectManager อีก
 
                 cy.log(`✅ PO Name updated (fresh): ${newName}`);
             });

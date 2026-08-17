@@ -306,10 +306,6 @@ const backToCksDoer = (registerBeforeBack: boolean = false): void => {
 
 // MAIN EXPORT
 
-/**
- * คลิกปุ่ม Approve — ลอง exact match "Approve To CGMD" ก่อน
- * ถ้าไม่เจอ fallback เป็น "Approve" เฉยๆ (สองจุดในหน้านี้ข้อความปุ่มไม่คงที่)
- */
 const clickApproveButton = (specificLabel: string | undefined, timeout: number): void => {
     const candidates = specificLabel ? [specificLabel, 'Approve'] : ['Approve'];
 

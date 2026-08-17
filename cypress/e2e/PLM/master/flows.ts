@@ -801,7 +801,19 @@ export const beforeapproveMKT = (): void => {
 
     cy.intercept('POST', '**/api-mkt/promoteFromMktDoer').as('submitApprove');
     cy.get('button.btn.btn-primary.btn-xs.ng-star-inserted').contains('Submit').click();
-    cy.wait(5000);
+
+    cy.get('body', { timeout: 10000 }).then($body => {
+        const $modal = $body.find('.modal-title.text-danger:contains("Validate Result")');
+        if ($modal.length > 0) {
+            const errors = Cypress.$('.modal-body .alert-danger')
+                .toArray()
+                .map(el => Cypress.$(el).text().trim())
+                .join(' | ');
+            // Close it so it doesn't linger and break the next test
+            cy.get('.modal-footer .btn-danger').contains('Close').click({ force: true });
+            throw new Error(`❌ Approve blocked by Validate Result modal: ${errors}`);
+        }
+    });
 
     cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
@@ -979,130 +991,187 @@ export const runMusicOrTscenterIfNeeded = (Module?: string): void => {
     const fn = buildMusicInsertFn(Module);
     if (fn) fn();
 };
-export const performTscenterRoleOnly = (): void => {
-    it('TSCENTER role', () => {
-        loginAndWaitReady(tscenter, tscenterpass);
-        const finalProjectName = getStandardProjectName();
-        cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+
+const runTscenterCore = (): void => {
+    loginAndWaitReady(tscenter, tscenterpass);
+    const finalProjectName = getStandardProjectName();
+    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+    ClaimProject(finalProjectName, { claimBy: 'project' });
+    approveProject(finalProjectName);
+
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+    cy.url({ timeout: 60000 }).should('include', '/zenon/ts-center');
+    cy.wait(500);
+    cy.get('select[formcontrolname="olympus"]').should('be.visible').select('No').should('have.value', 'No');
+
+    cy.scrollTo('bottom');
+    cy.wait(500);
+    cy.contains('button', 'Approve').should('be.visible').click({ force: true });
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+    cy.contains('button', 'Logout').should('be.visible').click();
+};
+
+const runSupportRoleCore = (
+    roleUser: any,
+    rolePass: any,
+    urlPart: string,
+    btnText: string
+): void => {
+    loginAndWaitReady(roleUser, rolePass);
+    const finalProjectName = getStandardProjectName();
+    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+
+    let checkUrl = '';
+    if (urlPart === 'csisp' || urlPart === 'csidp') checkUrl = '/zenon/csi-support';
+    else if (urlPart === 'aafsp' || urlPart === 'aafdp') checkUrl = '/zenon/aaf-support';
+    else if (urlPart === 'ssbsp' || urlPart === 'ssbdp') checkUrl = '/zenon/ssb-support';
+    else if (urlPart === 'cpcsp' || urlPart === 'cpcdp') checkUrl = '/zenon/cpc-support';
+    else checkUrl = urlPart;
+
+    projectExistsInTable('Unassigned Task', finalProjectName).then((projectFound) => {
+        if (!projectFound) {
+            cy.log(`⚠️ ไม่พบ Project "${finalProjectName}" สำหรับ role ${urlPart} — ข้ามไปทำ role ถัดไป`);
+            cy.get('body').then(($b2) => {
+                if ($b2.find('button:contains("Logout")').length > 0) {
+                    cy.contains('button', 'Logout').click({ force: true });
+                }
+            });
+            return;
+        }
+
         ClaimProject(finalProjectName, { claimBy: 'project' });
         approveProject(finalProjectName);
-
         cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-        cy.url({ timeout: 60000 }).should('include', '/zenon/ts-center');
-        cy.wait(500);
-        cy.get('select[formcontrolname="olympus"]').should('be.visible').select('No').should('have.value', 'No');
 
+        cy.url({ timeout: 60000 }).should('include', checkUrl);
+        cy.wait(500);
         cy.scrollTo('bottom');
         cy.wait(500);
-        cy.contains('button', 'Approve').should('be.visible').click({ force: true });
+        cy.contains('button', btnText).should('be.visible').click({ force: true });
         cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
         cy.contains('button', 'Logout').should('be.visible').click();
     });
 };
+
+const runE2eTestCore = (): void => {
+    loginAndWaitReady(e2etest, e2etestpass);
+    const finalProjectName = getStandardProjectName();
+    cy.log('🎯 Project ใช้สำหรับ Claim: ' + finalProjectName);
+    ClaimProject(finalProjectName, { claimBy: 'project' });
+    approveProject(finalProjectName);
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+    cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
+    cy.wait(500);
+    cy.scrollTo('bottom');
+    cy.wait(500);
+
+    cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
+    cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
+        cy.get('input[type="file"][id="files"]').selectFile(
+            { contents: Cypress.Buffer.from(fileContent, 'binary'), fileName: 'file.pdf', mimeType: 'application/pdf' },
+            { force: true }
+        );
+    });
+    cy.intercept('POST', '**/upload**').as('fileUpload');
+    cy.contains('button', 'Approve to MKT Doer').should('be.visible').click({ force: true });
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+    cy.contains('button', 'Logout').should('be.visible').click();
+};
+
+const runMktRoleCore = (): void => {
+    loginAndWaitReady(music, musicpass);
+    const finalProjectName = getStandardProjectName();
+    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+    approveProject(finalProjectName);
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+    cy.url({ timeout: 60000 }).should('include', '/owner-zenon');
+    cy.wait(500);
+    cy.scrollTo('bottom');
+    cy.wait(500);
+    cy.contains('button', 'Approve').should('be.visible').click({ force: true });
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+    cy.contains('button', 'Logout').should('be.visible').click();
+};
+
+const runE2eDpCore = (): void => {
+    loginAndWaitReady(e2edp, e2edppass);
+    const finalProjectName = getStandardProjectName();
+    cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+    ClaimProject(finalProjectName, { claimBy: 'project' });
+    approveProject(finalProjectName);
+    cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
+    cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
+    cy.wait(500);
+    cy.scrollTo('bottom');
+    cy.contains('button', 'Approve to Pre Go live').should('be.visible').click({ force: true });
+    cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
+    cy.contains('button', 'Logout').should('be.visible').click();
+};
+
+// ✅ ลำดับ full chain ทั้ง 12 role ตามของเดิม (TSCENTER เริ่มก่อนเสมอ, MKT อยู่ลำดับที่ 7)
+const runFullMusicChainCore = (): void => {
+    runTscenterCore();
+    runSupportRoleCore(csisp, csisppass, 'csisp', 'Promote To E2E Tester');
+    runSupportRoleCore(aafsp, aafsppass, 'aafsp', 'Promote To E2E Tester');
+    runSupportRoleCore(ssbsp, ssbsppass, 'ssbsp', 'Promote To E2E Tester');
+    runSupportRoleCore(cpcsp, cpcsppass, 'cpcsp', 'Promote To E2E Tester');
+    runE2eTestCore();
+    runMktRoleCore();
+    runSupportRoleCore(csidp, csidppass, 'csidp', 'Promote To E2E Deploy');
+    runSupportRoleCore(aafdp, aafdppass, 'aafdp', 'Promote To E2E Deploy');
+    runSupportRoleCore(ssbdp, ssbdppass, 'ssbdpp', 'Promote To E2E Deploy');
+    runSupportRoleCore(cpcdp, cpcdppass, 'cpcdp', 'Promote To E2E Deploy');
+    runE2eDpCore();
+};
+
+// ========================
+// MUSIC ROLES — PUBLIC it() WRAPPERS (คงชื่อเดิมไว้ ใครเรียกจากที่อื่นไม่พัง)
+// ========================
+
+export const performTscenterRoleOnly = (): void => {
+    it('TSCENTER role', () => runTscenterCore());
+};
+
 export const performMusicRoles = (): void => {
-    performTscenterRoleOnly();
+    // เดิมฟังก์ชันนี้ declare it() 12 ตัวแยกกันตรงนี้เลย (ใช้ตอน Module === 'MUSIC'
+    // ซึ่งรู้ตอน declare-time อยู่แล้ว ไม่มีปัญหา timing — คงพฤติกรรมเดิมไว้)
+    it('TSCENTER role', () => runTscenterCore());
+    it('csisp role', () => runSupportRoleCore(csisp, csisppass, 'csisp', 'Promote To E2E Tester'));
+    it('aafsp role', () => runSupportRoleCore(aafsp, aafsppass, 'aafsp', 'Promote To E2E Tester'));
+    it('ssbsp role', () => runSupportRoleCore(ssbsp, ssbsppass, 'ssbsp', 'Promote To E2E Tester'));
+    it('cpcsp role', () => runSupportRoleCore(cpcsp, cpcsppass, 'cpcsp', 'Promote To E2E Tester'));
+    it('e2etest role', () => runE2eTestCore());
+    it('MKT role', () => runMktRoleCore());
+    it('csidp role', () => runSupportRoleCore(csidp, csidppass, 'csidp', 'Promote To E2E Deploy'));
+    it('aafdp role', () => runSupportRoleCore(aafdp, aafdppass, 'aafdp', 'Promote To E2E Deploy'));
+    it('ssbdp role', () => runSupportRoleCore(ssbdp, ssbdppass, 'ssbdpp', 'Promote To E2E Deploy'));
+    it('cpcdp role', () => runSupportRoleCore(cpcdp, cpcdppass, 'cpcdp', 'Promote To E2E Deploy'));
+    it('e2edp role', () => runE2eDpCore());
+};
 
-    const performSupportRole = (roleUser: any, rolePass: any, urlPart: string, btnText: string) => {
-        it(`${urlPart} role`, () => {
-            loginAndWaitReady(roleUser, rolePass);
-            const finalProjectName = getStandardProjectName();
-            cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
+// ========================
+// ✅ NEW: RUNTIME-CHECKED DISPATCHER
+// declare it() เสมอ ไม่มีเงื่อนไขตอน declare-time (เหมือน pattern ROM/AQSS)
+// เช็ค Cypress.env(...) ข้างใน it() callback → ทำงานตอน RUN-TIME จริง
+// ตอนนั้นค่า hasYoutubePremium/hasCloudGame ถูก RandomProductSpecification
+// เซ็ตไปแล้วจริงจาก 'CKS role' ที่รันผ่านไปก่อนหน้านี้
+// ========================
 
-            let checkUrl = '';
-            if (urlPart === 'csisp' || urlPart === 'csidp') checkUrl = '/zenon/csi-support';
-            else if (urlPart === 'aafsp' || urlPart === 'aafdp') checkUrl = '/zenon/aaf-support';
-            else if (urlPart === 'ssbsp' || urlPart === 'ssbdp') checkUrl = '/zenon/ssb-support';
-            else if (urlPart === 'cpcsp' || urlPart === 'cpcdp') checkUrl = '/zenon/cpc-support';
-            else checkUrl = urlPart;
+export const runMusicOrTscenterRuntimeChecked = (Module?: string): void => {
+    it('Music/TSCENTER role (runtime-checked)', () => {
+        const hasYoutubePremium = Cypress.env('hasYoutubePremium') === true;
+        const hasCloudGame = Cypress.env('hasCloudGame') === true;
 
-            projectExistsInTable('Unassigned Task', finalProjectName).then((projectFound) => {
-                if (!projectFound) {
-                    cy.log(`⚠️ ไม่พบ Project "${finalProjectName}" สำหรับ role ${urlPart} — ข้ามไปทำ role ถัดไป`);
-                    cy.get('body').then(($b2) => {
-                        if ($b2.find('button:contains("Logout")').length > 0) {
-                            cy.contains('button', 'Logout').click({ force: true });
-                        }
-                    });
-                    return;
-                }
+        cy.log(`🔍 [Music/TSCENTER runtime check] Module="${Module}" hasYoutubePremium=${hasYoutubePremium} hasCloudGame=${hasCloudGame}`);
 
-                ClaimProject(finalProjectName, { claimBy: 'project' });
-                approveProject(finalProjectName);
-                cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-
-                cy.url({ timeout: 60000 }).should('include', checkUrl);
-                cy.wait(500);
-                cy.scrollTo('bottom');
-                cy.wait(500);
-                cy.contains('button', btnText).should('be.visible').click({ force: true });
-                cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-                cy.contains('button', 'Logout').should('be.visible').click();
-            });
-        });
-    };
-
-    performSupportRole(csisp, csisppass, 'csisp', 'Promote To E2E Tester');
-    performSupportRole(aafsp, aafsppass, 'aafsp', 'Promote To E2E Tester');
-    performSupportRole(ssbsp, ssbsppass, 'ssbsp', 'Promote To E2E Tester');
-    performSupportRole(cpcsp, cpcsppass, 'cpcsp', 'Promote To E2E Tester');
-
-    it('e2etest role', () => {
-        loginAndWaitReady(e2etest, e2etestpass);
-        const finalProjectName = getStandardProjectName();
-        cy.log('🎯 Project ใช้สำหรับ Claim: ' + finalProjectName);
-        ClaimProject(finalProjectName, { claimBy: 'project' });
-        approveProject(finalProjectName);
-        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-        cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
-        cy.wait(500);
-        cy.scrollTo('bottom');
-        cy.wait(500);
-
-        cy.get('input[type="file"]', { timeout: 10000 }).should('exist');
-        cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/file.pdf', 'binary').then((fileContent) => {
-            cy.get('input[type="file"][id="files"]').selectFile(
-                { contents: Cypress.Buffer.from(fileContent, 'binary'), fileName: 'file.pdf', mimeType: 'application/pdf' },
-                { force: true }
-            );
-        });
-        cy.intercept('POST', '**/upload**').as('fileUpload');
-        cy.contains('button', 'Approve to MKT Doer').should('be.visible').click({ force: true });
-        cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-        cy.contains('button', 'Logout').should('be.visible').click();
-    });
-
-    it('MKT role', () => {
-        loginAndWaitReady(music, musicpass);
-        const finalProjectName = getStandardProjectName();
-        cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-        approveProject(finalProjectName);
-        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-        cy.url({ timeout: 60000 }).should('include', '/owner-zenon');
-        cy.wait(500);
-        cy.scrollTo('bottom');
-        cy.wait(500);
-        cy.contains('button', 'Approve').should('be.visible').click({ force: true });
-        cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-        cy.contains('button', 'Logout').should('be.visible').click();
-    });
-
-    performSupportRole(csidp, csidppass, 'csidp', 'Promote To E2E Deploy');
-    performSupportRole(aafdp, aafdppass, 'aafdp', 'Promote To E2E Deploy');
-    performSupportRole(ssbdp, ssbdppass, 'ssbdpp', 'Promote To E2E Deploy');
-    performSupportRole(cpcdp, cpcdppass, 'cpcdp', 'Promote To E2E Deploy');
-
-    it('e2edp role', () => {
-        loginAndWaitReady(e2edp, e2edppass);
-        const finalProjectName = getStandardProjectName();
-        cy.log('Project ใช้สำหรับ Claim: ' + finalProjectName);
-        ClaimProject(finalProjectName, { claimBy: 'project' });
-        approveProject(finalProjectName);
-        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-        cy.url({ timeout: 60000 }).should('include', '/zenon/e2e-tester');
-        cy.wait(500);
-        cy.scrollTo('bottom');
-        cy.contains('button', 'Approve to Pre Go live').should('be.visible').click({ force: true });
-        cy.url({ timeout: 30000 }).should('include', '/#/workspace-home/workspace');
-        cy.contains('button', 'Logout').should('be.visible').click();
+        if (Module === 'MUSIC' || hasYoutubePremium) {
+            cy.log('🎬 [Dispatcher] Running FULL music chain (runtime)');
+            runFullMusicChainCore();
+        } else if (hasCloudGame) {
+            cy.log('☁️ [Dispatcher] Running TSCENTER only (Cloud Game, runtime)');
+            runTscenterCore();
+        } else {
+            cy.log('⏭️ ข้าม Music/TSCENTER role — ไม่เข้าเงื่อนไขตอน runtime');
+        }
     });
 };

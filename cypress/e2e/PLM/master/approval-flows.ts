@@ -120,6 +120,7 @@ const _approveSPADSup = (
         '/cgmd/cgmd-spad',
         (_poName, _poIndex) => () => {
             cy.then(() => {
+                cy.wait(3000);
                 const rnd5 = Math.floor(Math.random() * 90000) + 10000;
                 const rnd2 = Math.floor(Math.random() * 90) + 10;
                 cy.contains('label', 'FEATURE_SUB_CODE').closest('.col-md-4').find('input').clear().type(rnd5.toString());
@@ -160,7 +161,7 @@ const _approveSPADDoer = (
         'To Do List',
         '/cgmd/cgmd-configure',
         (_poName, _poIndex) => () => {
-            cy.wait(500);
+            cy.wait(3000);
 
             const fillRandom = (labelText: string, prefix: string) => {
                 const escaped = labelText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -214,7 +215,7 @@ const _approveSPADTester = (
         'To Do List',
         '/cgmd/cgmd-tester',
         (_poName, _poIndex) => () => {
-            cy.wait(500);
+            cy.wait(3000);
             scrollAndWait();
 
             cy.get('body').then(($body) => {
@@ -297,6 +298,7 @@ export const approveProjectSPADdeploy = (
         'To Do List',
         '/actm/actm-doer',
         (_poName, _poIndex) => () => {
+            cy.wait(3000);
             scrollAndWait();
             cy.contains('button', 'Promote To ACTM', { timeout: 60000 }).should('be.visible').click();
         },
@@ -317,6 +319,7 @@ export const approveProjectCGMD = (
         'To Do List',
         '/cgmd/cgmd-configure',
         (_poName, _poIndex) => () => {
+            cy.wait(3000);
             const selectSingleRandomMatOption = () => {
                 cy.get('.cdk-overlay-container mat-option:not(.mat-option-disabled)')
                     .should('have.length.greaterThan', 0)
@@ -409,6 +412,7 @@ export const approveProjectCGMDPRE = (
         'To Do List',
         '/cgmd/cgmd-configure',
         (_poName, _poIndex) => () => {
+            cy.wait(3000);
             const maxDigits = 12;
             const numDigits = Math.floor(Math.random() * maxDigits) + 1;
             const min = Math.pow(10, numDigits - 1);
@@ -453,7 +457,7 @@ const _approveProjectCGMDPREMainNotComplex = (
             cy.get('label:contains("PACKAGE_ID (PP ID)")').parent().next('div').find('input')
                 .type('PP' + Math.floor(Math.random() * 90000) + 10000);
             selectRandomOption('Gprs type');
-            cy.wait(500);
+            cy.wait(3000);
             selectRandomOption('Template');
             scrollAndWait();
             handleAddToUSMP();
@@ -521,6 +525,7 @@ export const approveProjectCGMDtester = (
         'To Do List',
         '/cgmd/cgmd-tester',
         (_poName, _poIndex) => () => {
+            cy.wait(3000);
             scrollAndWait();
 
             // ถ้าไม่เจอ "Promote to ACTM" ให้หา "Approve" แทน
@@ -547,6 +552,7 @@ export const approveProjectCGMDtesterPRE = (
         'To Do List',
         '/cgmd/cgmd-tester',
         (_poName, _poIndex) => () => {
+            cy.wait(3000);
             scrollAndWait();
             cy.contains('button', 'Promote To Pre Go Live', { timeout: 60000 }).should('be.visible').click();
             cy.contains('button', 'Yes').should('be.visible').click();
@@ -598,7 +604,7 @@ export const approveProjectCGMDtesterPREPlugin = (
         'To Do List',
         '/cgmd/cgmd-tester',
         (_poName, _poIndex) => () => {
-            cy.wait(500);
+            cy.wait(3000);
             scrollAndWait();
             cy.intercept('GET', '**/api/SendPluginMain_v2/**').as('sendPluginApi');
 
@@ -631,10 +637,6 @@ export const approveProjectCGMDtesterPREPlugin = (
 
 // ========================
 // OTHER APPROVAL FUNCTIONS
-// ========================
-
-// ========================
-// (ใช้แทน loopApproveAllPOs เพราะ createFullPageApprovalFlow hardcode "To Do List")
 // ========================
 
 const approveFromUnassignedTask = (
@@ -687,7 +689,6 @@ const approveFromUnassignedTask = (
 };
 
 // ACTM
-
 export const approveProjectACTM = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -696,13 +697,36 @@ export const approveProjectACTM = (
         '/actm/actm-doer',
         'ACTM',
         (_poName, _poIndex) => {
+            cy.wait(3000);
             scrollAndWait();
-            cy.get(':nth-child(3) > :nth-child(4)').click();
+
+            // ดัก native confirm dialog เผื่อมี
+            cy.on('window:confirm', () => true);
+
+            cy.get('button.btn-primary')
+                .filter((_i, el) => /^Promote To\s+\w+/.test(el.innerText.trim()))
+                .should('have.length', 1)
+                .click();
+
+            // ✅ เช็คว่ามี modal ยืนยันโผล่มาไหม แล้วกด Yes ถ้ามี
+            cy.wait(500);
+            cy.get('body').then($body => {
+                if ($body.find('.modal:visible').length > 0 || $body.find('button:contains("Yes")').length > 0) {
+                    cy.log('🔔 พบ modal ยืนยัน — กำลังกด Yes');
+                    cy.contains('button', 'Yes').should('be.visible').click();
+                } else {
+                    cy.log('ℹ️ ไม่พบ modal ยืนยัน');
+                }
+            });
+
+            // ✅ assert ว่า promote สำเร็จจริง เช่น redirect หรือ toast
+            cy.url({ timeout: 15000 }).should('not.include', '/actm/actm-doer/detail'); 
+            // หรือถ้ามี success message
+            // cy.contains('successfully', { timeout: 10000 }).should('be.visible');
         },
         options
     );
 };
-
 // OPER
 
 export const approveProjectOPER = (
@@ -713,6 +737,7 @@ export const approveProjectOPER = (
         '/oper/oper-doer',
         'OPER',
         (_poName, _poIndex) => {
+            cy.wait(3000);
             scrollAndWait();
             // ⚠️ selector เดิม — ถ้าพังให้เปลี่ยนเป็นข้อความที่ชัดเจน
             cy.get('.col-md-6 > :nth-child(3)').click();
@@ -731,6 +756,7 @@ export const approveProjectAPO = (
         '/apo/apo-doer',
         'APO',
         (_poName, _poIndex) => {
+            cy.wait(3000);
             scrollAndWait();
             cy.contains('button', 'Promote To Pre Go Live', { timeout: 60000 })
                 .should('be.visible')

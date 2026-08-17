@@ -8,24 +8,6 @@ const ALL_PRIORITY_QUOTA_TYPES = [
     'Unlimited Data (Fixed Speed)',
 ];
 
-// ⚠️ NOTE: เดิมมี QUOTA_TYPES_WITHOUT_ROW_PRIORITY ที่ใช้ skip inner Edit loop
-// ทั้งหมดตาม quota type ("Unlimited Data (Throttling Speed)" /
-// "Unlimited Data (Fixed Speed)") โดยสมมติว่า priority ถูกกรอกผ่าน
-// top-level field (fixedSpeedPriority / internetThrottlingSpeedPriority)
-// ไปแล้วใน Step 1
-//
-// ❌ แต่จาก DOM จริง คอลัมน์ "Priority" ใน "Internet Quota" table (inner table)
-// เป็นคนละ field กับ fixedSpeedPriority/internetThrottlingSpeedPriority
-// (คอลัมน์ Priority ใน table นั้น render เป็น <td></td> ว่างเปล่า และต้องกด
-// Edit ต่อแถวเพื่อเปิด sub-form ที่มี input[formcontrolname="priority"])
-//
-// ผลคือ quota type สองแบบนี้ไม่เคยถูกกรอก row-level priority เลย เพราะ
-// Step 2 ถูก skip ทั้งหมด — จึงลบเงื่อนไขนี้ออก แล้วเปลี่ยนไปเช็คจาก DOM จริง
-// ว่ามี inner table + มีแถวข้อมูลให้กรอกหรือไม่ (ปล่อยให้
-// pollForVisiblePriorityInput เป็นตัว fallback เองถ้าไม่เจอ input จริง ๆ)
-//
-// เก็บ constant นี้ไว้เผื่ออ้างอิง/ใช้ที่อื่น แต่ "ไม่ใช้" เป็นเงื่อนไข skip
-// ใน updatePriorityInPanel อีกต่อไป
 const QUOTA_TYPES_WITHOUT_ROW_PRIORITY: string[] = [
 ];
 

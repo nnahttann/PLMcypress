@@ -4,12 +4,14 @@
 class ProjectManager {
     private static instance: ProjectManager;
     private projects: Map<number, string> = new Map();
+    private projectCodes: Map<number, string> = new Map();
     private currentIndex: number = 0;
 
     private constructor() {
         const saved = Cypress.env('projectManager');
         if (saved) {
             this.projects = new Map(Object.entries(saved.projects || {}).map(([k, v]) => [parseInt(k), v as string]));
+            this.projectCodes = new Map(Object.entries(saved.projectCodes || {}).map(([k, v]) => [parseInt(k), v as string]));
             this.currentIndex = saved.currentIndex || 0;
         }
     }
@@ -39,6 +41,21 @@ class ProjectManager {
         return Array.from(this.projects.values());
     }
 
+    // ✅ ADD: Project Code (คู่กับ projectName ตาม index เดียวกัน)
+    registerCode(code: string, index?: number): void {
+        const idx = index ?? this.currentIndex;
+        this.projectCodes.set(idx, code);
+        this.save();
+    }
+
+    getCode(index: number = 0): string {
+        return this.projectCodes.get(index) || (Cypress.env('currentProjectCode') as string) || '';
+    }
+
+    getAllCodes(): string[] {
+        return Array.from(this.projectCodes.values());
+    }
+
     getStandardFallback(): string {
         return (Cypress.env('formattedDateMain') as string) ||
             (Cypress.env('formattedDate') as string) ||
@@ -59,6 +76,7 @@ class ProjectManager {
 
     clear(): void {
         this.projects.clear();
+        this.projectCodes.clear();
         this.currentIndex = 0;
         this.save();
     }
@@ -66,6 +84,7 @@ class ProjectManager {
     private save(): void {
         Cypress.env('projectManager', {
             projects: Object.fromEntries(this.projects),
+            projectCodes: Object.fromEntries(this.projectCodes),
             currentIndex: this.currentIndex
         });
     }
@@ -103,9 +122,9 @@ export const getStandardProjectName = (): string => {
 };
 
 export const getOntopProjectName = (): string =>
-    (Cypress.env('formattedDate') as string) ||             // ✅ FIX: writer จริงเขียนที่ 'formattedDate' เมื่อ ProductClass = 'ontop'/'ontopextra'
-    (Cypress.env('formattedDateOntopPONAME') as string) ||  // fallback: env key ของ PO name (ontop)
-    getProjectNameByIndex(1) ||                              // fallback: ProjectManager index 1 (ontop ถูก register ไว้ที่นี่)
+    (Cypress.env('formattedDate') as string) ||       
+    (Cypress.env('formattedDateOntopPONAME') as string) ||  
+    getProjectNameByIndex(1) ||                              
     '';
 
 export const getCurrentProjectIndex = (): number => {
@@ -115,4 +134,20 @@ export const getCurrentProjectIndex = (): number => {
 export const updateProjectName = (name: string, index?: number): void => {
     const idx = index ?? projectManager.getCurrentIndex();
     projectManager.register(name, idx);
+};
+
+// ========================
+// PROJECT CODE GETTERS
+// ========================
+
+export const registerProjectCode = (code: string, index?: number): void => {
+    projectManager.registerCode(code, index);
+};
+
+export const getProjectCodeByIndex = (index: number = 0): string => {
+    return projectManager.getCode(index);
+};
+
+export const getStandardProjectCode = (): string => {
+    return projectManager.getCode(projectManager.getCurrentIndex());
 };

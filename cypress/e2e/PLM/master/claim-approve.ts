@@ -18,14 +18,6 @@ const TIMEOUT = {
 const stripLabel = (raw: string): string =>
     raw.replace(/\(\s*\w+\s*\)/g, '').replace(/\s+/g, ' ').trim();
 
-const rowMatchesKeyword = (row: HTMLElement, keyword: string): boolean => {
-    const tdText = stripLabel(Cypress.$(row).find('td[colspan="2"]').text());
-    return (
-        tdText === keyword ||
-        tdText.startsWith(keyword + '_') ||
-        tdText.startsWith(keyword + ' ')
-    );
-};
 
 // ========================
 // SMART WAIT HELPERS
@@ -54,12 +46,12 @@ const retryFindRowInTable = (
 
         if (found) {
             cy.log(`✅ Found "${keyword}" on attempt ${attempt}`);
-            return cy.wrap(true);
+            return cy.wrap<boolean>(true);
         }
 
         if (attempt >= maxAttempts) {
             cy.log(`❌ "${keyword}" not found after ${maxAttempts} attempts`);
-            return cy.wrap(false);
+            return cy.wrap<boolean>(false);
         }
 
         cy.wait(3000);
@@ -75,205 +67,41 @@ export const projectExistsInTable = (headerText: string, keyword: string): Cypre
 };
 
 // ========================
-// CLAIM PROJECT
+// KEYWORD RESOLUTION (Project Code -> Project Name -> PO Name)
 // ========================
-export const ClaimProject = (projectName: string, options?: { claimBy?: 'project' | 'po'; specificPoName?: string }): void => {
-    const poCount: number = Cypress.env('poCount') ?? 1;
-    const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
-    const claimBy = options?.claimBy ?? 'po';
-
-    cy.log(`🔁 Total PO to Claim: ${poCount}`);
-    cy.log(`🔑 Claim mode: ${claimBy}`);
-
-    const MAX_PAGES = 3;
-
-    const waitForKeywordInToDo = (keyword: string): void => {
-        cy.get('h3:contains("To Do List")', { timeout: TIMEOUT.NAV })
-            .parent()
-            .find('tbody tr')
-            .should(($rows) => {
-                expect($rows.text()).not.to.contain('Fetching data');
-                expect($rows.text()).to.include(keyword);
-            });
-    };
-
-    const claimOnce = (keyword: string): void => {
-        const searchAndClaimOnce = (currentPage: number = 1): void => {
-            if (currentPage > MAX_PAGES) {
-                cy.log(`⚠️ Checked ${MAX_PAGES} pages, not found: "${keyword}"`);
-                return;
-            }
-
-            cy.log(`🔍 [Claim-Project] Page ${currentPage} keyword: "${keyword}"`);
-
-            retryFindRowInTable('Unassigned Task', keyword).then((found) => {
-                if (found) {
-                    cy.get('h3:contains("Unassigned Task")')
-                        .parent()
-                        .find('tbody tr')
-                        .then(($rows) => {
-                            const foundRowIndex = $rows.toArray()
-                                .findIndex((row) => rowMatchesKeyword(row, keyword));
-
-                            cy.log(`✅ Found - Page ${currentPage}, Row ${foundRowIndex}`);
-
-                            cy.intercept('POST', '**/claim**').as('claimApi');
-
-                            cy.get('h3:contains("Unassigned Task")')
-                                .parent()
-                                .find('tbody tr')
-                                .eq(foundRowIndex)
-                                .find('button.claim-top')
-                                .click({ force: true });
-
-                            cy.log(`✅ Claimed project (once)`);
-                            waitForKeywordInToDo(keyword);
-                            cy.log(`✅ Confirmed in To Do List`);
-                        });
-                } else {
-                    cy.get('body').then(($body) => {
-                        const $section = $body.find('h3:contains("Unassigned Task")').parent();
-                        const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
-
-                        if ($nextBtn.length > 0) {
-                            cy.log(`➡️ Page ${currentPage} - Not found, going next...`);
-
-                            cy.intercept('GET', '**/getTodoList/**').as('nextPage');
-                            cy.wrap($nextBtn).click();
-                            cy.wait('@nextPage', { timeout: TIMEOUT.NAV });
-
-                            searchAndClaimOnce(currentPage + 1);
-                        } else {
-                            cy.log(`📋 No more pages, "${keyword}" not found`);
-                        }
-                    });
-                }
-            });
-        };
-
-        searchAndClaimOnce();
-    };
-
-    const claimByPO = (remainingPOs: number, poIndex: number = 0, currentPage: number = 1): void => {
-        if (remainingPOs <= 0) {
-            cy.log('✅ All POs claimed and moved to To Do List');
-            return;
-        }
-
-        if (currentPage > MAX_PAGES) {
-            cy.log(`⚠️ Checked ${MAX_PAGES} pages, checking To Do List...`);
-            return;
-        }
-
-        const keyword = allPoNames[poIndex] ?? `${projectName}_PO${poIndex + 1}`;
-        cy.log(`🔍 [Claim-PO] Page ${currentPage} (Remaining: ${remainingPOs}) keyword: "${keyword}"`);
-
-        retryFindRowInTable('Unassigned Task', keyword).then((found) => {
-            if (found) {
-                cy.get('h3:contains("Unassigned Task")')
-                    .parent()
-                    .find('tbody tr')
-                    .then(($rows) => {
-                        const foundRowIndex = $rows.toArray()
-                            .findIndex((row) => rowMatchesKeyword(row, keyword));
-
-                        cy.log(`✅ Found - Page ${currentPage}, Row ${foundRowIndex}, keyword: "${keyword}"`);
-
-                        cy.intercept('POST', '**/claim**').as('claimApi');
-
-                        cy.get('h3:contains("Unassigned Task")')
-                            .parent()
-                            .find('tbody tr')
-                            .eq(foundRowIndex)
-                            .find('button.claim-top')
-                            .click({ force: true });
-
-                        cy.log(`✅ Claimed 1 PO`);
-                        waitForKeywordInToDo(keyword);
-                        cy.log(`✅ PO confirmed in To Do List`);
-
-                        claimByPO(remainingPOs - 1, poIndex + 1, 1);
-                    });
-            } else {
-                cy.get('body').then(($body) => {
-                    const $section = $body.find('h3:contains("Unassigned Task")').parent();
-                    const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
-
-                    if ($nextBtn.length > 0) {
-                        cy.log(`➡️ Page ${currentPage} - Not found, going next...`);
-
-                        cy.intercept('GET', '**/getTodoList/**').as('nextPage');
-                        cy.wrap($nextBtn).click();
-                        cy.wait('@nextPage', { timeout: TIMEOUT.NAV });
-
-                        claimByPO(remainingPOs, poIndex, currentPage + 1);
-                    } else {
-                        cy.log(`📋 No more pages, "${keyword}" not found`);
-                    }
-                });
-            }
-        });
-    };
-
-    if (claimBy === 'project') {
-        claimOnce(projectName);
-    } else {
-        claimByPO(poCount);
-    }
+const buildSearchKeywords = (...extra: (string | undefined)[]): string[] => {
+    const projectCode = (Cypress.env('currentProjectCode') as string) || '';
+    const currentProjectName = (Cypress.env('currentProjectName') as string) || '';
+    const all = [projectCode, currentProjectName, ...extra.filter(Boolean)] as string[];
+    return [...new Set(all.map((k) => k.trim()).filter(Boolean))];
 };
 
-// ========================
-// APPROVE PROJECT
-// ========================
-export const approveProject = (projectName: string): void => {
-    cy.log(`⏳ Waiting for "${projectName}" to appear in To Do List...`);
+interface RowKeywordMatch {
+    found: boolean;
+    matchedKeyword: string;
+}
 
-    const matchesKeyword = (tdText: string, keyword: string): boolean =>
-        tdText === keyword ||
-        tdText.startsWith(keyword + '_') ||
-        tdText.startsWith(keyword + ' ');
-
-    cy.get('h3:contains("To Do List")', { timeout: TIMEOUT.NAV })
-        .parent()
-        .find('tbody tr')
-        .should(($rows) => {
-            expect($rows.text()).not.to.contain('Fetching data');
-            const found = $rows.toArray().some((row) => {
-                const tdText = stripLabel(Cypress.$(row).find('td[colspan="2"]').text());
-                return matchesKeyword(tdText, projectName);
-            });
-            expect(found, `Expected To Do List to contain "${projectName}"`).to.be.true;
-        });
-
-    cy.log(`✅ "${projectName}" found in To Do List, proceeding to search...`);
-
-    searchInTableWithPagination(
-        'To Do List',
-        projectName,
-        (_$row, _index) => {
-            cy.get('h3:contains("To Do List")')
-                .parent()
-                .find('tbody tr.cursor-point')
-                .filter((_i, el) => {
-                    const tdText = stripLabel(Cypress.$(el).find('td[colspan="2"]').text());
-                    return matchesKeyword(tdText, projectName);
-                })
-                .first()
-                .as('approveRow');
-
-            cy.get('@approveRow').should('be.visible');
-            cy.get('@approveRow').click();
-
-            cy.log(`✅ Successfully entered approval page: ${projectName}`);
-        },
-        {
-            waitAfterNext: 2000,
-            filterCallback: ($row) => {
-                const tdText = stripLabel($row.find('td[colspan="2"]').text());
-                return matchesKeyword(tdText, projectName);
-            }
+const findRowInTableByKeywords = (
+    headerText: string,
+    keywords: string[],
+    maxAttemptsPerKeyword = 3
+): Cypress.Chainable<RowKeywordMatch> => {
+    const tryAt = (idx: number): Cypress.Chainable<RowKeywordMatch> => {
+        if (idx >= keywords.length) {
+            return cy.wrap<RowKeywordMatch>({ found: false, matchedKeyword: '' }, { log: false });
         }
-    );
+        const keyword = keywords[idx];
+        cy.log(`🔎 [${idx + 1}/${keywords.length}] ลองหาด้วย keyword: "${keyword}"`);
+        return retryFindRowInTable(headerText, keyword, maxAttemptsPerKeyword).then((found) => {
+            if (found) {
+                cy.log(`✅ เจอด้วย keyword: "${keyword}"`);
+                return cy.wrap<RowKeywordMatch>({ found: true, matchedKeyword: keyword }, { log: false });
+            }
+            cy.log(`⚠️ ไม่เจอด้วย "${keyword}"`);
+            return tryAt(idx + 1);
+        });
+    };
+    return tryAt(0);
 };
 
 // ========================
@@ -293,13 +121,15 @@ export const createFullPageApprovalFlow = (
     cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
 
     if (!options?.alreadyOnPage) {
-        retryFindRowInTable(taskListHeader, projectName).then((found) => {
+        // projectName ตรงนี้จริงๆ อาจเป็น poName ที่ loopApproveAllPOs ส่งเข้ามา
+        const keywords = buildSearchKeywords(projectName);
+        findRowInTableByKeywords(taskListHeader, keywords).then(({ found, matchedKeyword }) => {
             if (!found) {
-                throw new Error(`❌ "${projectName}" not found in "${taskListHeader}" after retries`);
+                throw new Error(`❌ ไม่เจอแถวที่ตรงกับ [${keywords.join(', ')}] ใน "${taskListHeader}"`);
             }
 
             cy.get('h3').contains(taskListHeader).parent().within(() => {
-                cy.contains('tbody tr', projectName, { timeout: TIMEOUT.NAV })
+                cy.contains('tbody tr', matchedKeyword, { timeout: TIMEOUT.NAV })
                     .should('be.visible')
                     .as('approveRowTarget');
             });
@@ -342,7 +172,7 @@ export const createSimplePageApprovalFlow = (
     taskListHeader: TaskListHeader,
     expectedUrl: string,
     coreTaskCallback: CoreTaskCallback,
-    finalAction: FinalAction = 'AlertAndLogout' 
+    finalAction: FinalAction = 'AlertAndLogout'
 ): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
@@ -417,9 +247,8 @@ const EXPECTED_HEADER: Record<NavRole, TaskListHeader> = {
     CGMD: 'To Do List',
     ACTM: 'Unassigned Task',
     OPER: 'Unassigned Task',
-    APO:  'Unassigned Task',
+    APO: 'Unassigned Task',
 };
-
 export const navigateToWorkspace = (options?: { role?: NavRole }): void => {
     const role: NavRole = options?.role ?? 'CGMD';
     const isAutoRedirect = AUTO_REDIRECT_ROLES.includes(role);
@@ -428,8 +257,23 @@ export const navigateToWorkspace = (options?: { role?: NavRole }): void => {
         cy.log(`🎯 [${role}] รอ auto-redirect เข้า workspace-home (ไม่ click Menu, ไม่ intercept loadTracking)`);
         cy.url({ timeout: TIMEOUT.LONG }).should('include', '/workspace-home/workspace');
     } else {
+        // ใช้ .should() แทน .then() เพื่อให้ Cypress poll จนกว่า URL จะนิ่ง/commit จริง
+        // กัน race condition ตอน full page reload (เช่นตอน Logout ทำให้เกิด hard navigation)
+        cy.url({ timeout: TIMEOUT.LONG }).should(
+            (currentUrl) =>
+                currentUrl.includes('/login') || currentUrl.includes('/workspace-home/workspace'),
+        );
+
         cy.url().then((currentUrl) => {
-            if (currentUrl.includes('/workspace-home/workspace')) {
+            if (currentUrl.includes('/login')) {
+                // ไม่ควรเกิดขึ้นแล้วหลังแก้ double-loop bug ใน performApprovalRole —
+                // ถ้าเห็น error นี้อีก แปลว่ามี call site อื่นเรียก navigateToWorkspace()
+                // หลัง Logout ไปแล้วโดยไม่ตั้งใจ ต้องตามหาแล้วเอาออก ไม่ใช่ silently re-login
+                throw new Error(
+                    `❌ [${role}] navigateToWorkspace() ถูกเรียกตอนอยู่หน้า /login — ` +
+                    `แสดงว่ามี call site เรียกซ้ำหลัง Logout ไปแล้ว ต้องหาต้นเหตุแล้วแก้ ไม่ควร re-login ปิดไว้ตรงนี้`
+                );
+            } else if (currentUrl.includes('/workspace-home/workspace')) {
                 cy.log(`⏭️ [${role}] Already on workspace-home — skip Menu click`);
             } else {
                 cy.log(`🎯 [${role}] Click Menu -> workspace-home (รอ URL + table ready แทน network intercept)`);
@@ -442,10 +286,6 @@ export const navigateToWorkspace = (options?: { role?: NavRole }): void => {
 
     waitForTableReady(EXPECTED_HEADER[role], TIMEOUT.NAV);
 };
-
-// ✅ FIX: ลบ ASSIGN_PO_LIMIT ออก — ให้ assign ทุก PO ตาม poCount จริง
-// เดิม: const ASSIGN_PO_LIMIT = 1; → ทำให้ assign แค่ PO เดียว แต่ approve พยายามหาทุก PO → fail
-// ใหม่: ใช้ poCount ตรงๆ → assign ครบทุก PO → approve ได้ครบ
 
 const performApprovalRole = (
     user: string,
@@ -493,56 +333,41 @@ const performApprovalRole = (
     // PHASE 2: Approve (เรียกหลัง assign ครบแล้ว)
     // ================================================
     const approveAllPOs = (): void => {
-        cy.log(`📦 Starting approval loop for ${poCount} PO(s)`);
+        cy.log(`📦 Starting approval — approveFunction จะจัดการครบทุก PO (${poCount}) เอง`);
 
-        for (let i = 0; i < poCount; i++) {
-            const keyword = getKeyword(i);
-            const isLast = i === poCount - 1;
-            const finalAction: FinalAction = isLast ? 'AlertAndLogout' : 'StopAfterCore';
+        waitForTableReady(taskHeader, TIMEOUT.NAV);
 
-            cy.log(`🔄 PO ${i + 1}/${poCount}: "${keyword}" — finalAction: ${finalAction}`);
+        const keyword = getKeyword(0);
 
-            waitForTableReady(taskHeader, TIMEOUT.NAV);
-
-            searchInTableWithPagination(
-                taskHeader,
-                keyword,
-                () => {
-                    cy.get(`h3:contains("${taskHeader}")`)
-                        .parent()
-                        .find('tbody tr.cursor-point')
-                        .filter((_i, el) => Cypress.$(el).text().includes(keyword))
-                        .first()
-                        .as('targetRow');
-                },
-                {
-                    waitAfterNext: 2000,
-                    filterCallback: ($row) => {
-                        const rowText = $row.text().trim();
-                        return rowText.includes(keyword) && !rowText.includes('Fetching data');
-                    }
+        searchInTableWithPagination(
+            taskHeader,
+            keyword,
+            () => {
+                cy.get(`h3:contains("${taskHeader}")`)
+                    .parent()
+                    .find('tbody tr.cursor-point')
+                    .filter((_i, el) => Cypress.$(el).text().includes(keyword))
+                    .first()
+                    .as('targetRow');
+            },
+            {
+                waitAfterNext: 2000,
+                filterCallback: ($row) => {
+                    const rowText = $row.text().trim();
+                    return rowText.includes(keyword) && !rowText.includes('Fetching data');
                 }
-            );
-
-            cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getProject');
-            cy.intercept('GET', '/PLMSpringBoot/newApi/cksnew/getproductdetailCGMD/**').as('getDetail');
-            cy.intercept('GET', '/PLMSpringBoot/api/flw-common/getProductDetailAttachment/**').as('getAttachment');
-
-            cy.get('@targetRow').should('be.visible').click();
-            cy.log(`✅ [${i + 1}/${poCount}] Entered PO approval page`);
-
-            approveFunction(projectNamePONAME, { 
-                alreadyOnPage: true, 
-                role: navRole,
-                finalAction 
-            } as any);
-
-            // ถ้าไม่ใช่ PO สุดท้าย ต้องกลับไป workspace เพื่อ approve PO ถัดไป
-            if (!isLast) {
-                cy.log(`🔙 Going back to workspace for next PO...`);
-                navigateToWorkspace({ role: navRole });
             }
-        }
+        );
+
+        cy.get('@targetRow').should('be.visible').click();
+        cy.log(`✅ [1/${poCount}] Entered PO approval page`);
+
+        // ✅ เรียกครั้งเดียว — approveFunction (ผ่าน loopApproveAllPOs) จัดการ PO ที่เหลือทั้งหมดเอง
+        // ไม่ต้องส่ง finalAction เข้าไป เพราะ loopApproveAllPOs คำนวณเองจาก isLast ภายใน
+        approveFunction(projectNamePONAME, {
+            alreadyOnPage: true,
+            role: navRole,
+        } as any);
 
         cy.log('✅ All POs approved — flow complete');
     };
@@ -663,12 +488,269 @@ export const performSimpleClaimAndApprovalRole = (
 // ASSIGN TEAM TASK
 // ========================
 
+export const registerAssignAlertListener = (): void => {
+    cy.on('window:alert', (text) => {
+        cy.log(`🔔 Alert: "${text}"`);
+        expect(text).to.include('success');
+    });
+};
+
+export const assignAllPOsThenNavigate = (
+    projectName: string,
+    assignee: string,
+    options?: { role?: NavRole }
+): void => {
+    const poCount: number = Cypress.env('poCount') ?? 1;
+    const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
+    const navRole: NavRole = options?.role ?? 'CGMD';
+
+    // ✅ FIX: ใช้ poCount แทน ASSIGN_PO_LIMIT
+    cy.log(`🔁 Total PO: ${poCount} — จะ assign ทุก PO`);
+
+    const assignNextPO = (index: number): void => {
+        if (index >= poCount) {
+            cy.log('✅ Assign ทุก PO เสร็จแล้ว — เรียก navigateToWorkspace()');
+            navigateToWorkspace({ role: navRole });
+            return;
+        }
+
+        const currentUniqueKeyword = allPoNames[index] ?? `${projectName}_PO${index + 1}`;
+        cy.log(`🧩 [Assign ${index + 1}/${poCount}] "${currentUniqueKeyword}"`);
+
+        assignTaskViaTracking(projectName, assignee, currentUniqueKeyword);
+
+        assignNextPO(index + 1);
+    };
+
+    assignNextPO(0);
+};
+// ========================
+// APPROVE PROJECT (Project Code -> Project Name -> PO Name fallback)
+// ========================
+export const approveProject = (projectName: string): void => {
+    const keywords = buildSearchKeywords(projectName);
+    cy.log(`⏳ Waiting for one of [${keywords.join(', ')}] to appear in To Do List...`);
+
+    const matchesAnyKeyword = (tdText: string): string | null =>
+        keywords.find((k) => tdText === k || tdText.startsWith(k + '_') || tdText.startsWith(k + ' ')) ?? null;
+
+    cy.get('h3:contains("To Do List")', { timeout: TIMEOUT.NAV })
+        .parent()
+        .find('tbody tr')
+        .should(($rows) => {
+            expect($rows.text()).not.to.contain('Fetching data');
+            const found = $rows.toArray().some((row) =>
+                matchesAnyKeyword(stripLabel(Cypress.$(row).find('td[colspan="2"]').text())) !== null
+            );
+            expect(found, `Expected To Do List to contain one of [${keywords.join(', ')}]`).to.be.true;
+        })
+        .then(($rows) => {
+            const row = $rows.toArray().find((el) =>
+                matchesAnyKeyword(stripLabel(Cypress.$(el).find('td[colspan="2"]').text())) !== null
+            );
+            const tdText = row ? stripLabel(Cypress.$(row).find('td[colspan="2"]').text()) : '';
+            const matchedKeyword = matchesAnyKeyword(tdText) || projectName;
+
+            cy.log(`✅ Matched keyword: "${matchedKeyword}" — proceeding to search...`);
+
+            searchInTableWithPagination(
+                'To Do List',
+                matchedKeyword,
+                (_$row, _index) => {
+                    cy.get('h3:contains("To Do List")')
+                        .parent()
+                        .find('tbody tr.cursor-point')
+                        .filter((_i, el) =>
+                            matchesAnyKeyword(stripLabel(Cypress.$(el).find('td[colspan="2"]').text())) !== null
+                        )
+                        .first()
+                        .as('approveRow');
+
+                    cy.get('@approveRow').should('be.visible');
+                    cy.get('@approveRow').click();
+                    cy.log(`✅ Successfully entered approval page: ${matchedKeyword}`);
+                },
+                {
+                    waitAfterNext: 2000,
+                    filterCallback: ($row) =>
+                        matchesAnyKeyword(stripLabel($row.find('td[colspan="2"]').text())) !== null
+                }
+            );
+        });
+};
+export const ClaimProject = (projectName: string, options?: { claimBy?: 'project' | 'po'; specificPoName?: string }): void => {
+    const poCount: number = Cypress.env('poCount') ?? 1;
+    const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
+    const claimBy = options?.claimBy ?? 'po';
+    const MAX_PAGES = 3;
+    const MAX_RELOAD_ATTEMPTS = 6;   // ✅ ADD: รอข้อมูลมาถึง backend สูงสุด 6 รอบ (~30s รวม wait)
+    const RELOAD_WAIT_MS = 5000;     // ✅ ADD: เว้นก่อน reload แต่ละรอบ
+
+    cy.log(`🔁 Total PO to Claim: ${poCount}`);
+    cy.log(`🔑 Claim mode: ${claimBy}`);
+
+    const waitForKeywordInToDo = (keyword: string): void => {
+        cy.get('h3:contains("To Do List")', { timeout: TIMEOUT.NAV })
+            .parent()
+            .find('tbody tr')
+            .should(($rows) => {
+                expect($rows.text()).not.to.contain('Fetching data');
+                expect($rows.text()).to.include(keyword);
+            });
+    };
+
+    const searchAndClaimWithKeyword = (keyword: string, currentPage: number = 1): Cypress.Chainable<boolean> => {
+        if (currentPage > MAX_PAGES) {
+            cy.log(`⚠️ Checked ${MAX_PAGES} pages, not found: "${keyword}"`);
+            return cy.wrap<boolean>(false, { log: false });
+        }
+        cy.log(`🔍 [Claim] Page ${currentPage} keyword: "${keyword}"`);
+
+        return retryFindRowInTable('Unassigned Task', keyword).then((found) => {
+            if (found) {
+                return cy.get('h3:contains("Unassigned Task")')
+                    .parent()
+                    .find('tbody tr')
+                    .then(($rows) => {
+                        const foundRowIndex = $rows.toArray().findIndex((row) => rowMatchesKeyword(row, keyword));
+                        cy.log(`✅ Found - Page ${currentPage}, Row ${foundRowIndex}, keyword: "${keyword}"`);
+
+                        cy.intercept('POST', '**/claim**').as('claimApi');
+                        cy.get('h3:contains("Unassigned Task")')
+                            .parent()
+                            .find('tbody tr')
+                            .eq(foundRowIndex)
+                            .find('button.claim-top')
+                            .click({ force: true });
+
+                        cy.log(`✅ Claimed`);
+                        waitForKeywordInToDo(keyword);
+                        cy.log(`✅ Confirmed in To Do List`);
+
+                        return cy.wrap<boolean>(true, { log: false });
+                    });
+            }
+            return cy.get('body').then(($body) => {
+                const $section = $body.find('h3:contains("Unassigned Task")').parent();
+                const $nextBtn = $section.find('.pagination li:not(.disabled) a:contains("Next")');
+
+                if ($nextBtn.length > 0) {
+                    cy.log(`➡️ Page ${currentPage} - Not found, going next...`);
+
+                    cy.wrap($nextBtn).click();
+
+                    cy.wait(1000);
+                    cy.get('h3:contains("Unassigned Task")', { timeout: TIMEOUT.NAV })
+                        .parent()
+                        .find('tbody tr', { timeout: TIMEOUT.NAV })
+                        .should(($rows) => {
+                            expect($rows.text()).not.to.contain('Fetching data');
+                            expect($rows.length).to.be.greaterThan(0);
+                        });
+
+                    return searchAndClaimWithKeyword(keyword, currentPage + 1);
+                }
+                cy.log(`📋 No more pages, "${keyword}" not found`);
+                return cy.wrap<boolean>(false, { log: false });
+            });
+        });
+    };
+
+    const claimWithFallback = (keywords: string[], idx: number = 0, reloadAttempt: number = 0): Cypress.Chainable<null> => {
+        if (idx >= keywords.length) {
+            // ✅ ADD: ครบทุก keyword + ทุกหน้าแล้วยังไม่เจอ — เป็นไปได้ว่าข้อมูลยังไม่มาถึง
+            // backend (พึ่งกด Approve/Assign มาสดๆ) ลอง reload หน้าแล้วค้นหาใหม่ทั้งชุด keyword
+            if (reloadAttempt < MAX_RELOAD_ATTEMPTS) {
+                cy.log(`⏳ ยังไม่เจอ [${keywords.join(', ')}] — รอข้อมูลมา (reload ${reloadAttempt + 1}/${MAX_RELOAD_ATTEMPTS})`);
+                cy.wait(RELOAD_WAIT_MS);
+                cy.reload();
+                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                waitForTableReady('Unassigned Task', TIMEOUT.NAV);
+                return claimWithFallback(keywords, 0, reloadAttempt + 1);
+            }
+            throw new Error(`❌ ไม่เจอแถวที่ตรงกับ keyword ใดๆ เลยแม้ reload ${MAX_RELOAD_ATTEMPTS} ครั้ง: [${keywords.join(', ')}]`);
+        }
+        const keyword = keywords[idx];
+        cy.log(`🔑 [Claim] ลองด้วย keyword ${idx + 1}/${keywords.length}: "${keyword}"`);
+        return searchAndClaimWithKeyword(keyword).then(
+            (success): Cypress.Chainable<null> => {
+                if (!success) {
+                    cy.log(`⚠️ ไม่เจอด้วย "${keyword}" — ลอง keyword ถัดไป`);
+                    return claimWithFallback(keywords, idx + 1, reloadAttempt);
+                }
+                return cy.wrap<null>(null, { log: false });
+            }
+        );
+    };
+
+    const claimByPO = (remainingPOs: number, poIndex: number = 0): void => {
+        if (remainingPOs <= 0) {
+            cy.log('✅ All POs claimed and moved to To Do List');
+            return;
+        }
+        const poName = allPoNames[poIndex] ?? `${projectName}_PO${poIndex + 1}`;
+        const keywords = buildSearchKeywords(projectName, poName);
+        cy.log(`🔁 [Claim-PO ${poIndex + 1}] keywords (Code -> Project -> PO): [${keywords.join(', ')}]`);
+
+        claimWithFallback(keywords).then(() => {
+            claimByPO(remainingPOs - 1, poIndex + 1);
+        });
+    };
+
+    if (claimBy === 'project') {
+        claimWithFallback(buildSearchKeywords(projectName));
+    } else {
+        claimByPO(poCount);
+    }
+};
+
+const rowMatchesKeyword = (row: HTMLElement, keyword: string): boolean => {
+    const $row = Cypress.$(row);
+
+    const codeText = $row.find('td').first().text().trim();
+    if (codeText === keyword) {
+        return true;
+    }
+
+    // Project Name column (td[colspan="2"], e.g. "MOB POST OT MAIN PRJ 0814 1138")
+    const tdText = stripLabel($row.find('td[colspan="2"]').text());
+    return (
+        tdText === keyword ||
+        tdText.startsWith(keyword + '_') ||
+        tdText.startsWith(keyword + ' ')
+    );
+};
+// ========================
+// ASSIGN TEAM TASK
+// ========================
+
+const TEAM_TASK_RELOAD_ATTEMPTS = 5;
+const TEAM_TASK_RELOAD_WAIT_MS = 50000;
+
+const reloadAndWaitForTeamTaskTable = (): void => {
+    cy.reload();
+
+    cy.url({ timeout: TIMEOUT.NAV }).should((url) => {
+        expect(url, '❌ Reload แล้วหลุดไปหน้า /login — session อาจหมดอายุระหว่างรอ').not.to.include('/login');
+    });
+
+    cy.get('h3', { timeout: TIMEOUT.NAV })
+        .contains('Team Task')
+        .parent()
+        .find('tbody tr', { timeout: TIMEOUT.NAV })
+        .should(($rows) => {
+            expect($rows.text()).not.to.contain('Fetching data');
+            expect($rows.length).to.be.greaterThan(0);
+        });
+};
+
 export function assignTeamTask(
     taskIdentifier: string,
     assignee: string,
     uniqueKeyword: string = ''
 ): void {
-    cy.get('h3').contains('Team Task', { timeout: TIMEOUT.NAV })
+    cy.get('h3', { timeout: TIMEOUT.NAV })
+        .contains('Team Task')
         .should('be.visible')
         .parent()
         .find('tbody tr', { timeout: TIMEOUT.NAV })
@@ -687,8 +769,15 @@ export function assignTeamTask(
         throw new Error(`❌ searchKeyword is empty — cannot search`);
     }
 
-    const findAndAssignOnCurrentPage = (): void => {
-        cy.get('tbody tr').then(($rows) => {
+    const findAndAssignOnCurrentPage = (reloadAttempt: number = 0): void => {
+        // ✅ FIX: scope ทุกอย่างไว้ใต้ Team Task section เดียว กัน pagination
+        // ไปชนกับ ul.pagination ของ "Tracking Task" table ที่อยู่ถัดลงไปในหน้าเดียวกัน
+        cy.get('h3', { timeout: TIMEOUT.NAV })
+            .contains('Team Task')
+            .parent()
+            .as('teamTaskSection');
+
+        cy.get('@teamTaskSection').find('tbody tr').then(($rows) => {
             const matchedRow = $rows.filter((_, el) => {
                 const productName = Cypress.$(el).find('td:nth-child(2) div').text().trim();
                 return productName.includes(searchKeyword);
@@ -762,8 +851,7 @@ export function assignTeamTask(
                     expect(String(assignAlertText).toLowerCase(), `alert text should indicate success: "${assignAlertText}"`).to.include('success');
                 });
 
-                cy.get('h3').contains('Team Task', { timeout: TIMEOUT.NAV })
-                    .parent()
+                cy.get('@teamTaskSection')
                     .find('tbody', { timeout: TIMEOUT.NAV })
                     .should(($tbody) => {
                         const row = $tbody.find('tr').toArray().find((el) =>
@@ -778,34 +866,56 @@ export function assignTeamTask(
                 cy.log('✅ assignTeamTask complete');
 
             } else {
-                cy.get('ul.pagination li').then(($items) => {
-                    const nextItem = $items.filter((_, li) => {
-                        return (
-                            Cypress.$(li).text().trim() === 'Next' &&
-                            !Cypress.$(li).hasClass('disabled')
-                        );
-                    });
+                // ✅ FIX: ถ้ายังอยู่หน้า 1 และไม่เจอ — PO ใหม่มักโผล่หน้า 1 ก่อน (sort by recency)
+                // ระบบช้า/ยัง sync ไม่ทัน จึงควร reload+รอ ก่อนรีบกด Next ไปหน้าอื่น
+                cy.get('@teamTaskSection').find('ul.pagination li.active').then(($active) => {
+                    const isFirstPage = $active.length === 0 || $active.text().trim() === '1';
 
-                    if (nextItem.length > 0) {
-                        cy.log(`➡️ Not found on this page — going next`);
-
-                        // ✅ FIX: นำ cy.intercept และ cy.wait('@getRequest') ออก
-                        // เปลี่ยนมารอ DOM settle แทน เพราะ Next page อาจไม่ได้ยิง API
-                        cy.wrap(nextItem.first()).find('a').click();
-                        
-                        cy.wait(500);
-                        cy.get('h3').contains('Team Task', { timeout: TIMEOUT.NAV })
-                            .parent()
-                            .find('tbody tr', { timeout: TIMEOUT.NAV })
-                            .should(($rows) => {
-                                expect($rows.text()).not.to.contain('Fetching data');
-                                expect($rows.length).to.be.greaterThan(0);
-                            });
-
-                        findAndAssignOnCurrentPage();
-                    } else {
-                        throw new Error(`❌ "${searchKeyword}" not found on any page`);
+                    if (isFirstPage && reloadAttempt < TEAM_TASK_RELOAD_ATTEMPTS) {
+                        cy.log(`⏳ ไม่เจอ "${searchKeyword}" บนหน้า 1 — อาจยัง sync ไม่ทัน รอแล้ว reload (${reloadAttempt + 1}/${TEAM_TASK_RELOAD_ATTEMPTS})`);
+                        cy.wait(TEAM_TASK_RELOAD_WAIT_MS);
+                        reloadAndWaitForTeamTaskTable();
+                        findAndAssignOnCurrentPage(reloadAttempt + 1);
+                        return;
                     }
+
+                    // ✅ FIX: scope pagination lookup ใต้ @teamTaskSection เท่านั้น
+                    // (เดิม cy.get('ul.pagination li') ดึงจากทั้งหน้า ปนกับ Tracking Task table ด้านล่าง)
+                    cy.get('@teamTaskSection').find('ul.pagination li').then(($items) => {
+                        const nextItem = $items.filter((_, li) => {
+                            return (
+                                Cypress.$(li).text().trim() === 'Next' &&
+                                !Cypress.$(li).hasClass('disabled')
+                            );
+                        });
+
+                        if (nextItem.length > 0) {
+                            cy.log(`➡️ Not found on this page — going next`);
+
+                            cy.wrap(nextItem.first()).find('a').click();
+
+                            cy.wait(500);
+                            cy.get('h3', { timeout: TIMEOUT.NAV })
+                                .contains('Team Task')
+                                .parent()
+                                .find('tbody tr', { timeout: TIMEOUT.NAV })
+                                .should(($rows) => {
+                                    expect($rows.text()).not.to.contain('Fetching data');
+                                    expect($rows.length).to.be.greaterThan(0);
+                                });
+
+                            findAndAssignOnCurrentPage(0); // reset reload counter บนหน้าใหม่
+                        } else if (reloadAttempt < TEAM_TASK_RELOAD_ATTEMPTS) {
+                            // ✅ ADD: เดินครบทุกหน้าแล้วก็ยังไม่เจอ — วนกลับ First page แล้ว reload รอบใหม่
+                            cy.log(`🔄 เดินครบทุกหน้าแล้วไม่เจอ "${searchKeyword}" — วนกลับ First page แล้ว reload (${reloadAttempt + 1}/${TEAM_TASK_RELOAD_ATTEMPTS})`);
+                            cy.get('@teamTaskSection').contains('a', 'First').click();
+                            cy.wait(TEAM_TASK_RELOAD_WAIT_MS);
+                            reloadAndWaitForTeamTaskTable();
+                            findAndAssignOnCurrentPage(reloadAttempt + 1);
+                        } else {
+                            throw new Error(`❌ "${searchKeyword}" not found on any page after ${TEAM_TASK_RELOAD_ATTEMPTS} reload attempts`);
+                        }
+                    });
                 });
             }
         });
@@ -813,40 +923,3 @@ export function assignTeamTask(
 
     findAndAssignOnCurrentPage();
 }
-
-export const registerAssignAlertListener = (): void => {
-    cy.on('window:alert', (text) => {
-        cy.log(`🔔 Alert: "${text}"`);
-        expect(text).to.include('success');
-    });
-};
-
-export const assignAllPOsThenNavigate = (
-    projectName: string,
-    assignee: string,
-    options?: { role?: NavRole }
-): void => {
-    const poCount: number = Cypress.env('poCount') ?? 1;
-    const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
-    const navRole: NavRole = options?.role ?? 'CGMD';
-
-    // ✅ FIX: ใช้ poCount แทน ASSIGN_PO_LIMIT
-    cy.log(`🔁 Total PO: ${poCount} — จะ assign ทุก PO`);
-
-    const assignNextPO = (index: number): void => {
-        if (index >= poCount) {
-            cy.log('✅ Assign ทุก PO เสร็จแล้ว — เรียก navigateToWorkspace()');
-            navigateToWorkspace({ role: navRole });
-            return;
-        }
-
-        const currentUniqueKeyword = allPoNames[index] ?? `${projectName}_PO${index + 1}`;
-        cy.log(`🧩 [Assign ${index + 1}/${poCount}] "${currentUniqueKeyword}"`);
-
-        assignTaskViaTracking(projectName, assignee, currentUniqueKeyword);
-
-        assignNextPO(index + 1);
-    };
-
-    assignNextPO(0);
-};

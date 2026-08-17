@@ -360,7 +360,7 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
   cy.wait(2000);
 
   cy.then(() => {
-    const projectName = Cypress.env('projectName') || Cypress.env('formattedDateMain') || 'Mobile Service';
+    const projectName = Cypress.env('projectName') || Cypress.env('formattedDateMain');
     const poName = Cypress.env('poName') || 'Product Offering';
     const module = Cypress.env('module') || 'MOB';
     const priceType = Cypress.env('priceType') || 'recurring';

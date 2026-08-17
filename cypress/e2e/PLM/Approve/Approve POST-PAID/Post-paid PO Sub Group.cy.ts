@@ -1,6 +1,6 @@
 import * as Master from '../../Master';
 
-let isFirstRun = true; 
+let isFirstRun = true;
 
 beforeEach(() => {
   if (isFirstRun) {
@@ -11,12 +11,17 @@ beforeEach(() => {
     });
     isFirstRun = false;
   }
+
   cy.visit(Master.urlsit, {
+    timeout: 60000,
     onBeforeLoad: (win) => {
       win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
     }
   });
-  
+
+  cy.get('app-login', { timeout: 60000 }).should('be.visible');
+  cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
+
   // Reset env variables
   Cypress.env('formattedDateMain', undefined);
   Cypress.env('formattedDateOntop', undefined);

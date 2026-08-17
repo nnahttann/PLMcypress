@@ -26,117 +26,120 @@ beforeEach(() => {
 });
 
 // ========================
-// USSD (Non-Human Touch Point) - Main
+// Rom, Easy App Rom & USSD (Human + Non-Human Touch Point) - Main
 // ========================
-describe('USSD - POST-PAID Main', () => {
+describe('Rom, Easy App Rom & USSD - PRE-PAID Main', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
     priceTypes.forEach((priceType) => {
         describe(`Standard ${priceType}`, () => {
             describe('Mobile', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'main', {
-                        Module: 'POST',
-                        subModule: 'POST',
+                        Module: 'PRE',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                if (priceType === 'usage') {
-                    Master.afterMKTMainUsagePOST();
-                } else {
-                    Master.afterMKTMAINPOST();
-                }
+                Master.afterMKTMainPRE_FullSpadFlow();
             });
         });
     });
 });
 
 // ========================
-// USSD (Non-Human Touch Point) - Ontop
+// Rom, Easy App Rom & USSD (Human + Non-Human Touch Point) - Ontop
 // ========================
-describe('USSD - POST-PAID Ontop', () => {
+describe('Rom, Easy App Rom & USSD - PRE-PAID Ontop', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
     priceTypes.forEach((priceType) => {
         describe(`${priceType}`, () => {
             describe('Mobile', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontop', {
-                        Module: 'POST',
-                        subModule: 'POST',
+                        Module: 'PRE',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                Master.afterMKTontopPOST();
+                Master.afterMKTontopPRE();
             });
             describe('ENTER', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontop', {
                         Module: 'ENTER',
-                        subModule: 'POST',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                Master.afterMKTontopENTER();
+                Master.afterMKTontopPREENTER();
             });
             describe('MUSIC', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontop', {
                         Module: 'MUSIC',
-                        subModule: 'POST',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                Master.afterMKTontopMUSIC();
+                Master.afterMKTontopPREMUSIC();
             });
         });
     });
 });
 
 // ========================
-// USSD (Non-Human Touch Point) - OntopExtra
+// Rom, Easy App Rom & USSD (Human + Non-Human Touch Point) - OntopExtra
 // ========================
-describe('USSD - POST-PAID OntopExtra', () => {
+describe('Rom, Easy App Rom & USSD - PRE-PAID OntopExtra', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
     priceTypes.forEach((priceType) => {
         describe(`${priceType}`, () => {
             describe('Mobile', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontopextra', {
-                        Module: 'POST',
-                        subModule: 'POST',
+                        Module: 'PRE',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                Master.afterMKTontopPOST();
+                Master.afterMKTontopPRE();
             });
             describe('ENTER', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontopextra', {
                         Module: 'ENTER',
-                        subModule: 'POST',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                Master.afterMKTontopENTER();
+                Master.afterMKTontopPREENTER();
             });
             describe('MUSIC', () => {
-                it('MKT POSTPAID role', () => {
+                it('MKT PRE-PAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontopextra', {
                         Module: 'MUSIC',
-                        subModule: 'POST',
+                        subModule: 'PRE',
                         autoSetDuration: true,
+                        runHumanTouchPoint: true,
                         runNonHumanTouchPoint: true,
                     });
                 });
-                Master.afterMKTontopMUSIC();
+                Master.afterMKTontopPREMUSIC();
             });
         });
     });

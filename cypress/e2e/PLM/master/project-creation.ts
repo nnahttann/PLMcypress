@@ -1,7 +1,7 @@
 import { Module, PriceType, ProductClass, ProjectBasicOptions, now, MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from './config';
 import { getTimeSuffix } from './config';
 import { login, getRandomPhone, scrollAndWait } from './helpers';
-import { registerProjectName } from './project-manager';
+import { registerProjectName, registerProjectCode } from './project-manager';
 import { createPOWordingPools, RandomProjectDescription, RandomRemark } from '../Approve/po-wording-pools';
 import { PriceExcluding, selectTargetGroup, dropdownPromotionGroup, targetgroup, RetryPattern, RandomMultiDuration, Randomdropdown, RandomFixedDates, RunMassMktTabs } from './dropdowns-randomizers';
 import { CopyDeductFail } from './priority-updaters';
@@ -90,7 +90,8 @@ const generateProjectNames = (
     PriceType: string,
     ProductClass?: string,
     PoSubGroup?: string,
-    Plugin?: string
+    Plugin?: string,
+    touchPoint?: { runHumanTouchPoint?: boolean; runNonHumanTouchPoint?: boolean }
 ): { projectName: string; poName: string; prefixName: string } => {
     const timeId = generateUniqueId();
     let prefixName: string;
@@ -111,14 +112,79 @@ const generateProjectNames = (
         const parts = [ModulePart, getAbbreviation(PriceType), getAbbreviation(ProductClass), getAbbreviation(Plugin)].filter(Boolean);
         prefixName = parts.join(' ');
     }
+    const touchPointTag =
+        touchPoint?.runHumanTouchPoint && touchPoint?.runNonHumanTouchPoint
+            ? 'BTP'
+            : touchPoint?.runHumanTouchPoint
+            ? 'HTP'
+            : touchPoint?.runNonHumanTouchPoint
+            ? 'NHTP'
+            : '';
 
-    const projectIdentifier = `PRJ ${timeId}`;
+    const projectIdentifier = touchPointTag
+        ? `PRJ ${touchPointTag} ${timeId}`
+        : `PRJ ${timeId}`;
     const poIdentifier = `PO ${timeId}`;
 
     const projectName = buildUniqueName(prefixName, projectIdentifier, 40);
     const poName = buildUniqueName(prefixName, poIdentifier, 35);
 
     return { projectName, poName, prefixName };
+};
+
+const selectOptionSafely = (
+    selector: string,
+    targetText: string,
+    options: { timeout?: number; retries?: number } = {}
+): void => {
+    const { timeout = 15000, retries = 3 } = options;
+    const normalize = (s: string) => (s || '').trim().replace(/\s+/g, ' ');
+
+    const attempt = (retriesLeft: number): void => {
+        cy.get(selector, { timeout }).should('be.visible').and('not.be.disabled');
+
+        cy.get(`${selector} option`, { timeout }).should('have.length.greaterThan', 0);
+
+        cy.get(`${selector} option`).then(($opts) => {
+            const target = normalize(targetText);
+            const optArr = [...$opts] as HTMLOptionElement[];
+
+            // 1) exact match on trimmed visible text
+            let match = optArr.find((o) => normalize(o.textContent || '') === target);
+
+            // 2) exact match on the option's value attribute
+            if (!match) {
+                match = optArr.find((o) => normalize(o.value) === target);
+            }
+
+            // 3) fallback: text contains target (handles minor formatting drift)
+            if (!match) {
+                match = optArr.find((o) => normalize(o.textContent || '').includes(target));
+            }
+
+            if (!match) {
+                const dump = optArr
+                    .map((o) => `value="${o.value}" text="${normalize(o.textContent || '')}"`)
+                    .join(' | ');
+                cy.log(`⚠️ [selectOptionSafely] No match for "${targetText}" in ${selector}. Options: ${dump}`);
+
+                if (retriesLeft > 0) {
+                    cy.wait(1000);
+                    attempt(retriesLeft - 1);
+                    return;
+                }
+
+                throw new Error(
+                    `❌ selectOptionSafely: could not find option matching "${targetText}" in ${selector}. Available: ${dump}`
+                );
+            }
+
+            cy.get(selector).select(match!.value);
+            cy.get(selector).should('have.value', match!.value);
+        });
+    };
+
+    attempt(retries);
 };
 
 // ========================
@@ -130,7 +196,8 @@ const createProjectBase = (
     projectName: string,
     Module: Module,
     subModule?: string,
-    projectObject: string = 'Create'
+    projectObject: string = 'Create',
+    projectIndex: number = 0
 ): string => {
     login(credentials.user, credentials.pass);
 
@@ -185,9 +252,19 @@ const createProjectBase = (
 
     cy.get('modal-container').should('not.exist');
 
+    cy.get('input[formcontrolname="projectCode"]', { timeout: 15000 })
+        .should('be.visible')
+        .invoke('val')
+        .should('not.be.empty')
+        .then((code) => {
+            const projectCode = String(code).trim();
+            cy.log(`📌 Captured Project Code: "${projectCode}" (index: ${projectIndex})`);
+            Cypress.env('currentProjectCode', projectCode);
+            registerProjectCode(projectCode, projectIndex);
+        });
+
     return finalProjectName;
 };
-
 // ========================
 // CREATE PO BASE
 // ========================
@@ -495,12 +572,7 @@ export const backBacicInfo = (): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getRequest4');
     cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 1000000 });
 
-    // 🟡 FIX: modal "unsaved changes" (Angular route guard) จะขึ้นเฉพาะกรณีที่ PO สุดท้าย
-    // ยังไม่ถูก Save เท่านั้น ถ้า PO สุดท้ายถูก Save ไปแล้ว (เช่นผ่าน fillSmsWordingSection
-    // ที่มี Save + closeSuccessModal ในตัวเองอยู่แล้ว) modal นี้จะไม่ขึ้นเลย
-    // เดิม code ใช้ .should('be.visible') ตรงๆ ทำให้ timeout ยาวเป็นชั่วโมงเวลาไม่มี unsaved changes
-    // เปลี่ยนเป็นเช็คแบบมีเงื่อนไข ให้รอสั้นๆ ว่ามันจะขึ้นไหม แล้วค่อยตัดสินใจคลิกหรือข้าม
-    cy.wait(1500); // ให้เวลา Angular route guard ขึ้น modal ถ้าจะขึ้น
+    cy.wait(1500); 
 
     cy.get('body').then(($body) => {
         const $btn = $body.find('.modal-body > .col-md-12 > :nth-child(1) > .btn');
@@ -555,17 +627,28 @@ export const ProjectBasicInformationComplete = (
     const credentials = getCredentials(Module);
     const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
-    const { projectName, poName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
+    const { projectName, poName, prefixName } = generateProjectNames(
+        prefix,
+        Module,
+        subModule,
+        PriceType,
+        ProductClass,
+        undefined,
+        Plugin,
+        { runHumanTouchPoint, runNonHumanTouchPoint }
+    );
 
-    createProjectBase(credentials, projectName, Module, subModule);
+    const projectIndex = ProductClass === 'main' ? 0 : 1;
+    createProjectBase(credentials, projectName, Module, subModule, 'Create', projectIndex);
+
     const envKey = ProductClass === 'main' ? 'formattedDateMain' : 'formattedDate';
     Cypress.env(envKey, projectName);
-    registerProjectName(projectName, ProductClass === 'main' ? 0 : 1);
+    registerProjectName(projectName, projectIndex);
 
     Cypress.env('hasYoutubePremium', false);
     Cypress.env('hasCloudGame', false);
 
-    const poCount = 1;
+    const poCount = 2;
 
     const poEnvKey = ProductClass === 'main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
     const poNames: string[] = [];
@@ -592,17 +675,8 @@ export const ProjectBasicInformationComplete = (
             ? productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra']
             : productClassMapMobile[ProductClass];
 
-        cy.get('select[formcontrolname="productClass"]')
-            .should('be.visible')
-            .and('not.be.disabled')
-            .select(productValue)
-            .should('have.value', productValue);
-
-        cy.get('select[formcontrolname="priceType"]')
-            .should('be.visible')
-            .and('not.be.disabled')
-            .select(priceTypeMap[PriceType])
-            .should('have.value', priceTypeMap[PriceType]);
+        selectOptionSafely('select[formcontrolname="productClass"]', productValue);
+        selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
 
         if (ProductClass === 'main') {
             const defaultItems = ['Internet', 'MMS', 'SMS', 'Voice'];
@@ -620,14 +694,10 @@ export const ProjectBasicInformationComplete = (
                         cy.log(`✅ default items confirmed`);
                     } else if (attemptsLeft > 0) {
                         cy.log(`⚠️ default items missing (${attemptsLeft} retries left)`);
-                        cy.get('select[formcontrolname="productClass"]').select(productClassMapMobile['ontop']);
-                        cy.get('select[formcontrolname="productClass"]').should('have.value', productClassMapMobile['ontop']);
-                        cy.get('select[formcontrolname="productClass"]').select(productValue);
-                        cy.get('select[formcontrolname="productClass"]').should('have.value', productValue);
+                        selectOptionSafely('select[formcontrolname="productClass"]', productClassMapMobile['ontop']);
+                        selectOptionSafely('select[formcontrolname="productClass"]', productValue);
                         cy.get('select[formcontrolname="priceType"]').should('exist').and('not.be.disabled');
-                        cy.get('select[formcontrolname="priceType"]')
-                            .select(priceTypeMap[PriceType])
-                            .should('have.value', priceTypeMap[PriceType]);
+                        selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
                         retrySelectProductClass(attemptsLeft - 1);
                     } else {
                         cy.log(`❌ default items still missing after retries`);
@@ -648,26 +718,95 @@ export const ProjectBasicInformationComplete = (
                 'year': [2, 3, 4, 5, 6, 7, 8, 9, 10],
             };
 
-            cy.get('select[formcontrolname="packageDurationUnit"] option:not([disabled])')
-                .should('have.length.greaterThan', 0)
-                .then($options => {
-                    const randomIndex = Math.floor(Math.random() * $options.length);
-                    const selectedOption = $options[randomIndex] as HTMLOptionElement;
-                    const unitText = selectedOption.text.trim().toLowerCase();
+            cy.log(`⏱️ autoSetDuration=true, entering packageDurationUnit selection`);
 
-                    const matchedKey = Object.keys(realisticDurations).find(key =>
-                        unitText.includes(key) || key.includes(unitText)
-                    );
+            const stripIndexPrefix = (raw: string): string => raw.replace(/^\d+:\s*/, '').trim();
 
-                    const possibleDurations = matchedKey
-                        ? realisticDurations[matchedKey]
-                        : [2, 3, 7, 14, 30, 60, 90];
+            const waitForStableOptions = (attemptsLeft: number, prevSignature: string | null): void => {
+                cy.get('select[formcontrolname="packageDurationUnit"]')
+                    .filter(':visible')
+                    .should('have.length', 1)
+                    .find('option:not([disabled])')
+                    .should('have.length.greaterThan', 0)
+                    .then($options => {
+                        const labels = [...$options].map(o => stripIndexPrefix((o as HTMLOptionElement).text));
+                        const signature = labels.join('|');
 
-                    const randomDuration = possibleDurations[Math.floor(Math.random() * possibleDurations.length)];
+                        if (signature === prevSignature) {
+                            cy.log(`✅ packageDurationUnit options stable: [${labels.join(', ')}]`);
+                            pickAndSelect(labels);
+                        } else if (attemptsLeft > 0) {
+                            cy.log(`⏳ packageDurationUnit options still changing, waiting... (${attemptsLeft} left)`);
+                            cy.wait(400);
+                            waitForStableOptions(attemptsLeft - 1, signature);
+                        } else {
+                            cy.log(`⚠️ options never stabilized after retries, proceeding anyway with: [${labels.join(', ')}]`);
+                            pickAndSelect(labels);
+                        }
+                    });
+            };
 
-                    cy.get('select[formcontrolname="packageDurationUnit"]').select(selectedOption.value);
-                    cy.get('input[formcontrolname="packageDuration"]').clear().type(randomDuration.toString());
-                });
+            const pickAndSelect = (stableLabels: string[]): void => {
+                const targetLabel = stableLabels[Math.floor(Math.random() * stableLabels.length)];
+                const unitText = targetLabel.toLowerCase();
+
+                const matchedKey = Object.keys(realisticDurations).find(key =>
+                    unitText.includes(key) || key.includes(unitText)
+                );
+                const possibleDurations = matchedKey ? realisticDurations[matchedKey] : [2, 3, 7, 14, 30, 60, 90];
+                const randomDuration = possibleDurations[Math.floor(Math.random() * possibleDurations.length)];
+
+                const selectAndVerify = (attemptsLeft: number): void => {
+                    cy.get('select[formcontrolname="packageDurationUnit"]')
+                        .filter(':visible')
+                        .should('have.length', 1)
+                        .find('option:not([disabled])')
+                        .then($options => {
+                            const match = [...$options].find(
+                                o => stripIndexPrefix((o as HTMLOptionElement).text) === targetLabel
+                            ) as HTMLOptionElement | undefined;
+
+                            if (!match) {
+                                if (attemptsLeft > 0) {
+                                    cy.log(`⚠️ "${targetLabel}" not found in current options, retrying — ${attemptsLeft} left`);
+                                    cy.wait(400);
+                                    selectAndVerify(attemptsLeft - 1);
+                                    return;
+                                }
+                                throw new Error(`packageDurationUnit: "${targetLabel}" never reappeared in options after retries`);
+                            }
+
+                            cy.get('select[formcontrolname="packageDurationUnit"]')
+                                .filter(':visible')
+                                .select(match.value, { force: true });
+
+                            cy.get('select[formcontrolname="packageDurationUnit"]')
+                                .filter(':visible')
+                                .then($select => {
+                                    const currentRaw = $select.val() as string;
+                                    const currentLabelMatches = currentRaw != null && stripIndexPrefix(currentRaw) === targetLabel;
+                                    if (currentRaw === match.value || currentLabelMatches) {
+                                        cy.log(`✅ packageDurationUnit confirmed: ${targetLabel}`);
+                                    } else if (attemptsLeft > 0) {
+                                        cy.log(`⚠️ packageDurationUnit not set yet (got "${currentRaw}"), retrying — ${attemptsLeft} left`);
+                                        cy.wait(400);
+                                        selectAndVerify(attemptsLeft - 1);
+                                    } else {
+                                        throw new Error(
+                                            `packageDurationUnit: failed to select "${targetLabel}" after retries — stuck at "${currentRaw}"`
+                                        );
+                                    }
+                                });
+                        });
+                };
+
+                selectAndVerify(4);
+
+                cy.get('input[formcontrolname="packageDuration"]').clear().type(randomDuration.toString());
+                cy.log(`🗓️ Package Duration set to: ${randomDuration} ${targetLabel}`);
+            };
+
+            waitForStableOptions(5, null);
 
             cy.get('.col-md-8 > .btn').click();
         }
@@ -708,9 +847,14 @@ export const ProjectBasicInformationComplete = (
                     });
             }
         }
+        const isMultiDurationEligible =
+            PriceType?.toString().trim().toLowerCase() === 'recurring' ||
+            PriceType?.toString().trim().toLowerCase() === 'usage';
 
-        const isMultiDurationEligible = PriceType === 'recurring' || PriceType === 'usage';
-        const useMultiDuration = isMultiDurationEligible && Math.random() < 0.5;
+        const randomValue = Math.random();
+        const useMultiDuration = isMultiDurationEligible && randomValue < 0.5;
+
+        cy.log(`🔍 PriceType="${PriceType}" | isMultiDurationEligible=${isMultiDurationEligible} | randomValue=${randomValue.toFixed(3)} | useMultiDuration=${useMultiDuration}`);
 
         if (useMultiDuration) {
             cy.log(`🎲 Multi Duration randomly selected: Yes (PriceType=${PriceType})`);
@@ -718,6 +862,7 @@ export const ProjectBasicInformationComplete = (
         } else {
             PriceExcluding();
         }
+
         RandomFixedDates();
         Randomdropdown();
         selectTargetGroup('random');
@@ -805,10 +950,23 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     cy.get('input[aria-label="Date input field"]').type(formattedDate);
     cy.get('input[aria-label="Date input field"]').should('have.value', formattedDate);
     cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
+
     RandomProjectDescription(projectName, Module);
     cy.get('button[type="button"]').contains('Save').click();
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
+
+    // ✅ เก็บ Project Code ลง ENV + ProjectManager (มี project เดียวต่อรัน ไม่ต้องส่ง index)
+    cy.get('input[formcontrolname="projectCode"]', { timeout: 15000 })
+        .should('be.visible')
+        .invoke('val')
+        .should('not.be.empty')
+        .then((code) => {
+            const projectCode = String(code).trim();
+            cy.log(`📌 Captured Project Code: "${projectCode}"`);
+            Cypress.env('currentProjectCode', projectCode);
+            registerProjectCode(projectCode);
+        });
 
     const poCount = 2;
     const poNames: string[] = [];
@@ -845,7 +1003,8 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
         if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
             const priceTypeMap: Record<string, string> = { onetime: 'One-Time', recurring: 'Recurring', usage: 'Usage' };
-            cy.get('select[formcontrolname="priceType"]').select(priceTypeMap[PriceType]);
+            // ✅ FIX: ใช้ selectOptionSafely แทน .select() ตรงๆ (จุดเสี่ยงเดียวกัน)
+            selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
         }
 
         if (Module === 'POST' && PoSubGroup === 'CashBack') {
@@ -994,9 +1153,6 @@ const searchProductOfferingByPO = (
             const matchCount = countMatchingRows($rows, PriceType, ProductClass);
             const isLastAttempt = attemptIndex >= monthsBackOptions.length - 1;
 
-            // ✅ FIX: เดิมเช็คแค่ matchCount === 0 ทำให้พอเจอ PO ตรงเงื่อนไขแค่ 1 ตัว
-            // (ทั้งที่ขอมา poCount=2) ก็หยุด widen ทันที ไม่ไปหาต่อในช่วงเดือนถัดไป
-            // แก้ให้เช็คว่าเจอ "ครบตามที่ขอ" (matchCount >= poCount) ก่อนถึงจะพอ
             if (matchCount < poCount && !isLastAttempt) {
                 cy.log(
                     `⚠️ Found only ${matchCount}/${poCount} matching PO within ${monthsBack} month(s), widening search...`
@@ -1005,7 +1161,6 @@ const searchProductOfferingByPO = (
             }
 
             if (matchCount === 0) {
-                // 🔎 DEBUG: log expected token + sample rows ก่อน throw
                 const priceTypeToken = PriceType ? getAbbreviation(PriceType).toUpperCase() : null;
                 const productClassToken = ProductClass ? getAbbreviation(ProductClass).toUpperCase() : null;
 
@@ -1099,11 +1254,12 @@ export const ProjectBasicInformationCompleteModify = (
 
     const { projectName, poName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
 
-    const actualProjectName = createProjectBase(credentials, projectName, Module, subModule, 'Modify By PO');
+    const projectIndex = ProductClass === 'main' ? 0 : 1;
+    const actualProjectName = createProjectBase(credentials, projectName, Module, subModule, 'Modify By PO', projectIndex);
 
     const envKey = ProductClass === 'main' ? 'formattedDateMain' : 'formattedDate';
     Cypress.env(envKey, actualProjectName);
-    registerProjectName(actualProjectName, ProductClass === 'main' ? 0 : 1);
+    registerProjectName(actualProjectName, projectIndex);
 
     searchProductOfferingByPO(poCount, PriceType, ProductClass).then((selected) => {
         Cypress.env('modifyTargetPoNames', selected.map(s => s.poName));
@@ -1143,14 +1299,12 @@ export const ProjectBasicInformationCompleteModify = (
                     throw new Error('❌ ไม่พบ PO ใน Sidebar หลังคลิก Modify');
                 }
 
-                // วน loop ตามจำนวน PO ที่มีจริงใน Sidebar
                 cy.wrap(Array.from({ length: actualPOCount })).each((_: any, index: number) => {
                     cy.log(`🔄 [${index + 1}/${actualPOCount}] Processing PO in sidebar...`);
 
                     if (index > 0) {
                         cy.log(`🔀 Switching to PO at index ${index}...`);
 
-                        // 1. รอ Loading หาย
                         cy.get('body').then(($body) => {
                             if ($body.find('.loading-curtain').length > 0) {
                                 cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
@@ -1158,7 +1312,6 @@ export const ProjectBasicInformationCompleteModify = (
                         });
                         cy.wait(2000);
 
-                        // 2. คลิก PO ตาม index โดยตรง
                         cy.get('div.drawer1')
                             .find('a.button')
                             .then($links => {
@@ -1173,7 +1326,6 @@ export const ProjectBasicInformationCompleteModify = (
                                 }
                             });
 
-                        // 3. รอหน้าฟอร์มโหลดเสร็จ
                         cy.wait(3000);
                         cy.get('body').then(($body) => {
                             if ($body.find('.loading-curtain').length > 0) {
@@ -1182,14 +1334,12 @@ export const ProjectBasicInformationCompleteModify = (
                         });
                     }
 
-                    // ✅ เลือก Section ใหม่ทุกครั้งที่เริ่มทำ PO
                     selectModifySections(1, 3).then((sections) => {
                         cy.log(`📝 Selected sections for PO ${index + 1}: ${sections.join(', ')}`);
 
                         fillSelectedModifySections(sections, index);
                     });
 
-                    // กด Save + ปิด Modal (ถ้ายังไม่ใช่ PO สุดท้าย)
                     if (index < actualPOCount - 1) {
                         cy.contains('button', 'Save')
                             .should('be.visible')

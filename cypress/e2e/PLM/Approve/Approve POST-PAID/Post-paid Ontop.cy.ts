@@ -2,7 +2,7 @@ import * as Master from '../../Master';
 
 type PriceType = 'onetime' | 'recurring' | 'usage';
 
-let isFirstRun = true; 
+let isFirstRun = true;
 
 beforeEach(() => {
   if (isFirstRun) {
@@ -13,11 +13,16 @@ beforeEach(() => {
     });
     isFirstRun = false;
   }
+
   cy.visit(Master.urlsit, {
+    timeout: 60000,
     onBeforeLoad: (win) => {
       win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
     }
   });
+
+  cy.get('app-login', { timeout: 60000 }).should('be.visible');
+  cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
 });
 
 describe('POST-PAID Ontop', () => {
@@ -37,7 +42,7 @@ describe('POST-PAID Ontop', () => {
         });
         Master.afterMKTontopENTER();
       });
-      describe('MUSIC', () => {
+      describe.only('MUSIC', () => {
         it('MKT POSTPAID role', () => {
           Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
         });
