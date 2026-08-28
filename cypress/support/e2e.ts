@@ -1,6 +1,25 @@
 
 import './commands';
 
+// Mirror every cy.log(...) call to the browser console as well
+try {
+  // Overwrite the built-in `log` command so it also writes to console
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (Cypress as any).Commands?.overwrite?.('log', (orig: any, ...args: any[]) => {
+    orig(...args);
+    try {
+      // eslint-disable-next-line no-console
+      console.log(...args);
+    } catch (e) {
+      // ignore
+    }
+  });
+} catch (err) {
+  // best-effort; if overwrite fails, fall back to adding a simple patch
+  // eslint-disable-next-line no-console
+  console.warn('cLog wrapper: could not overwrite cy.log', err);
+}
+
 
 
 function applyGlobalIntercepts() {

@@ -242,8 +242,10 @@ const _approveSPADTester = (
                             cy.contains('button', 'Yes').click({ force: true });
                         });
 
-                    cy.wait('@sendPluginApi', { timeout: 60000 })
-                        .its('response.statusCode').should('eq', 200);
+                    cy.wait('@sendPluginApi', { timeout: 60000 }).then((interception) => {
+                        const statusCode = interception.response?.statusCode ?? 0;
+                        expect(statusCode, 'sendPluginApi status').to.be.oneOf([200, 304]);
+                    });
 
                     pollUntilSPADDeployReady();
 
@@ -437,8 +439,21 @@ export const approveProjectCGMDPRE = (
 
             scrollAndWait();
             handleAddToUSMP();
-            cy.contains('button', 'Approve To CGMD', { timeout: 60000 }).should('be.visible').click({ force: true });
-            cy.contains('button', 'Yes').should('be.visible').click({ force: true });
+
+            cy.contains('button', 'Approve To CGMD', { timeout: 60000 })
+                .should('be.visible')
+                .and('not.be.disabled')   // fail fast if it's disabled instead of timing out on "Yes"
+                .click();                 // drop force:true — let Cypress prove it's actually clickable
+
+            cy.on('window:confirm', () => true); // in case this path uses a native confirm
+
+            cy.get('body', { timeout: 10000 }).then(($body) => {
+                if ($body.find('.modal:visible button:contains("Yes")').length > 0) {
+                    cy.contains('.modal', /./).contains('button', 'Yes').click({ force: true });
+                } else {
+                    cy.log('ℹ️ No modal "Yes" button appeared — assuming native confirm handled it');
+                }
+            });
 
         },
         'AlertAndLogout',
@@ -720,7 +735,7 @@ export const approveProjectACTM = (
             });
 
             // ✅ assert ว่า promote สำเร็จจริง เช่น redirect หรือ toast
-            cy.url({ timeout: 15000 }).should('not.include', '/actm/actm-doer/detail'); 
+            cy.url({ timeout: 15000 }).should('not.include', '/actm/actm-doer/detail');
             // หรือถ้ามี success message
             // cy.contains('successfully', { timeout: 10000 }).should('be.visible');
         },

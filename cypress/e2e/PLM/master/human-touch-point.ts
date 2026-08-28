@@ -274,102 +274,109 @@ export const RandomHumanTouchPoint = (subModule?: string): void => {
                 return;
             }
 
-            cy.get('select[formcontrolname="availableListBox"]')
+            cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
+                .should('exist')
                 .select(finalSelection, { force: true });
 
-            cy.get('button.str')
-                .should('not.be.disabled')
+            cy.get('ng2-dual-list-box button.str', { timeout: 20000 })
+                .should('exist')
+                .and('not.be.disabled')
                 .click({ force: true });
         });
 
         // -----------------------------------------------------------
         // STEP 4: Loop เพื่อกรอกข้อมูล (Edit) ในแต่ละแถว
         // -----------------------------------------------------------
+        const editNextApplicableRow = (): void => {
+            cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 }).then($rows => {
+                const nextRow = [...$rows].find($row => {
+                    const firstCellText = $row.querySelector('td')?.textContent?.trim() ?? '';
+                    return (
+                        firstCellText === 'ROM' ||
+                        firstCellText === 'Easy App ROM' ||
+                        firstCellText === 'Event' ||
+                        firstCellText === 'Selective Channel/Location'
+                    );
+                });
+
+                if (!nextRow) {
+                    cy.log('✅ No remaining applicable rows to edit');
+                    return;
+                }
+
+                const channel = nextRow.querySelector('td')?.textContent?.trim() ?? '';
+                if (!channel) {
+                    cy.log('⚠️ Skipping empty row after re-query');
+                    return;
+                }
+
+                cy.log(`✏️ Edit Human Touch Point: ${channel}`);
+
+                cy.wrap(nextRow)
+                    .find('button[title="Edit"]', { timeout: 20000 })
+                    .should('be.visible')
+                    .click({ force: true });
+
+                if (channel === 'ROM' || channel === 'Easy App ROM') {
+                    if (subModule === 'PRE') {
+                        let sub = '';
+                        let unsub = '';
+
+                        do {
+                            sub = generateAccessNumberWithFormat();
+                            unsub = generateAccessNumberWithFormat();
+                        } while (sub === unsub);
+
+                        cy.get('input[formcontrolname="subscribeAccessNumber"]', { timeout: 20000 })
+                            .should('be.visible')
+                            .clear()
+                            .type(sub);
+
+                        cy.get('input[formcontrolname="unsubscribeAccessNumber"]', { timeout: 20000 })
+                            .should('be.visible')
+                            .clear()
+                            .type(unsub);
+
+                        cy.log(`📱 Subscribe: ${sub}, Unsubscribe: ${unsub}`);
+                    }
+
+                    const randomDescription = Cypress._.sample(descriptionTexts) ?? '';
+                    cy.get('textarea[formcontrolname="description"]', { timeout: 20000 })
+                        .should('be.visible')
+                        .clear()
+                        .type(randomDescription);
+
+                    cy.get('input[type="file"]', { timeout: 20000 })
+                        .should('exist')
+                        .selectFile('cypress/fixtures/file.pdf', { force: true });
+
+                    const randomAttachmentDesc = Cypress._.sample(attachmentDescriptionTexts) ?? '';
+                    cy.get('textarea[formcontrolname="attachmentDescription"]', { timeout: 20000 })
+                        .should('be.visible')
+                        .clear()
+                        .type(randomAttachmentDesc);
+                }
+
+                if (channel === 'Event' || channel === 'Selective Channel/Location') {
+                    const randomDescription = Cypress._.sample(descriptionTexts) ?? '';
+                    cy.get('textarea[formcontrolname="description"]', { timeout: 20000 })
+                        .should('be.visible')
+                        .clear()
+                        .type(randomDescription);
+                }
+
+                cy.contains('button', 'Update', { timeout: 20000 })
+                    .should('be.visible')
+                    .click({ force: true });
+
+                cy.wait(500);
+                editNextApplicableRow();
+            });
+        };
+
         cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 })
             .should('have.length.greaterThan', 0);
 
-        cy.get('table tbody tr.ng-star-inserted')
-            .each($row => {
-                // ✅ ตรวจสอบก่อนว่า row นี้มี <td> หรือไม่
-                // เพื่อป้องกัน Error จาก tr ว่างเปล่าที่ Angular สร้างไว้เป็น placeholder
-                if ($row.find('td').length === 0) {
-                    cy.log('⚠️ Skipping empty row (no <td> elements found)');
-                    return; // ข้ามการประมวลผล row นี้ทันที
-                }
-
-                cy.wrap($row)
-                    .find('td')
-                    .first()
-                    .invoke('text')
-                    .then(raw => {
-                        const channel = raw.trim();
-                        if (!channel) return; // ป้องกันกรณี td มีแต่ช่องว่าง
-
-                        cy.log(`✏️ Edit Human Touch Point: ${channel}`);
-
-                        cy.wrap($row)
-                            .find('button[title="Edit"]')
-                            .should('be.visible')
-                            .click({ force: true });
-
-                        if (channel === 'ROM' || channel === 'Easy App ROM') {
-                            // Logic: ตรวจสอบ subModule = PRE เท่านั้น (ตรงกับ DOM ที่มีคอลัมน์ Subscribe/Unsubscribe)
-                            if (subModule === 'PRE') {
-                                let sub = '';
-                                let unsub = '';
-
-                                do {
-                                    // ✅ สุ่มใหม่เสมอต่อแถว/ต่อ PO — ไม่มี caching
-                                    sub = generateAccessNumberWithFormat();
-                                    unsub = generateAccessNumberWithFormat();
-                                } while (sub === unsub);
-
-                                cy.get('input[formcontrolname="subscribeAccessNumber"]', { timeout: 20000 })
-                                    .clear()
-                                    .type(sub);
-
-                                cy.get('input[formcontrolname="unsubscribeAccessNumber"]')
-                                    .clear()
-                                    .type(unsub);
-
-                                cy.log(`📱 Subscribe: ${sub}, Unsubscribe: ${unsub}`);
-                            }
-
-                            // ✅ สุ่มใหม่ทุกครั้ง — ใช้ meaningful text แทน random string
-                            const randomDescription = Cypress._.sample(descriptionTexts) ?? '';
-                            cy.get('textarea[formcontrolname="description"]')
-                                .clear()
-                                .type(randomDescription);
-
-                            cy.get('input[type="file"]')
-                                .selectFile('cypress/fixtures/file.pdf', { force: true });
-
-                            // ✅ สุ่มใหม่ทุกครั้ง — ใช้ meaningful text แทน random string
-                            const randomAttachmentDesc = Cypress._.sample(attachmentDescriptionTexts) ?? '';
-                            cy.get('textarea[formcontrolname="attachmentDescription"]')
-                                .clear()
-                                .type(randomAttachmentDesc);
-                        }
-
-                        if (
-                            channel === 'Event' ||
-                            channel === 'Selective Channel/Location'
-                        ) {
-                            // ✅ สุ่มใหม่ทุกครั้ง — ใช้ meaningful text แทน random string
-                            const randomDescription = Cypress._.sample(descriptionTexts) ?? '';
-                            cy.get('textarea[formcontrolname="description"]')
-                                .clear()
-                                .type(randomDescription);
-                        }
-
-                        // กด Update
-                        cy.contains('button', 'Update', { timeout: 20000 })
-                            .should('be.visible')
-                            .click({ force: true });
-
-                        // รอให้ UI / Form ปิดลงก่อนวนลูปไปแก้แถวถัดไป
-                        cy.wait(500);
-                    });
-            });
+        editNextApplicableRow();
     });
 };

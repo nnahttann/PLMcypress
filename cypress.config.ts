@@ -50,6 +50,7 @@ export default defineConfig({
 
   experimentalMemoryManagement: true,
   numTestsKeptInMemory: 0,
+  allowCypressEnv: true,
 
   taskTimeout: 30000,
   screenshotOnRunFailure: false, // Disable screenshots on failures to save time

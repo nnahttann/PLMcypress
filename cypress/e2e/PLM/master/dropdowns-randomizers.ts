@@ -8,6 +8,7 @@ const closeSuccessModal = (): void => {
         .and('not.be.disabled')
         .click();
 };
+
 // =============================
 // Helper: format Date → dd/mm/yyyy
 // =============================
@@ -17,9 +18,11 @@ const formatDate = (d: Date): string =>
 // =============================
 // Helper: parse dd/mm/yyyy → Date
 // =============================
-const parseDate = (val: string): Date | null => {
-    if (!val || val.trim() === '') return null;
-    const parts = val.trim().split('/');
+const parseDate = (val: any): Date | null => {
+    // ✅ FIX: แปลงเป็น String อย่างปลอดภัย ป้องกัน Error หาก val เป็น null หรือ number
+    const strVal = String(val ?? '');
+    if (!strVal || strVal.trim() === '') return null;
+    const parts = strVal.trim().split('/');
     if (parts.length !== 3) return null;
     const day = parseInt(parts[0], 10);
     const month = parseInt(parts[1], 10) - 1;
@@ -48,7 +51,8 @@ const typeDatePicker = (formcontrolname: string, date: Date) => {
     const formatted = formatDate(date);
     cy.get(`my-date-picker[formcontrolname="${formcontrolname}"] input[aria-label="Date input field"]`)
         .click()
-        .clear()
+        // ✅ FIX: ใช้ {selectall}{backspace} แทน .clear() เพื่อ Trigger Angular Change Detection ได้ดีกว่า
+        .type('{selectall}{backspace}')
         .type(formatted, { delay: 30 });
     cy.get(`my-date-picker[formcontrolname="${formcontrolname}"] input[aria-label="Date input field"]`)
         .should('have.value', formatted);
@@ -62,7 +66,7 @@ const readDatePicker = (formcontrolname: string): Cypress.Chainable<Date | null>
         .get(`my-date-picker[formcontrolname="${formcontrolname}"] input[aria-label="Date input field"]`)
         .invoke('val')
         .then((val) => {
-            const parsed = parseDate(val as string);
+            const parsed = parseDate(val);
             if (!parsed) {
                 cy.log(`⚠️ ${formcontrolname}: อ่านค่าไม่ได้ (val="${val}")`);
             } else {
@@ -149,6 +153,7 @@ export const RandomFixedDates = () => {
         });
     });
 };
+
 // ========================
 // RANDOM DROPDOWN PRE-PAID ONTOP/MAIN
 // ========================
@@ -336,6 +341,7 @@ export const Randomdropdown = () => {
     // =============================
     maybeRandomSelect('select[formcontrolname="promotionSubGroup"]', (v) => v !== '0: null');
 };
+
 // ========================
 // HELPER: normalize whitespace
 // ========================
@@ -447,29 +453,21 @@ const handleDropdownField = (fieldLabel: string): void => {
         const currentText = normalizeText($select.find('.mat-select-value-text').text());
         const isEmpty = isPlaceholder || currentText === '' || currentText === 'Please Select';
 
-        // ✅ ใช้ id หรือ ng-tns class เพื่อ re-query ใหม่แทน cy.wrap($select)
-        const selectId = $select.attr('id');
-
         if (isEmpty) {
             cy.log(`📭 "${fieldLabel}" is empty → picking a new value`);
-            // ✅ re-query จาก DOM ใหม่ แล้ว click ที่ .mat-select-trigger
-            cy.get(`#${selectId} .mat-select-trigger`).click({ force: true });
+            // ✅ FIX: ใช้ cy.wrap แทนการพึ่งพา id ที่อาจเป็น undefined ใน Angular
+            cy.wrap($select).find('.mat-select-trigger').click({ force: true });
             cy.wait(300);
-            // ✅ re-query $select ใหม่สำหรับ verify
-            cy.get(`#${selectId}`).then(($freshSelect) => {
-                selectRandomOption($freshSelect, fieldLabel);
-            });
+            selectRandomOption($select, fieldLabel);
         } else {
             const shouldChange = Math.random() < 0.5;
             cy.log(
                 `🔍 "${fieldLabel}" = "${currentText}" → ${shouldChange ? 'changing' : 'keeping'}`
             );
             if (shouldChange) {
-                cy.get(`#${selectId} .mat-select-trigger`).click({ force: true });
+                cy.wrap($select).find('.mat-select-trigger').click({ force: true });
                 cy.wait(300);
-                cy.get(`#${selectId}`).then(($freshSelect) => {
-                    selectRandomOption($freshSelect, fieldLabel, currentText);
-                });
+                selectRandomOption($select, fieldLabel, currentText);
             }
         }
     });
@@ -487,14 +485,12 @@ const handleRecurringDropdowns = (): void => {
 // EXPORTS
 // ========================
 export const dropdownRecurringCKS = (): void => handleRecurringDropdowns();
-
 export const dropdownRecurringCKSMain = (): void => handleRecurringDropdowns();
-
 export const dropdownRecurringPreMainCKS = (): void => handleRecurringDropdowns();
+
 // ========================
 // UNREGISTER
 // ========================
-
 export const unregister = (): void => {
     cy.get('body').then(($body) => {
         if ($body.text().includes('UnRegister (Hold)')) {
@@ -516,7 +512,6 @@ export const unregister = (): void => {
 // ========================
 // ADD AUTO 5G CKS
 // ========================
-
 export const addauto5gCKS = (): void => {
     const values = ['1: Y', '2: X', '3: N'];
     const randomValue = values[Math.floor(Math.random() * values.length)];
@@ -537,7 +532,6 @@ export const addauto5gCKS = (): void => {
 // ========================
 // DIY FLAG CKS
 // ========================
-
 export const diyflagCKS = (): void => {
     const isDiyYes = Math.random() < 0.5;
     const diyLabelToClick = isDiyYes ? 'Yes' : 'No';
@@ -583,7 +577,8 @@ export const diyflagCKS = (): void => {
         .as('activeDropdown')
         .click();
 
-    cy.get('mat-option:not(.mat-option-disabled)')
+    // ✅ FIX: Scope ให้ชัดเจนที่ overlay container ป้องกันการไปเจอ option ของ dropdown อื่น
+    cy.get('.cdk-overlay-container mat-option:not(.mat-option-disabled)')
         .should('have.length.gt', 0)
         .then(($options) => {
             const optionCount = $options.length;
@@ -606,7 +601,6 @@ export const diyflagCKS = (): void => {
 // ========================
 // TARIFF
 // ========================
-
 export const Tariff = (): void => {
     cy.get('.scrollmenu > .nav').contains('Tariff Plan & Discount')
         .scrollIntoView({ offset: { top: -100, left: 0 } })
@@ -654,6 +648,7 @@ export const Tariff = (): void => {
 
     closeSuccessModal();
 };
+
 // ========================
 // PRICE EXCLUDING
 // ========================
@@ -683,7 +678,7 @@ export const PriceExcluding = (): void => {
         const validPrices = realisticPrices.filter(p => p >= min && p <= max);
         const price = validPrices.length > 0
             ? validPrices[Math.floor(Math.random() * validPrices.length)]
-            : Math.floor(Math.random() * (max - min) + min); // fallback ถ้าไม่มีในช่วง
+            : Math.floor(Math.random() * (max - min) + min);
         return price.toFixed(2);
     }
 
@@ -701,8 +696,9 @@ export const PriceExcluding = (): void => {
         .should('not.be.disabled')
         .click();
 };
+
 // ========================
-// PRICE EXCLUDING
+// RANDOM MULTI DURATION
 // ========================
 export const RandomMultiDuration = (): void => {
     function getRandomRealisticCharge(min = 100, max = 2000): string {
@@ -758,21 +754,22 @@ export const RandomMultiDuration = (): void => {
             for (let row = 0; row < rowCount; row++) {
                 cy.log(`📦 Multi Duration row ${row + 1}/${rowCount}`);
 
-                // ✅ กด + ทุก row รวม row แรก เพราะ form ไม่ได้เปิดอัตโนมัติ
                 cy.get('.col-md-8.col-md-offset-2 > .btn-primary').click();
 
                 const fromValue = Math.min(currentFrom, packageDuration);
                 cy.log(`   durationFrom: ${fromValue}`);
 
+                // ✅ FIX: เพิ่ม .eq(row) เพื่อเจาะจง input ของ row ปัจจุบัน ป้องกันการ Fail จาก Multiple Elements
                 cy.get('input[formcontrolname="durationFrom"]')
+                    .eq(row)
                     .should('be.visible')
-                    .clear()
+                    .type('{selectall}{backspace}')
                     .type(fromValue.toString())
                     .trigger('input')
                     .trigger('change')
                     .should('have.value', fromValue.toString());
 
-                cy.get('input[formcontrolname="durationTo"]').then($el => {
+                cy.get('input[formcontrolname="durationTo"]').eq(row).then($el => {
                     if ($el.prop('disabled')) {
                         cy.log('🔒 POST path — durationTo disabled (auto-calculated)');
                     } else {
@@ -785,22 +782,30 @@ export const RandomMultiDuration = (): void => {
                 cy.log(`   chargeExcVat: ${randomChargeExc}, chargeIncVat: ${randomChargeInc}`);
 
                 cy.get('input[formcontrolname="chargeExcVat"]')
+                    .eq(row)
                     .should('be.visible')
-                    .clear()
+                    .type('{selectall}{backspace}')
                     .type(randomChargeExc)
                     .trigger('input')
                     .trigger('change')
                     .should('have.value', randomChargeExc);
 
                 cy.get('input[formcontrolname="chargeIncVat"]')
+                    .eq(row)
                     .should('be.visible')
-                    .clear()
+                    .type('{selectall}{backspace}')
                     .type(randomChargeInc)
                     .trigger('input')
                     .trigger('change')
                     .should('have.value', randomChargeInc);
 
-                cy.contains('button', 'Add').click();
+                // ✅ FIX: Scope การกดปุ่ม Add ให้อยู่ใน row ปัจจุบัน ป้องกันการกดผิดปุ่ม
+                cy.get('input[formcontrolname="chargeIncVat"]')
+                    .eq(row)
+                    .closest('.row, .form-group, .panel-body') 
+                    .find('button')
+                    .contains('Add')
+                    .click();
 
                 currentFrom = Math.min(currentFrom + step, packageDuration);
             }
@@ -823,7 +828,6 @@ export const RandomMultiDuration = (): void => {
 // ========================
 // SELECT TARGET GROUP
 // ========================
-
 export const selectTargetGroup = (type:
     'mass' | 'massDisabled' | 'massStudents' | 'save' | 'fmc' |
     'specialCondition' | 'cvm' | 'staff' | 'test' | 'netGift' |
@@ -864,38 +868,11 @@ export const selectTargetGroup = (type:
     cy.get('select[formcontrolname="targetGroup"]')
         .select(value)
         .should('have.value', value);
-
-    // if (selectedType === 'traveller') {
-    //     const firstUseYes = Math.random() < 0.5;
-
-    //     cy.get('input[formcontrolname="firstUseFeature"]')
-    //         .eq(firstUseYes ? 0 : 1) // 0 = Yes, 1 = No
-    //         .check({ force: true });
-
-    //     if (firstUseYes) {
-    //         const randomDuration = Math.floor(Math.random() * 99999) + 1;
-
-    //         cy.get('input[formcontrolname="durationFirstUse"]')
-    //             .clear()
-    //             .type(randomDuration.toString());
-    //     }
-    // }
-
-    // if (selectedType === 'netGift') {
-    //     const useExisting = Math.random() < 0.5;
-
-    //     if (useExisting) {
-    //         selectRandomExistingCostCode();
-    //     } else {
-    //         addNewCostCode();
-    //     }
-    // }
 };
 
 // ========================
 // DROPDOWN PROMOTION GROUP
 // ========================
-
 export const dropdownPromotionGroup = (): void => {
     cy.get('select[formcontrolname="groupPackage"]').then($select => {
         const options = $select.find('option:not([value="0: null"])');
@@ -919,7 +896,6 @@ export const dropdownPromotionGroup = (): void => {
             cy.get('select[formcontrolname="promotionGroup"]').select(valueToSelect);
         });
 
-    // Wait for promotionGroup to propagate to subGroup
     cy.get('select[formcontrolname="promotionSubGroup"]', { timeout: 5000 }).should('exist');
 
     cy.get('select[formcontrolname="promotionSubGroup"]').each(($select: JQuery<HTMLElement>) => {
@@ -940,8 +916,7 @@ export const dropdownPromotionGroup = (): void => {
 // ========================
 // TARGET GROUP (DUAL LIST)
 // ========================
-
-export const targetgroup = (): void => {
+export const targetgroup = (forceOptions?: string[]): void => {
     const optionsToSelect = [
         'Change Charge Type (Convert)',
         'Existing',
@@ -950,32 +925,40 @@ export const targetgroup = (): void => {
         'Renew / Recall from Terminate'
     ];
 
-    const randomOption = optionsToSelect[Math.floor(Math.random() * optionsToSelect.length)];
-
     cy.get('select[formcontrolname="availableListBox"]')
         .should('exist')
         .and('be.visible');
 
-    cy.get('select[formcontrolname="availableListBox"]')
-        .contains('option', randomOption)
-        .should('exist')
-        .and('be.visible')
-        .then($option => {
-            cy.wrap($option).dblclick({ force: true });
-        });
+    const selectedOptions = forceOptions ?? (() => {
+        const minCount = 1;
+        const maxCount = optionsToSelect.length;
+        const count = Math.floor(Math.random() * (maxCount - minCount + 1)) + minCount;
+        const shuffled = [...optionsToSelect].sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, count);
+    })();
+
+    cy.log(`🎯 targetgroup เลือก ${selectedOptions.length} ตัว: ${selectedOptions.join(', ')}`);
+
+    selectedOptions.forEach((optionText) => {
+        cy.get('select[formcontrolname="availableListBox"]')
+            .contains('option', optionText)
+            .should('exist')
+            .and('be.visible')
+            .then($option => {
+                cy.wrap($option).dblclick({ force: true });
+            });
+    });
 };
+
 // ========================
 // RETRY PATTERN
 // ========================
-
 export const RetryPattern = (): void => {
     cy.get('.scrollmenu > .nav')
         .contains('Retry Pattern')
         .scrollIntoView()
         .should('be.visible')
         .click();
-
-    // Max Retry Period: only type a random value if the field is empty or not a valid integer
     cy.get('input[formcontrolname="maxRetryPeriod"]')
         .filter(':visible')
         .then(($input) => {
@@ -983,14 +966,11 @@ export const RetryPattern = (): void => {
             const isValidInteger = /^\d+$/.test(currentValue.trim());
 
             if (!isValidInteger) {
-                // maxlength="3" on the field -> random 1-999
                 const randomPeriod = String(Math.floor(Math.random() * 999) + 1);
-
                 cy.wrap($input)
                     .clear()
                     .type(randomPeriod)
                     .blur({ force: true });
-
                 cy.log(`Max Retry Period was empty/invalid, typed random value: ${randomPeriod}`);
             } else {
                 cy.log(`Max Retry Period already has a valid value: ${currentValue}`);
@@ -1029,6 +1009,7 @@ export const RetryPattern = (): void => {
             }
         });
 };
+
 // ========================
 // Top up
 // ========================
@@ -1073,7 +1054,7 @@ export const ClickTopupTab = (): void => {
                 .should('be.visible')
                 .click();
             cy.wait(500);
-            Topup(); // → เช็คต่ออีกชั้นใน Topup()
+            Topup();
         } else {
             cy.log('No "Top up" tab found, skipping...');
         }
@@ -1084,7 +1065,6 @@ export const ClickTopupTab = (): void => {
 // Rom ID
 // ========================
 export const RomID = (): void => {
-    // ✅ ใช้ selector เดียวกันทั้ง check และ click กัน mismatch ระหว่าง 2 selector คนละตัว
     const TAB_SELECTOR = 'ul.nav.nav-tabs a';
     const TARGET_CHANNELS = ['ROM', 'Easy App ROM'];
     const DATA_ROW_SELECTOR = 'tbody tr';
@@ -1098,17 +1078,15 @@ export const RomID = (): void => {
             return;
         }
 
-        // 1. คลิกเปิด Tab
         cy.contains(TAB_SELECTOR, 'Selling Location & Channel', { timeout: 30000 })
             .scrollIntoView()
             .click({ force: true });
 
-        // 2. รอให้ Component หลักปรากฏ
         cy.get('app-mass-enh-human-touch-point', { timeout: 30000 })
             .should('exist')
             .and('be.visible');
 
-        cy.wait(2000); // เวลา settle สำหรับ Angular data binding หลัง tab เปิด
+        cy.wait(2000);
 
         cy.get('app-mass-enh-human-touch-point').then($component => {
             const $rows = $component.find(DATA_ROW_SELECTOR);
@@ -1130,7 +1108,6 @@ function processNextRomRow(remainingChannels: string[]): void {
     }
 
     cy.get('body').then($body => {
-        // หา row แรกที่ยัง match กับ channel ที่เหลืออยู่ — query สดทุกครั้งที่เรียกฟังก์ชันนี้
         const $rows = $body
             .find('app-mass-enh-human-touch-point table tbody tr.ng-star-inserted')
             .filter((_, el) => Cypress.$(el).find('td').length > 0);
@@ -1139,7 +1116,7 @@ function processNextRomRow(remainingChannels: string[]): void {
         let matchedChannel = '';
 
         $rows.each((_, el) => {
-            if (matchedRow) return; // already found one this pass
+            if (matchedRow) return;
             const $el = Cypress.$(el);
             const channel = $el.find('td').first().text().trim();
             if (remainingChannels.includes(channel)) {
@@ -1160,11 +1137,6 @@ function processNextRomRow(remainingChannels: string[]): void {
             .should('be.visible')
             .click({ force: true });
 
-        // -----------------------------------------------------------
-        // สุ่มเลือกระหว่าง Generate ROM ID หรือ Type เอง
-        // Scope ทุก selector ให้อยู่ใน component + :visible เพื่อกัน
-        // การ match ฟอร์มของ row อื่นที่แค่ถูกซ่อนด้วย CSS ไม่ได้ destroy
-        // -----------------------------------------------------------
         const shouldGenerate = Math.random() > 0.5;
 
         if (shouldGenerate) {
@@ -1174,7 +1146,6 @@ function processNextRomRow(remainingChannels: string[]): void {
                 .filter(':visible')
                 .should('be.visible')
                 .click({ force: true });
-
             cy.wait(1000);
         } else {
             cy.log('🎲 Logic: Type ROM ID manually (numbers only)');
@@ -1196,7 +1167,7 @@ function processNextRomRow(remainingChannels: string[]): void {
             cy.get('app-mass-enh-human-touch-point', { timeout: 10000 })
                 .find('input[formcontrolname="romID"]')
                 .filter(':visible')
-                .should('have.length', 1) // fail loud instead of silently acting on wrong row's input
+                .should('have.length', 1)
                 .clear()
                 .type(romIdValue);
 
@@ -1210,11 +1181,8 @@ function processNextRomRow(remainingChannels: string[]): void {
             .click({ force: true });
 
         cy.log(`✅ ${matchedChannel} updated successfully`);
-
-        // รอให้ UI ปิดฟอร์ม + tbody re-render เสร็จก่อนไป row ถัดไป
         cy.wait(500);
 
-        // ตัด channel ที่เพิ่ง process ออก แล้วเรียกตัวเองใหม่เพื่อ re-query DOM สดๆ
         const nextRemaining = remainingChannels.filter(c => c !== matchedChannel);
         processNextRomRow(nextRemaining);
     });
@@ -1260,16 +1228,16 @@ export const RunMassMktTabs = (): void => {
         });
     });
 };
+
 // ========================
 // Change Promotion Fee
 // ========================
 export const ChangePromotionFee = (): void => {
     cy.get('app-mass-mkt-change-promotion-fee').within(() => {
-        // Randomly choose Yes/No for Change Promotion Fee (Switching Fee)
         const isYes = Math.random() < 0.5;
 
         cy.get('input[formcontrolname="changePromotionFee"]')
-            .eq(isYes ? 0 : 1) // 0 = Yes, 1 = No
+            .eq(isYes ? 0 : 1)
             .check({ force: true });
 
         if (!isYes) {
@@ -1277,12 +1245,10 @@ export const ChangePromotionFee = (): void => {
             return;
         }
 
-        // Yes -> default "Free for First Time Change Promotion" to Yes
         cy.get('input[formcontrolname="freeforFirstTimeChangePromotionFlag"]')
-            .eq(0) // 0 = Yes
+            .eq(0)
             .check({ force: true });
 
-        // Randomly decide whether to type "Number of Days for Free First Time Change Promotion"
         const shouldTypeDays = Math.random() < 0.5;
 
         if (shouldTypeDays) {
@@ -1300,22 +1266,18 @@ export const SpecialCondition = (): void => {
     const targetLabel = 'Unsubscribe not Allowed';
 
     cy.get('app-mass-mkt-special-condition').within(() => {
-        // Get all available options and pick one at random
         cy.get('select[formcontrolname="availableListBox"] option').then($options => {
             const options = Array.from($options);
             const randomIndex = Math.floor(Math.random() * options.length);
             const randomOption = options[randomIndex];
             const randomLabel = randomOption.textContent?.trim() ?? '';
 
-            // Select that option in the Available items list box
             cy.get('select[formcontrolname="availableListBox"]').select(
                 Cypress.$(randomOption).val() as string
             );
 
-            // Click the "add to right" (atr) button to move it to Selected items
             cy.get('button.atr').click();
 
-            // If the randomly picked item was "Unsubscribe not Allowed", edit it
             if (randomLabel === targetLabel) {
                 cy.log(`${targetLabel} was selected -> editing detail`);
 
@@ -1339,18 +1301,43 @@ export const SpecialCondition = (): void => {
 
 export const MarketSegment = (): void => {
     cy.get('app-mass-mkt-market-segment').within(() => {
+        const dblClickOptionSafely = (
+            selector: string,
+            label: string,
+            attempt = 1
+        ): void => {
+            cy.get(selector)
+                .contains('option', label)
+                .then($opt => {
+                    cy.wrap($opt).dblclick({ force: true });
+                });
+
+            cy.get(selector).then($select => {
+                const stillThere = $select
+                    .find('option')
+                    .toArray()
+                    .some(el => Cypress.$(el).text().trim() === label);
+
+                if (stillThere) {
+                    if (attempt >= 3) {
+                        throw new Error(
+                            `"${label}" did not leave "${selector}" after ${attempt} attempts`
+                        );
+                    }
+                    cy.log(`"${label}" still present — retrying dblclick (attempt ${attempt + 1})`);
+                    dblClickOptionSafely(selector, label, attempt + 1);
+                }
+            });
+        };
+
         const shouldRemoveResidential = Math.random() < 0.5;
 
         if (shouldRemoveResidential) {
-            cy.get('select[formcontrolname="selectedListBox"] option')
-                .contains('Residential')
-                .dblclick();
+            dblClickOptionSafely(
+                'select[formcontrolname="selectedListBox"]',
+                'Residential'
+            );
             cy.log('Residential moved back to Available items (double click)');
-
-            // Wait for Angular to actually move it before continuing
-            cy.get('select[formcontrolname="availableListBox"] option')
-                .contains('Residential')
-                .should('exist');
         } else {
             cy.log('Keeping default Residential in Selected items');
         }
@@ -1362,9 +1349,8 @@ export const MarketSegment = (): void => {
             return;
         }
 
-        // Decide how many to pick based on a fresh read, but re-query for each pick
-        cy.get('select[formcontrolname="availableListBox"] option').then($options => {
-            const count = $options.length;
+        cy.get('select[formcontrolname="availableListBox"]').then($select => {
+            const count = $select.find('option').length;
 
             if (count === 0) {
                 if (shouldRemoveResidential) {
@@ -1378,21 +1364,21 @@ export const MarketSegment = (): void => {
             const numToPick = Math.max(1, Math.floor(Math.random() * count) + 1);
             cy.log(`Adding ${numToPick} extra Market Segment item(s)`);
 
-            // Pick one at a time, always re-querying the CURRENT live list,
-            // so we never act on a label that's already moved.
             const pickOnce = () => {
-                cy.get('select[formcontrolname="availableListBox"] option').then($current => {
-                    if ($current.length === 0) return;
-                    const idx = Math.floor(Math.random() * $current.length);
-                    const label = $current.eq(idx).text().trim();
+                cy.get('select[formcontrolname="availableListBox"]').then($currentSelect => {
+                    const $currentOptions = $currentSelect.find('option');
+                    if ($currentOptions.length === 0) {
+                        cy.log('No more available items to pick — stopping early');
+                        return;
+                    }
+                    const idx = Math.floor(Math.random() * $currentOptions.length);
+                    const label = $currentOptions.eq(idx).text().trim();
                     cy.log(`Double-clicking: ${label}`);
-                    cy.get('select[formcontrolname="availableListBox"] option')
-                        .contains(label)
-                        .dblclick();
-                    // confirm it actually left the available list before moving on
-                    cy.get('select[formcontrolname="availableListBox"] option')
-                        .contains(label)
-                        .should('not.exist');
+
+                    dblClickOptionSafely(
+                        'select[formcontrolname="availableListBox"]',
+                        label
+                    );
                 });
             };
 
@@ -1405,92 +1391,79 @@ export const MarketSegment = (): void => {
 
 export const CommuTouchPoint = (): void => {
     cy.get('app-mass-mkt-commu-touch-point').within(() => {
-        // 1. PO Name for Commu (TH)
         cy.get('input[formcontrolname="poNameCommu"]')
             .clear()
             .type('Test PO Name Commu');
 
-        // Helper Function สำหรับจัดการ ng2-dual-list-box
-        // เปลี่ยนจากการ dblclick เป็นการเลือกค่าแล้วกดปุ่มย้าย (Add Selected) ซึ่งเสถียรกว่ามาก
         const selectDualListItems = (formControlName: string, selectCount: number = 1) => {
             cy.get(`ng2-dual-list-box[formcontrolname="${formControlName}"]`).within(() => {
-                cy.get('select[formcontrolname="availableListBox"] option').then($options => {
-                    if ($options.length === 0) return;
+                cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
+                    .then($select => {
+                        const $options = $select.find('option');
 
-                    // สุ่มจำนวน Item ที่จะเลือก
-                    const numToPick = Math.min(selectCount, $options.length);
-                    const valuesToSelect: string[] = [];
-                    
-                    const indices = new Set<number>();
-                    while (indices.size < numToPick) {
-                        indices.add(Math.floor(Math.random() * $options.length));
-                    }
-                    
-                    // เก็บค่า (value) ของ Item ที่สุ่มได้
-                    indices.forEach(idx => {
-                        const val = $options.eq(idx).val() as string;
-                        valuesToSelect.push(val);
-                        cy.log(`Selecting: ${$options.eq(idx).text().trim()}`);
+                        if ($options.length === 0) {
+                            cy.log(`⏭️ ${formControlName}: no options available, skipping`);
+                            return;
+                        }
+
+                        const numToPick = Math.min(selectCount, $options.length);
+                        const valuesToSelect: string[] = [];
+
+                        const indices = new Set<number>();
+                        while (indices.size < numToPick) {
+                            indices.add(Math.floor(Math.random() * $options.length));
+                        }
+
+                        indices.forEach(idx => {
+                            const val = $options.eq(idx).val() as string;
+                            valuesToSelect.push(val);
+                            cy.log(`Selecting: ${$options.eq(idx).text().trim()}`);
+                        });
+
+                        cy.wrap($select).select(valuesToSelect as any);
+                        cy.get('button.str').should('not.be.disabled').click();
                     });
-
-                    // เลือกค่าใน Available Listbox (รองรับ Multiple Select)
-                    cy.get('select[formcontrolname="availableListBox"]').select(valuesToSelect as any);
-                    
-                    // กดปุ่ม "Add Selected" (class 'str' = single to right)
-                    // รอให้ปุ่มสามารถกดได้ (ปุ่มจะ disabled อยู่ถ้าไม่ได้เลือก item ไว้)
-                    cy.get('button.str').should('not.be.disabled').click();
-                });
             });
         };
 
-        // 2. ประเภทลูกค้า (customerCatergoryBox)
         const catCount = Math.floor(Math.random() * 3) + 1;
         selectDualListItems('customerCatergoryBox', catCount);
 
-        // 3. กลุ่มเป้าหมายลูกค้า (targetCustomerBox)
         const shouldAddTarget = Math.random() < 0.5;
         if (shouldAddTarget) {
             const targetCount = Math.floor(Math.random() * 2) + 1;
             selectDualListItems('targetCustomerBox', targetCount);
         }
 
-        // 4. ลูกค้าได้รับเมื่อสมัครแพ็ก - click "+" to add a Serenade Segment row
         cy.get('button.btn-primary.btn-xs').first().click();
 
-        // รอให้ Hidden Panel แสดงผลออกมา (Angular จะลบ hidden attribute ออก)
-        // การ .should('be.visible') จะช่วยหยุดรอจนกว่าฟอร์มจะพร้อมใช้งาน
         cy.get('select[formcontrolname="customerSegment"]', { timeout: 10000 })
             .should('be.visible')
             .then($select => {
                 const segments = ['Emerald', 'Gold', 'Platinum'];
                 const randomSegment = segments[Math.floor(Math.random() * segments.length)];
-                
+
                 cy.wrap($select).select(randomSegment);
-                
-                // Scope การทำงานให้อยู่เฉพาะใน .panel ที่เพิ่งเปิดขึ้นมา
-                // เพื่อป้องกันการกดปุ่ม Add ของส่วนอื่นบนหน้าเว็บ
+
                 cy.wrap($select).closest('.panel').within(() => {
                     cy.get('textarea[formcontrolname="remarkSegment"]')
                         .clear()
                         .type('Auto remark for ' + randomSegment);
-                    
-                    // กดปุ่ม Add ที่อยู่ใน Panel นี้เท่านั้น
+
                     cy.contains('button', 'Add').click();
                 });
             });
 
-        // 5. Final Remark textarea
         cy.get('textarea[formcontrolname="remark"]')
             .clear()
             .type('remark for Communication Touch Point');
     });
 };
+
 export const OtherPrivilege = (): void => {
     cy.get('app-mass-mkt-other-privilege').within(() => {
-        // Click "+" to reveal the "Other Privilege Detail" panel
         cy.get('button.btn-primary.btn-xs').first().click();
 
-        // Select a random Privilege Type (skip the disabled "Please Select" placeholder)
         cy.get('select[formcontrolname="privilegeType"] option:not([disabled])').then($options => {
             const options = Array.from($options);
             if (options.length === 0) return;
@@ -1501,12 +1474,10 @@ export const OtherPrivilege = (): void => {
             cy.get('select[formcontrolname="privilegeType"]').select(value);
         });
 
-        // Privilege Description (required)
         cy.get('input[formcontrolname="privilegeDesc"]')
             .clear()
             .type('Auto Privilege Description');
 
-        // Channel to apply (optional)
         const shouldFillChannel = Math.random() < 0.5;
         if (shouldFillChannel) {
             cy.get('input[formcontrolname="channelToApply"]')
@@ -1514,7 +1485,6 @@ export const OtherPrivilege = (): void => {
                 .type('Auto Channel');
         }
 
-        // Remark (optional)
         const shouldFillRemark = Math.random() < 0.5;
         if (shouldFillRemark) {
             cy.get('textarea[formcontrolname="remark"]')
@@ -1522,10 +1492,10 @@ export const OtherPrivilege = (): void => {
                 .type('Auto remark for Other Privilege');
         }
 
-        // Click Add to confirm the row
         cy.contains('button', 'Add').click();
     });
 };
+
 const selectRandomFromDualListBox = (
     scopeSelector: string,
     formControlName?: string
@@ -1536,13 +1506,10 @@ const selectRandomFromDualListBox = (
 
     cy.get(scopeSelector).within(() => {
         cy.get(dualListBoxSelector).within(() => {
-            // Wait until the Available items list box actually has options loaded (async data)
             cy.get('select[formcontrolname="availableListBox"] option', { timeout: 20000 })
                 .should('have.length.greaterThan', 0)
                 .then($options => {
                     const options = Array.from($options);
-
-                    // Randomly pick 2 to 3 items (or fewer if not enough options)
                     const numToPick = Math.min(
                         options.length,
                         Math.floor(Math.random() * 2) + 2
@@ -1554,12 +1521,6 @@ const selectRandomFromDualListBox = (
 
                     cy.log(`Selecting from ${formControlName ?? scopeSelector}: ${chosenLabels.join(', ')}`);
 
-                    // Double-click each chosen option individually to move it to
-                    // "Selected items". Deliberately NOT using the .atr button here —
-                    // .atr (glyphicon-list + chevron-right) is "Add ALL to Right",
-                    // not "Add Selected to Right". The correct single-select button
-                    // is .str, but double-click per option is more robust than
-                    // depending on either button's enabled/disabled state.
                     chosenOptions.forEach(opt => {
                         cy.wrap(opt).dblclick({ force: true });
                     });
@@ -1569,20 +1530,16 @@ const selectRandomFromDualListBox = (
 };
 
 export const MatchingFeeAndCashBack = (): void => {
-    // Account Fee
     selectRandomFromDualListBox(
         'app-mass-mkt-matching-fee',
         'matchingFee'
     );
 
-    // Order Fee
     selectRandomFromDualListBox(
         'app-mass-mkt-matching-fee',
         'matchingOrderFee'
     );
 
-    // Cash Back (no formcontrolname on the ng2-dual-list-box tag itself in this HTML,
-    // so we scope by component + the inner list-box CSS class instead)
     cy.get('app-mass-mkt-matching-cash-back').within(() => {
         cy.get('select[formcontrolname="availableListBox"] option', { timeout: 20000 })
             .should('have.length.greaterThan', 0)
@@ -1602,9 +1559,9 @@ export const MatchingFeeAndCashBack = (): void => {
             });
     });
 };
+
 export const BalanceWarningAndTransfer = (): void => {
     cy.get('app-mass-mkt-balance-warning-and-transfer').within(() => {
-        // ===== Balance Warning =====
         cy.get('app-mass-mkt-balance-warning').within(() => {
             cy.get('input[formcontrolname="balanceWarningByPrompt"]')
                 .clear()
@@ -1614,7 +1571,6 @@ export const BalanceWarningAndTransfer = (): void => {
                 .clear()
                 .type((Math.floor(Math.random() * 500) + 1).toString());
 
-            // Optional field - randomly decide to fill or leave default
             const shouldFillSMS2 = Math.random() < 0.5;
             if (shouldFillSMS2) {
                 cy.get('input[formcontrolname="balanceWarningBySMS2"]')
@@ -1632,13 +1588,11 @@ export const BalanceWarningAndTransfer = (): void => {
             cy.get('select[formcontrolname="SMSAlertType"]').select(randomSMSAlert);
         });
 
-        // ===== Transfer =====
         cy.get('app-mass-mkt-transfer').within(() => {
-            // Randomly choose Yes/No for Allow Transfer
             const isYes = Math.random() < 0.5;
 
             cy.get('input[formcontrolname="allowTransferForm"]')
-                .eq(isYes ? 0 : 1) // 0 = Yes, 1 = No
+                .eq(isYes ? 0 : 1)
                 .check({ force: true });
 
             if (!isYes) {
@@ -1648,7 +1602,6 @@ export const BalanceWarningAndTransfer = (): void => {
 
             cy.log('Allow Transfer = Yes -> Transfer Detail fields revealed');
 
-            // Helper: for each required Days/Baht field, randomly decide "keep default" vs "type new value"
             const maybeType = (
                 formcontrolname: string,
                 randomValueFn: () => string,
@@ -1677,7 +1630,6 @@ export const BalanceWarningAndTransfer = (): void => {
             maybeType('balanceTransferLimit', randomBaht, 'Balance Transfer Limit');
             maybeType('validityTransferLimit', randomDays, 'Validity Transfer Limit');
 
-            // Channel Discount Rate table - randomly decide whether to edit one channel's rate
             const shouldEditChannel = Math.random() < 0.5;
 
             if (shouldEditChannel) {
@@ -1691,7 +1643,6 @@ export const BalanceWarningAndTransfer = (): void => {
                     .find('button[title="Edit"]')
                     .click();
 
-                // The hidden panel becomes visible with channel + discountRate fields
                 cy.get('select[formcontrolname="channel"]').select(randomChannel);
 
                 const randomRate = (Math.random() * 100).toFixed(2);
@@ -1706,6 +1657,7 @@ export const BalanceWarningAndTransfer = (): void => {
         });
     });
 };
+
 export const ManageSim = (): void => {
     cy.get('app-mass-mkt-manage-sim').within(() => {
         const durationFields = [
@@ -1719,7 +1671,7 @@ export const ManageSim = (): void => {
             const shouldChange = Math.random() < 0.5;
 
             if (shouldChange) {
-                const randomDays = Math.floor(Math.random() * 365) + 1; // maxlength=3, keep <= 999
+                const randomDays = Math.floor(Math.random() * 365) + 1;
 
                 cy.get(`input[formcontrolname="${name}"]`)
                     .clear()
@@ -1751,15 +1703,12 @@ const selectRandomDualListBox = (scopeAlias: () => Cypress.Chainable): void => {
 
 export const RewardPerTargetCustomer = (): void => {
     cy.get('app-mass-reward-per-target-customer').within(() => {
-        // Click "+" to reveal the "Reward per Target Customer Detail" panel
         cy.get('button.btn-primary.btn-xs').first().click();
 
-        // --- Reward per Target Customer (required dual-list-box) ---
         selectRandomDualListBox(() =>
             cy.get('ng2-dual-list-box[formcontrolname="rewardPerTargetCustomer"]')
         );
 
-        // --- Reward Type (optional radio: Immediate / With condition) ---
         const shouldSetRewardType = Math.random() < 0.5;
         if (shouldSetRewardType) {
             const isImmediate = Math.random() < 0.5;
@@ -1774,7 +1723,6 @@ export const RewardPerTargetCustomer = (): void => {
             }
         }
 
-        // --- Reward 1st Pocket ---
         const shouldFillFirstPocket = Math.random() < 0.5;
         if (shouldFillFirstPocket) {
             cy.get('input[formcontrolname="rewardBalanceFirstPocket"]')
@@ -1785,7 +1733,6 @@ export const RewardPerTargetCustomer = (): void => {
                 .type((Math.floor(Math.random() * 90) + 1).toString());
         }
 
-        // --- Reward 2nd Pocket ---
         const shouldFillSecondPocket = Math.random() < 0.5;
         if (shouldFillSecondPocket) {
             cy.get('input[formcontrolname="rewardBalanceSecondPocket"]')
@@ -1795,13 +1742,11 @@ export const RewardPerTargetCustomer = (): void => {
                 .clear()
                 .type((Math.floor(Math.random() * 90) + 1).toString());
 
-            // 2nd Pocket Usage dual-list-box
             selectRandomDualListBox(() =>
                 cy.get('ng2-dual-list-box[formcontrolname="secondPocketUsage"]')
             );
         }
 
-        // --- Reward Description ---
         const shouldFillDescription = Math.random() < 0.5;
         if (shouldFillDescription) {
             cy.get('textarea[formcontrolname="rewardDescription"]')
@@ -1809,7 +1754,6 @@ export const RewardPerTargetCustomer = (): void => {
                 .type('Auto-generated reward description');
         }
 
-        // --- Reward Offering (optional dual-list-box) ---
         const shouldFillRewardOffering = Math.random() < 0.5;
         if (shouldFillRewardOffering) {
             selectRandomDualListBox(() =>
@@ -1817,7 +1761,6 @@ export const RewardPerTargetCustomer = (): void => {
             );
         }
 
-        // Finally click "Add" to submit the Reward per Target Customer Detail
         cy.contains('button', 'Add').click();
     });
 };
@@ -1865,7 +1808,6 @@ function randomizeMassEnhConfiguration(options?: {
         classAttributeCount = 3,
     } = options || {};
 
-    // ---- Target Value (single mat-select, required, no Add button) ----
     cy.contains('.form-group', 'Target Value')
         .parents('.row')
         .first()
@@ -1877,14 +1819,11 @@ function randomizeMassEnhConfiguration(options?: {
         cy.wrap($options.eq(idx)).click({ force: true });
     });
 
-    // ---- Brand / Product Group / Product Package (mat-select + Add) ----
     addMultiple('Brand', brandCount);
     addMultiple('Product Group', productGroupCount);
     addMultiple('Product Package', productPackageCount);
 
-    // ---- Class Attribute (dual-list-box, double-click to move) ----
     selectRandomClassAttributes(classAttributeCount);
-
 }
 
 function selectAndAdd(rowLabel: string, optionText?: string) {
@@ -1900,9 +1839,20 @@ function selectAndAdd(rowLabel: string, optionText?: string) {
             .contains(optionText)
             .click({ force: true });
     } else {
-        cy.get('.cdk-overlay-container mat-option').then(($options) => {
-            const idx = Cypress._.random(0, $options.length - 1);
-            cy.wrap($options.eq(idx)).click({ force: true });
+        // ✅ FIX: กรองตัวเลือกที่ disabled หรือเป็น "Please Select" ออก เพื่อป้องกันการเลือกค่าที่ไม่ถูกต้อง
+        cy.get('.cdk-overlay-container mat-option:not([aria-disabled="true"])').then(($options) => {
+            const validOptions = $options.filter((_, el) => {
+                const text = Cypress.$(el).text().trim();
+                return text !== 'Please Select' && text !== '';
+            });
+
+            if (validOptions.length === 0) {
+                cy.log(`⚠️ No valid options for ${rowLabel}`);
+                return;
+            }
+
+            const idx = Cypress._.random(0, validOptions.length - 1);
+            cy.wrap(validOptions.eq(idx)).click({ force: true });
         });
     }
 
@@ -1916,10 +1866,9 @@ function selectAndAdd(rowLabel: string, optionText?: string) {
 function addMultiple(rowLabel: string, count: number) {
     for (let i = 0; i < count; i++) {
         selectAndAdd(rowLabel);
-        cy.wait(300); // let Angular re-render the added-value list before next open
+        cy.wait(300);
     }
 }
-
 
 function selectRandomClassAttributes(count: number) {
     cy.get('ng2-dual-list-box')
@@ -1931,7 +1880,7 @@ function selectRandomClassAttributes(count: number) {
 
             Cypress._.shuffle(indices)
                 .slice(0, Math.min(count, total))
-                .sort((a, b) => b - a) // descending, so earlier dblclicks don't shift later indices
+                .sort((a, b) => b - a)
                 .forEach((idx) => {
                     cy.get('ng2-dual-list-box')
                         .find('select[formcontrolname="availableListBox"] option')

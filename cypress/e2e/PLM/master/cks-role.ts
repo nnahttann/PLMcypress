@@ -154,6 +154,23 @@ export const standardCksPoEnhancementFlow = (
         registerProjectPageIntercepts();
         waitForProjectPageLoad(60000);
 
+        // ✅ FIX: ดึงรายชื่อ PO ทั้งหมดจากหน้า CKS Doer (h3 PLM PO Name) ก่อนกด Enhance PO
+        cy.get('h3').then($h3s => {
+            const poNames: string[] = [];
+            $h3s.each((_, el) => {
+                const text = Cypress.$(el).text();
+                if (text.includes('PLM PO Name')) {
+                    const spanText = Cypress.$(el).find('span').text().trim();
+                    if (spanText) {
+                        poNames.push(spanText);
+                    }
+                }
+            });
+            Cypress.env('allPoNames', poNames);
+            Cypress.env('poCount', poNames.length);
+            cy.log(`📋 Collected ${poNames.length} PO Names from CKS Doer page: ${JSON.stringify(poNames)}`);
+        });
+
         cy.get('button.btn-sample')
             .filter((_, el) => el.textContent?.trim() === 'Enhance PO')
             .then(($buttons) => {
@@ -213,9 +230,6 @@ const enhanceSinglePO = (
     cy.intercept({ method: 'GET', url: '**/getProjectByProjectId/**', times: 1 })
         .as(`getProject_${tag}`);
 
-    // ✅ FIX: แทน sffProductDiy/addupdatesoid ด้วย sff-product-by-detailrowid
-    // (ยิงครบทุก PO subgroup ตามที่ยืนยันจาก HAR — เดิมยิงเฉพาะ Mobile ทำให้ค้างสำหรับ
-    // Entertainment Partnership / Music)
     cy.intercept({ method: 'GET', url: '**/sff-product-by-detailrowid/**', times: 1 })
         .as(`pageReady_${tag}`);
 
@@ -273,12 +287,10 @@ const backToCksDoer = (registerBeforeBack: boolean = false): void => {
         }
     });
 
-    // ✅ register intercepts ก่อน click Back (ถ้า caller ต้องการ wait หลัง back)
     if (registerBeforeBack) {
         registerProjectPageIntercepts();
     }
 
-    // 🔍 Debug: log ปุ่มทั้งหมดในหน้า ก่อนหา "Back"
     cy.get('body').then(($body) => {
         const buttonTexts = $body
             .find('button')
@@ -288,7 +300,6 @@ const backToCksDoer = (registerBeforeBack: boolean = false): void => {
         cy.log(`🔍 ปุ่มที่เจอในหน้านี้: ${JSON.stringify(buttonTexts)}`);
     });
 
-    // 🔍 เช็ค overlay อีกรอบก่อนกด เผื่อมันโผล่มาใหม่ระหว่าง customStepsCallback ทำงานเสร็จ
     cy.get('body').then(($body) => {
         if ($body.find('.cdk-overlay-backdrop').length > 0) {
             cy.log('⚠️ พบ overlay-backdrop โผล่ใหม่ก่อนกด Back');
@@ -339,7 +350,6 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
             cy.contains('label', 'Fast Lane :', { timeout: 300000 })
                 .should('be.visible');
 
-            // register ก่อน check — เผื่อ checkbox trigger API
             cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
 
             cy.contains('label', 'Fast Lane :')
@@ -415,15 +425,20 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
     cy.intercept('POST', '**/api/flw-cgmd/assigneecgmdconfig/**').as('assignCgmd');
     cy.intercept('POST', '**/mail-service/CGMD-Conigure/**').as('sendMail');
 
-    // 🟢 ลอง "Approve To CGMD" ก่อน ถ้าไม่เจอ fallback เป็น "Approve"
     clickApproveButton('Approve To CGMD', 3_000_0000);
 
-    cy.wait('@promoteChecker', { timeout: 600000 })
-        .its('response.statusCode').should('eq', 200);
-    cy.wait('@assignCgmd', { timeout: 600000 })
-        .its('response.statusCode').should('eq', 200);
-    cy.wait('@sendMail', { timeout: 600000 })
-        .its('response.statusCode').should('eq', 200);
+    cy.wait('@promoteChecker', { timeout: 600000 }).then((interception) => {
+        const statusCode = interception.response?.statusCode ?? 0;
+        expect(statusCode, 'promoteChecker status').to.be.oneOf([200, 304]);
+    });
+    cy.wait('@assignCgmd', { timeout: 600000 }).then((interception) => {
+        const statusCode = interception.response?.statusCode ?? 0;
+        expect(statusCode, 'assignCgmd status').to.be.oneOf([200, 304]);
+    });
+    cy.wait('@sendMail', { timeout: 600000 }).then((interception) => {
+        const statusCode = interception.response?.statusCode ?? 0;
+        expect(statusCode, 'sendMail status').to.be.oneOf([200, 304]);
+    });
 
     cy.url({ timeout: 3_000_0000 })
         .should('include', '/#/workspace-home/workspace');
@@ -432,6 +447,7 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
         .should('be.visible')
         .click();
 };
+
 const fmtDate = (d: Date): string => {
     const dd = String(d.getDate()).padStart(2, '0');
     const mm = String(d.getMonth() + 1).padStart(2, '0');

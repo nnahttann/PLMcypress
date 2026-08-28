@@ -66,7 +66,7 @@ export const createPOWordingPools = (
     },
     'usage': {
       EN: 'Usage', TH: 'ตามการใช้งาน', CHI: '按使用量', JPN: '使用量', KOR: '사용량',
-      KHM: 'តាមការប្រើប្រាស់', LAO: 'ຕາມการໃຊ້ງານ', BUR: 'အသုံးပြုမှုအလိုက်'
+      KHM: 'តាមការប្រើប្រាស់', LAO: 'ຕາມການໃຊ້ງານ', BUR: 'အသုံးပြုမှုအလိုက်'
     },
   };
 
@@ -94,48 +94,74 @@ export const createPOWordingPools = (
         `${p} Super WiFi Unlimited`, `${p} ZEED 5G`, `${p} Sawasdee Special`, `${p} Max Experience`,
         `${p} Hot Deal Non-Stop`, `${p} Never Stop Net`, `${p} myAIS Exclusive`, `${p} Play Max`,
         `${p} Best Deal`, `${p} Go Together`, `${p} Gamer Speed`, `${p} Family Non-Stop`,
+        // ✨ Wording สมจริงจาก Telecom
+        `${p} Turbo 5G`, `${p} Next Gen Unlimited`, `${p} Prime Plus`, `${p} Connect Max`,
+        `${p} Data Boost 30GB`, `${p} Work From Home Pack`, `${p} Student Saver`, `${p} Senior Care`,
+        `${p} Smart Living`, `${p} Digital Life`, `${p} Cloud Connect`, `${p} Stream Max`,
       ],
       TH: [
         `${p} 5G Max UNLIMITED`, `${p} 5G ไม่มีสะดุด`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi ไม่จำกัด`, `${p} ZEED 5G`, `${p} สวัสดีสุดพิเศษ`, `${p} Max Experience`,
         `${p} ฮอตดีล ไม่หยุดไม่พัก`, `${p} เน็ตไม่มีสะดุด`, `${p} myAIS เอ็กซ์คลูซีฟ`, `${p} เพลย์แม็กซ์`,
         `${p} ดีลสุดคุ้ม`, `${p} ไปด้วยกัน`, `${p} เกมเมอร์สปีด`, `${p} ครอบครัวไม่มีสะดุด`,
+        // ✨ Wording สมจริงจาก Telecom
+        `${p} เทอร์โบ 5G`, `${p} เน็กซ์เจน ไม่จำกัด`, `${p} ไพร์ม พลัส`, `${p} คอนเนค แม็กซ์`,
+        `${p} บูสต์เน็ต 30GB`, `${p} แพ็กทำงานที่บ้าน`, `${p} นักเรียนประหยัด`, `${p} ดูแลผู้สูงอายุ`,
+        `${p} สมาร์ทลิฟวิ่ง`, `${p} ดิจิทัลไลฟ์`, `${p} คลาวด์ คอนเนค`, `${p} สตรีม แม็กซ์`,
       ],
       CHI: [
         `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop 不间断`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi 无限畅享`, `${p} ZEED 5G`, `${p} Sawasdee 特别套餐`, `${p} Max Experience`,
         `${p} 热门礼遇 不间断`, `${p} 永不停止上网`, `${p} myAIS 专享`, `${p} Play Max`,
         `${p} 最优惠`, `${p} 同行计划`, `${p} 游戏加速`, `${p} 家庭不间断`,
+        // ✨ Wording สมจริง
+        `${p} 极速5G`, `${p} 新一代无限流量`, `${p} 尊享套餐`, `${p} 畅享连接`,
+        `${p} 居家办公包`, `${p} 学生优惠`, `${p} 长者关怀`, `${p} 数字生活`,
       ],
       JPN: [
         `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi 無制限`, `${p} ZEED 5G`, `${p} Sawasdee スペシャル`, `${p} Max Experience`,
         `${p} ホットディール ノンストップ`, `${p} ネバーストップネット`, `${p} myAIS 限定`, `${p} Play Max`,
         `${p} ベストディール`, `${p} ゴートゥギャザー`, `${p} ゲーマースピード`, `${p} ファミリーノンストップ`,
+        // ✨ Wording สมจริง
+        `${p} ターボ5G`, `${p} 次世代無制限`, `${p} プライムプラス`, `${p} コネクトマックス`,
+        `${p} テレワークパック`, `${p} 学割プラン`, `${p} シニアケア`, `${p} デジタルライフ`,
       ],
       KOR: [
         `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi 무제한`, `${p} ZEED 5G`, `${p} Sawasdee 스페셜`, `${p} Max Experience`,
         `${p} 핫딜 논스톱`, `${p} 네버스톱 넷`, `${p} myAIS 익스클루시브`, `${p} Play Max`,
         `${p} 베스트딜`, `${p} 고투게더`, `${p} 게이머 스피드`, `${p} 패밀리 논스톱`,
+        // ✨ Wording สมจริง
+        `${p} 터보 5G`, `${p} 넥스트젠 무제한`, `${p} 프라임 플러스`, `${p} 커넥트 맥스`,
+        `${p} 재택근무 팩`, `${p} 학생 세이브`, `${p} 시니어 케어`, `${p} 디지털 라이프`,
       ],
       KHM: [
         `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi គ្មានកំណត់`, `${p} ZEED 5G`, `${p} Sawasdee ពិសេស`, `${p} Max Experience`,
         `${p} ការផ្តល់ជូនក្តៅ Non-Stop`, `${p} មិនដែលឈប់ប្រើប្រាស់`, `${p} myAIS ពិសេស`, `${p} Play Max`,
         `${p} ការផ្តល់ជូនល្អបំផុត`, `${p} ទៅជាមួយគ្នា`, `${p} ល្បឿនហ្គេមឃ័រ`, `${p} គ្រួសារ Non-Stop`,
+        // ✨ Wording สมจริง
+        `${p} ទួរបូ 5G`, `${p} ជំនាន់ថ្មីគ្មានដែនកំណត់`, `${p} ប្រៃម ផ្លាស់`, `${p} ភ្ជាប់អតិបរមា`,
+        `${p} កញ្ចប់ធ្វើការពីផ្ទះ`, `${p} សន្សំសំចៃសម្រាប់សិស្ស`, `${p} ថែរក្សាចាស់ជរា`, `${p} ជីវិតឌីជីថល`,
       ],
       LAO: [
         `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi ບໍ່ຈຳກັດ`, `${p} ZEED 5G`, `${p} Sawasdee ພິເສດ`, `${p} Max Experience`,
         `${p} ໂປຮ໋ອດດີລ ບໍ່ຢຸດພັກ`, `${p} ເນັດບໍ່ມີສະດຸດ`, `${p} myAIS ສະເພາະ`, `${p} Play Max`,
         `${p} ດີລສຸດຄຸ້ມ`, `${p} ໄປພ້ອມກັນ`, `${p} ເກມເມີສະປີດ`, `${p} ຄອບຄົວ Non-Stop`,
+        // ✨ Wording สมจริง
+        `${p} ເທິໂບ 5G`, `${p} ລຸ້ນໃໝ່ບໍ່ຈຳກັດ`, `${p} ໄພຣມ ພລັສ`, `${p} ຄອນເນັກ ແມັກ`,
+        `${p} ແພັກເຮັດວຽກຢູ່ເຮືອນ`, `${p} ປະຢັດນັກຮຽນ`, `${p} ດູແລຜູ້ເຖົ້າ`, `${p} ຊີວິດດິຈິຕອນ`,
       ],
       BUR: [
         `${p} 5G Max UNLIMITED`, `${p} 5G Non-Stop`, `${p} Max Speed`, `${p} Serenade Exclusive`,
         `${p} Super WiFi အကန့်အသတ်မရှိ`, `${p} ZEED 5G`, `${p} Sawasdee အထူး`, `${p} Max Experience`,
         `${p} ဟော့ဒီးလ် Non-Stop`, `${p} ဘယ်တော့မှမရပ်ဘဲအင်တာနက်`, `${p} myAIS အထူး`, `${p} Play Max`,
         `${p} အကောင်းဆုံးဒီးလ်`, `${p} အတူတကွသွား`, `${p} Gamer အမြန်နှုန်း`, `${p} မိသားစု Non-Stop`,
+        // ✨ Wording สมจริง
+        `${p} တာဘို 5G`, `${p} နောက်မျိုးဆက်အကန့်အသတ်မရှိ`, `${p} ပရိုင်း ပလပ်စ်`, `${p} ကွန်နက် မက်စ်`,
+        `${p} အိမ်ကနေအလုပ်လုပ်`, `${p} ကျောင်းသားသက်သာ`, `${p} သက်ကြီးရွယ်အိုစောင့်ရှောက်`, `${p} ဒစ်ဂျစ်တယ်ဘဝ`,
       ],
     },
 
@@ -245,7 +271,7 @@ export const createPOWordingPools = (
         `${p}ကိုစာရင်းသွင်းပြီး ${dataAmount}ဒေတာကို ${speed}အမြန်နှုန်းဖြင့်ရယူပါ။ ${validity}ရက်အထိသက်တမ်းရှိသည်။`,
         `${p}ပက်ကေ့ခ်ျတွင် ${dataAmount}ဒေတာပါဝင်သည်။ ကွာတ ပြည့်ပြီးနောက်အမြန်နှုန်း 128Kbpsသို့လျော့ကျသည်။`,
         `${p}ဖြင့် ${dataAmount}ဒေတာနှင့်အကန့်အသတ်မရှိခေါ်ဆိုမှုများကိုခံစားပါ။ အခြားပရိုမိုးရှင်းများနှင့်ပေါင်းစပ်၍မရပါ။`,
-        `${p}ကို လစဉ်${price}ဘတ်သာရယူပါ။ သက်တမ်းကုန်ဆုံးရန် 1ရက်အလိုတွင်မဖ скасаလျှင်အလိုအလျောက်သက်တမ်းတိုးသည်။`,
+        `${p}ကို လစဉ်${price}ဘတ်သာရယူပါ။ သက်တမ်းကုန်ဆုံးရန် 1ရက်အလိုတွင်မဖျက်သိမ်းလျှင်အလိုအလျောက်သက်တမ်းတိုးသည်။`,
       ],
     },
 
@@ -430,10 +456,10 @@ export const createPOWordingPools = (
         `${p} ຖືກຍົກເລີກມີຜົນ %1. ຂອບໃຈທີ່ໃຊ້ບໍລິການຂອງພວກເຮົາ.`,
       ],
       BUR: [
-        `သင်၏${p}ပက်ကေ့ခ်ျကိုဖ скасаပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။`,
+        `သင်၏${p}ပက်ကေ့ခ်ျကိုဖျက်သိမ်းပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။`,
         `${p}ကိုသင်၏နံပါတ်မှဖယ်ရှားပြီးပါပြီ။`,
         `သင်၏${p}ပလန်ကိုယခုပိတ်ပြီးပါပြီ။ ကျေးဇူးတင်ပါသည်။`,
-        `${p}ကို %1 မှစ၍ဖ скасаပါသည်။ ကျွန်ုပ်တို့၏ဝန်ဆောင်မှုကိုအသုံးပြုသည့်အတွက်ကျေးဇူးတင်ပါသည်။`,
+        `${p}ကို %1 မှစ၍ဖျက်သိမ်းပါသည်။ ကျွန်ုပ်တို့၏ဝန်ဆောင်မှုကိုအသုံးပြုသည့်အတွက်ကျေးဇူးတင်ပါသည်။`,
       ],
     },
 
@@ -894,7 +920,7 @@ export const createPOWordingPools = (
         `${dataAmount}ဒေတာအကန့်အသတ်သို့ရောက်သောအခါမျှတသောအသုံးပြုမှုမူဝါဒအကျုံးဝင်သည်။`,
         `ဤပရိုမိုးရှင်းကိုအခြားကမ်းလှမ်းချက်များနှင့်ပေါင်းစပ်၍မရပါ။`,
         `ခရက်ဒစ်စစ်ဆေးမှုနှင့်ခွင့်ပြုချက်ကိုလိုက်နာရမည်။`,
-        `သက်တမ်းတိုးရက်မတိုင်မီဖ скасаခြင်းမရှိလျှင်လစဉ်အလိုအလျောက်သက်တမ်းတိုးသည်။`,
+        `သက်တမ်းတိုးရက်မတိုင်မီဖျက်သိမ်းခြင်းမရှိလျှင်လစဉ်အလိုအလျောက်သက်တမ်းတိုးသည်။`,
         `ဤပရိုမိုးရှင်း၏စည်းမျဉ်းစည်းကမ်းများအကျုံးဝင်သည်။`,
         `အနည်းဆုံးစာချုပ်ကာလ ${contractMonths}လအကျုံးဝင်သည်။`,
       ],
@@ -1150,6 +1176,366 @@ export const createPOWordingPools = (
         `သင်၏${p}ဘေလ်မှာသက်တမ်းလွန်နေပါသည်။ ဝန်ဆောင်မှုရပ်ဆိုင်းခြင်းကိုရှောင်ရှားရန် %1 ဘတ်ပေးချေပါ။`,
         `ငွေပေးချေမှုပျက်ကွက်ခြင်းကြောင့် ${p}အတွက်ဝန်ဆောင်မှုဆိုင်းငံ့ထားရန်သတိပေးချက်။`,
       ],
+    },
+
+    // ==========================================
+    // 🐛 TEST EDGE CASES - สำหรับหา Bug ใน Production
+    // ==========================================
+    testEdgeCases: {
+      // Bug: HTML Injection / XSS
+      htmlInjection: {
+        EN: `${p} <script>alert('XSS')</script> & "quotes" <b>bold</b>`,
+        TH: `${p} <script>alert('XSS')</script> & "อัญประกาศ" <b>ตัวหนา</b>`,
+        CHI: `${p} <script>alert('XSS')</script> & "引号" <b>粗体</b>`,
+        JPN: `${p} <script>alert('XSS')</script> & "引用符" <b>太字</b>`,
+        KOR: `${p} <script>alert('XSS')</script> & "따옴표" <b>굵게</b>`,
+        KHM: `${p} <script>alert('XSS')</script> & "សញ្ញា" <b>ក្រាស់</b>`,
+        LAO: `${p} <script>alert('XSS')</script> & "ເຄື່ອງໝາຍ" <b>ໜາ</b>`,
+        BUR: `${p} <script>alert('XSS')</script> & "ကိုးကား" <b>ထူ</b>`,
+      },
+
+      // Bug: SQL Injection
+      sqlInjection: {
+        EN: `${p}'; DROP TABLE users; --`,
+        TH: `${p}'; DROP TABLE users; --`,
+        CHI: `${p}'; DROP TABLE users; --`,
+        JPN: `${p}'; DROP TABLE users; --`,
+        KOR: `${p}'; DROP TABLE users; --`,
+        KHM: `${p}'; DROP TABLE users; --`,
+        LAO: `${p}'; DROP TABLE users; --`,
+        BUR: `${p}'; DROP TABLE users; --`,
+      },
+
+      // Bug: Very Long String
+      veryLongString: {
+        EN: `${p} ` + 'Very Long Package Name '.repeat(50) + ` End`,
+        TH: `${p} ` + 'ชื่อแพ็กเกจยาวมาก '.repeat(50) + ` จบ`,
+        CHI: `${p} ` + '非常长的套餐名称 '.repeat(50) + ` 结束`,
+        JPN: `${p} ` + '非常に長いパッケージ名 '.repeat(50) + ` 終わり`,
+        KOR: `${p} ` + '매우 긴 패키지 이름 '.repeat(50) + ` 끝`,
+        KHM: `${p} ` + 'ឈ្មោះកញ្ចប់វែងខ្លាំង '.repeat(50) + ` បញ្ចប់`,
+        LAO: `${p} ` + 'ຊື່ແພັກເກັດຍາວຫຼາຍ '.repeat(50) + ` ຈົບ`,
+        BUR: `${p} ` + 'အလွန်ရှည်သောပက်ကေ့ချျအမည် '.repeat(50) + ` အဆုံး`,
+      },
+
+      // Bug: Empty & Whitespace
+      emptyAndWhitespace: {
+        EN: ['', '   ', '\t\n\r', '     \n     '],
+        TH: ['', '   ', '\t\n\r', '     \n     '],
+        CHI: ['', '   ', '\t\n\r', '     \n     '],
+        JPN: ['', '   ', '\t\n\r', '     \n     '],
+        KOR: ['', '   ', '\t\n\r', '     \n     '],
+        KHM: ['', '   ', '\t\n\r', '     \n     '],
+        LAO: ['', '   ', '\t\n\r', '     \n     '],
+        BUR: ['', '   ', '\t\n\r', '     \n     '],
+      },
+
+      // Bug: Special Characters & Unicode
+      specialChars: {
+        EN: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} ឡាວ`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        TH: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} ภาษาไทย English ລາວ`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        CHI: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} 中文 English ไทย`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        JPN: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} 日本語 English ไทย`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        KOR: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} 한국어 English ไทย`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        KHM: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} ខ្មែរ English ไทย`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        LAO: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} ລາວ English ไทย`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+        BUR: [
+          `${p} 🚀📱💯❤️🔥`,
+          `${p} & < > " ' \\ /`,
+          `${p} ${String.fromCharCode(0)}`,
+          `${p} မြန်မာ English ไทย`,
+          `${p} \u200B\u200C\u200D`,
+        ],
+      },
+
+      // Bug: Placeholder Conflicts
+      placeholderConflicts: {
+        EN: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        TH: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        CHI: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        JPN: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        KOR: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        KHM: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        LAO: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+        BUR: [
+          `${p} %1 %2 %3`,
+          `${p} %{1} %{2}`,
+          `${p} %1%1%1`,
+          `${p} ${'%'}1`,
+        ],
+      },
+
+      // Bug: Numbers & Currency
+      numbersAndCurrency: {
+        EN: [
+          `${p} 1,234,567.89 THB`,
+          `${p} ฿${price}.00`,
+          `${p} 100% discount`,
+          `${p} +66-2-123-4567`,
+        ],
+        TH: [
+          `${p} 1,234,567.89 บาท`,
+          `${p} ฿${price}.00`,
+          `${p} ส่วนลด 100%`,
+          `${p} +66-2-123-4567`,
+        ],
+        CHI: [
+          `${p} 1,234,567.89 泰铢`,
+          `${p} ฿${price}.00`,
+          `${p} 100% 折扣`,
+          `${p} +66-2-123-4567`,
+        ],
+        JPN: [
+          `${p} 1,234,567.89 バーツ`,
+          `${p} ฿${price}.00`,
+          `${p} 100% 割引`,
+          `${p} +66-2-123-4567`,
+        ],
+        KOR: [
+          `${p} 1,234,567.89 바트`,
+          `${p} ฿${price}.00`,
+          `${p} 100% 할인`,
+          `${p} +66-2-123-4567`,
+        ],
+        KHM: [
+          `${p} 1,234,567.89 បាទ`,
+          `${p} ฿${price}.00`,
+          `${p} បញ្ចុះតម្លៃ 100%`,
+          `${p} +66-2-123-4567`,
+        ],
+        LAO: [
+          `${p} 1,234,567.89 ບາດ`,
+          `${p} ฿${price}.00`,
+          `${p} ສ່ວນຫຼຸດ 100%`,
+          `${p} +66-2-123-4567`,
+        ],
+        BUR: [
+          `${p} 1,234,567.89 ဘတ်`,
+          `${p} ฿${price}.00`,
+          `${p} 100% လျှော့စျေး`,
+          `${p} +66-2-123-4567`,
+        ],
+      },
+
+      // Bug: Line Breaks & Formatting
+      lineBreaks: {
+        EN: [
+          `${p}\nLine 2\nLine 3`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        TH: [
+          `${p}\nบรรทัด 2\nบรรทัด 3`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        CHI: [
+          `${p}\n第2行\n第3行`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        JPN: [
+          `${p}\n2行目\n3行目`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        KOR: [
+          `${p}\n2번째 줄\n3번째 줄`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        KHM: [
+          `${p}\nជួរទី 2\nជួរទី 3`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        LAO: [
+          `${p}\nແຖວທີ 2\nແຖວທີ 3`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+        BUR: [
+          `${p}\nဒုတိယလိုင်း\nတတိယလိုင်း`,
+          `${p}\r\nWindows CRLF`,
+          `${p}<br>HTML Break`,
+        ],
+      },
+    },
+
+    // ==========================================
+    // ⚠️ FLAKY TEST SCENARIOS
+    // ==========================================
+    flakyTestScenarios: {
+      scenarios: [
+        {
+          name: 'Race Condition with Math.random()',
+          issue: 'Math.random() ทำให้ผลลัพธ์ไม่คงที่ในแต่ละการรัน',
+          solution: 'ใช้ seed-based random หรือ mock Math.random() ใน test',
+          example: 'cy.stub(Math, "random").returns(0.5)',
+        },
+        {
+          name: 'Timing Issues with cy.wait()',
+          issue: 'cy.wait(WAIT_TIME) อาจไม่พอถ้า UI โหลดช้า',
+          solution: 'ใช้ cy.intercept() รอ API response แทน',
+          example: 'cy.intercept("POST", "/api/**").as("saveData")',
+        },
+        {
+          name: 'Element Visibility Timing',
+          issue: 'Element อาจยังไม่ visible เมื่อ query',
+          solution: 'ใช้ .should("be.visible") แทนการ check length',
+          example: 'cy.get("textarea").should("be.visible").type(text)',
+        },
+        {
+          name: 'Text Truncation in UI',
+          issue: 'UI อาจตัดข้อความยาว ทำให้ assertion ล้มเหลว',
+          solution: 'ตรวจสอบว่าข้อความที่แสดงเป็น subset ของข้อความเต็ม',
+          example: 'expect(displayedText).to.include(truncatedText)',
+        },
+        {
+          name: 'Unicode Encoding Issues',
+          issue: 'ภาษาไทย จีน พม่า เขมร อาจไม่แสดงถูกต้อง',
+          solution: 'ตรวจสอบ meta charset และ font-family',
+          example: '<meta charset="UTF-8">',
+        },
+        {
+          name: 'Placeholder Replacement Failures',
+          issue: '%1, %2 อาจไม่ถูก replace ถ้า logic มี bug',
+          solution: 'Validate ว่า placeholders ทั้งหมดถูก replace',
+          example: 'expect(text).not.to.match(/%\\d/)',
+        },
+        {
+          name: 'Concurrent Form Updates',
+          issue: 'หลาย form fields อัพเดทพร้อมกันอาจ overwrite กัน',
+          solution: 'ใช้ cy.wait() ระหว่าง field updates',
+          example: 'cy.get("input1").type("val1"); cy.wait(100);',
+        },
+        {
+          name: 'Network Latency Simulation',
+          issue: 'Test ผ่านใน dev แต่ fail ใน production เนื่องจาก network',
+          solution: 'ใช้ cy.intercept() จำลอง network delay',
+          example: 'cy.intercept("**/*", { delay: 1000 })',
+        },
+      ],
+
+      randomizationIssues: {
+        EN: [
+          'Test may fail randomly due to Math.random() in wording selection',
+          'Character count varies between runs causing length assertions to fail',
+          'Different language selection may cause UI layout issues',
+        ],
+        TH: [
+          'การทดสอบอาจล้มเหลวแบบสุ่มจากการใช้ Math.random() ในการเลือกข้อความ',
+          'จำนวนตัวอักษรเปลี่ยนไปแต่ละการรัน ทำให้ assertion เรื่องความยาวล้มเหลว',
+          'การเลือกภาษาที่ต่างกันอาจทำให้ UI layout มีปัญหา',
+        ],
+        CHI: [
+          '由于在文本选择中使用Math.random(),测试可能会随机失败',
+          '每次运行的字符数不同,导致长度断言失败',
+          '不同的语言选择可能导致UI布局问题',
+        ],
+        JPN: [
+          'テキスト選択でMath.random()を使用しているため、テストがランダムに失敗する可能性があります',
+          '実行ごとに文字数が異なり、長さのアサーションが失敗します',
+          '異なる言語選択によりUIレイアウトの問題が発生する可能性があります',
+        ],
+        KOR: [
+          '텍스트 선택에서 Math.random()을 사용하기 때문에 테스트가 무작위로 실패할 수 있습니다',
+          '실행마다 문자 수가 달라 길이 단언이 실패합니다',
+          '다른 언어 선택으로 UI 레이아웃 문제가 발생할 수 있습니다',
+        ],
+        KHM: [
+          'ការធ្វើតេស្តអាចបរាជ័យដោយចៃដន្យដោយសារការប្រើ Math.random() ក្នុងការជ្រើសរើសអត្ថបទ',
+          'ចំនួនតួអក្សរខុសគ្នារវាងការរត់នីមួយៗធ្វើឱ្យការអះអាងប្រវែងបរាជ័យ',
+          'ការជ្រើសរើសភាសាផ្សេងគ្នាអាចបណ្តាលឱ្យមានបញ្ហាប្លង់ UI',
+        ],
+        LAO: [
+          'ການທົດສອບອາດຈະລົ້ມເຫຼວແບບສຸ່ມເນື່ອງຈາກການໃຊ້ Math.random() ໃນການເລືອກຂໍ້ຄວາມ',
+          'ຈຳນວນຕົວອັກສອນແຕກຕ່າງກັນໃນແຕ່ລະການແລ່ນເຮັດໃຫ້ການຢືນຢັນຄວາມຍາວລົ້ມເຫຼວ',
+          'ການເລືອກພາສາທີ່ແຕກຕ່າງກັນອາດເຮັດໃຫ້ເກີດບັນຫາ UI layout',
+        ],
+        BUR: [
+          'စာသားရွေးချယ်ရာတွင် Math.random() ကိုအသုံးပြုသောကြောင့် စမ်းသပ်မှုသည် ကျပန်းကျရှုံးနိုင်သည်',
+          'အကြိမ်တိုင်းတွင် စာလုံးအရေအတွက်ကွာခြားသောကြောင့် အရှည်အတည်ပြုချက်များ ကျရှုံးသည်',
+          'မတူညီသောဘာသာစကားရွေးချယ်မှုသည် UI layout ပြဿနာများကို ဖြစ်စေနိုင်သည်',
+        ],
+      },
     },
   };
 };
@@ -1807,8 +2193,8 @@ const buildPackageContext = (
   const benefitList = BENEFITS_BY_CLASS[pClass === 'main' ? 'main' : 'ontop'];
   const benefit1EN = pickRandom(benefitList.EN);
   const benefit1TH = pickRandom(benefitList.TH);
-  const benefit2EN = pickRandom(benefitList.EN.filter(b => b == benefit1EN));
-  const benefit2TH = pickRandom(benefitList.TH.filter(b => b == benefit1TH));
+  const benefit2EN = pickRandom(benefitList.EN.filter(b => b !== benefit1EN));
+  const benefit2TH = pickRandom(benefitList.TH.filter(b => b !== benefit1TH));
 
   const currentDate = new Date();
   const thaiDate = currentDate.toLocaleDateString('th-TH', {

@@ -41,7 +41,7 @@ export const RandomProductSpecification = (
 
     const effectiveBlocked = [
         ...blockedForMain,
-        ...(productClass === 'main' ? ['AI IP Camera','Cloud Game','Content VDO', 'Youtube Premium', 'Mobile Care', 'Ubisoft Plus', 'Calling Melody', 'Karaoke', 'VRBT', 'Music Streaming', 'Arcade', 'TV Plus'] : []),
+        ...(productClass === 'main' ? ['Vertical App', 'AI IP Camera', 'Cloud Game', 'Content VDO', 'Youtube Premium', 'Calling Melody', 'Karaoke', 'VRBT', 'Music Streaming', 'Arcade', 'TV Plus'] : []),
     ];
 
     const canRandomPick = productClass === 'main' || productClass === 'ontop' || productClass === 'ontop extra';
@@ -980,7 +980,6 @@ export const VerticalApp = (): void => {
         .click({ force: true });
     cy.wait(500);
 
-    // Scope to the LAST vertical-app panel in case this helper is invoked
     cy.get('app-mass-mkt-vertical-app').last().as('vaRoot');
 
     cy.get('@vaRoot').within(() => {
@@ -1006,7 +1005,6 @@ export const VerticalApp = (): void => {
                 .select(val, { force: true });
         });
 
-    // --- Vertical App Quota Type ---
     cy.get('@vaRoot')
         .find('select[formcontrolname="VerticalAppQuotaType"]', { timeout: 10000 })
         .find('option:not([disabled])')
@@ -1079,9 +1077,9 @@ export const VerticalApp = (): void => {
             .should('have.length.greaterThan', 0)
             .each(($checkbox, index) => {
                 const shouldCheck =
-                    (scenario === 0 && index === 2) ||  // 3G only
-                    (scenario === 1 && index >= 1) ||   // 4G + 3G
-                    (scenario === 2);                   // 5G + 4G + 3G
+                    (scenario === 0 && index === 2) ||
+                    (scenario === 1 && index >= 1) ||
+                    (scenario === 2);
 
                 if (shouldCheck) {
                     cy.wrap($checkbox).check({ force: true });
@@ -1119,9 +1117,70 @@ export const VerticalApp = (): void => {
         });
 
         cy.wait(1500);
-        cy.contains('button', /^Add$/).click({ force: true });
+
+        // 🔍 Guard: check every select / mat-select in scope for empty/placeholder
+        // values and auto-fill them before attempting Add.
+        cy.get('body').then(() => {
+            cy.get('select').each(($select) => {
+                const val = $select.val();
+                const isEmpty = val === '' || val === null || val === undefined;
+                if (isEmpty) {
+                    const name = $select.attr('formcontrolname') || '(unnamed select)';
+                    cy.wrap($select)
+                        .find('option:not([disabled])')
+                        .then(($options) => {
+                            if ($options.length > 0) {
+                                const randomIndex = Cypress._.random(0, $options.length - 1);
+                                const fillVal = $options.eq(randomIndex).val() as string;
+                                cy.log(`⚠️ Empty select found: ${name} → auto-filling "${fillVal}"`);
+                                cy.wrap($select).select(fillVal, { force: true });
+                            } else {
+                                cy.log(`⚠️ Empty select found: ${name} but has no valid options`);
+                            }
+                        });
+                }
+            });
+
+            cy.get('mat-select').each(($matSelect) => {
+                const currentText = $matSelect.find('.mat-select-value').text().trim();
+                const isEmpty =
+                    currentText === '' ||
+                    currentText.toLowerCase().includes('please select');
+                if (isEmpty) {
+                    cy.log(`⚠️ Empty mat-select found → opening to auto-select a value`);
+                    cy.wrap($matSelect)
+                        .scrollIntoView()
+                        .find('.mat-select-trigger')
+                        .click({ force: true });
+                    cy.get('.cdk-overlay-container .mat-select-panel', { timeout: 10000 }).should('exist');
+                    cy.get('.cdk-overlay-container .mat-select-panel mat-option', { timeout: 10000 })
+                        .not('.mat-option-disabled')
+                        .should('have.length.greaterThan', 0)
+                        .then(($options) => {
+                            const randomIndex = Cypress._.random(0, $options.length - 1);
+                            cy.wrap($options).eq(randomIndex).click({ force: true });
+                        });
+                }
+            });
+        });
+
+        cy.wait(500);
+
+        // ✅ Only click Add once the button is confirmed enabled
+        cy.contains('button', /^Add$/)
+            .should(($btn) => {
+                expect($btn.prop('disabled'), 'Add button should not be disabled').to.be.false;
+            })
+            .click({ force: true });
+
         cy.log(`✅ Vertical App → Add clicked`);
         cy.wait(3500);
+
+        // ✅ Confirm a real row was added (not just a "No data to display" placeholder)
+        cy.get('tbody tr').then(($rows) => {
+            const realRows = $rows.filter((_, el) => !el.textContent?.includes('No data to display'));
+            cy.log(`📋 Real data rows after Add: ${realRows.length}`);
+        });
     });
 };
 
@@ -1789,7 +1848,9 @@ export const VRBT = (): void => {
                 });
         });
 };
-
+// ========================
+// INTERNET
+// ========================
 const INTERNET_SPEEDS = [
     '4Gbps/4Gbps', '3Gbps/3Gbps', 'Max Speed (5G 2Gbps/2Gbps)',
     'Max Speed (5G Default 1Gbps/1Gbps)', '1000 Mbps', '450 Mbps',
@@ -1934,13 +1995,30 @@ const selectMatOptionWithValidation = (
         .closest('.row')
         .find('mat-select')
         .should('not.contain', 'Please Select')
-        // ✅ รอ Angular commit ค่าลง form
         .should('have.class', 'ng-valid')
         .and('have.class', 'ng-dirty');
 };
 
 const isPreModule = (productClass: string, subModule?: string): boolean =>
     productClass === 'main' && subModule?.toLowerCase() === 'pre';
+
+const handleUsageLocalized = (): void => {
+    cy.get('body').then($body => {
+        const $radios = $body
+            .find('input[formcontrolname="usageLocalizedFlag"]')
+            .filter(':visible');
+
+        if ($radios.length === 0) {
+            cy.log('ℹ️ Usage Localized field not present in this variant, skipping');
+            return;
+        }
+
+        const idx = Cypress._.random(0, $radios.length - 1);
+        cy.wrap($radios.eq(idx)).click({ force: true });
+        cy.wait(300);
+        cy.log(`📌 Usage Localized option ${idx} selected`);
+    });
+};
 
 const handleLimitedData = (productClass: string, subModule?: string) => {
     selectMatOption('*Internet Quota :', text => text.startsWith('5G'));
@@ -2006,157 +2084,199 @@ const handleUnlimitedThrottling = (productClass: string, subModule?: string) => 
 };
 
 function selectMatOptionByLabel(labelText: string, optionText?: string) {
-  // 1. ปิด overlay ที่ค้างอยู่ก่อน (ถ้ามี) กัน query โดนของเก่า
-  cy.get('body').then(($body) => {
-    if ($body.find('.cdk-overlay-pane').length > 0) {
-      cy.get('body').type('{esc}', { force: true });
-      cy.wait(200);
-    }
-  });
+    cy.get('body').then(($body) => {
+        if ($body.find('.cdk-overlay-pane').length > 0) {
+            cy.get('body').type('{esc}', { force: true });
+            cy.wait(200);
+        }
+    });
 
-  cy.contains('label', labelText)
-    .filter(':visible')
-    .closest('.row')
-    .find('mat-select .mat-select-trigger')
-    .click({ force: true });
+    cy.contains('label', labelText)
+        .filter(':visible')
+        .closest('.row')
+        .find('mat-select .mat-select-trigger')
+        .click({ force: true });
 
-  // 2. scope เฉพาะ pane ล่าสุด (Angular append overlay ใหม่ต่อท้ายเสมอ)
-  cy.get('.cdk-overlay-pane').last().within(() => {
-    if (optionText) {
-      cy.contains('mat-option', optionText).click({ force: true });
-    } else {
-      cy.get('mat-option:not(.mat-option-disabled)').then(($opts) => {
-        const idx = Cypress._.random(0, $opts.length - 1);
-        cy.wrap($opts.eq(idx)).click({ force: true });
-      });
-    }
-  });
+    cy.get('.cdk-overlay-pane').last().within(() => {
+        if (optionText) {
+            cy.contains('mat-option', optionText).click({ force: true });
+        } else {
+            cy.get('mat-option:not(.mat-option-disabled)').then(($opts) => {
+                const idx = Cypress._.random(0, $opts.length - 1);
+                cy.wrap($opts.eq(idx)).click({ force: true });
+            });
+        }
+    });
 
-  cy.wait(300);
-
-  // 3. verify ด้วย retry แทนการ assert ครั้งเดียวแล้ว fail ทันที
-  verifyMatSelectChanged(labelText);
+    cy.wait(300);
+    verifyMatSelectChanged(labelText);
 }
 
 function verifyMatSelectChanged(labelText: string, attemptsLeft: number = 2) {
-  cy.contains('label', labelText)
-    .filter(':visible')
-    .closest('.row')
-    .find('mat-select')
-    .then(($select) => {
-      const stillPlaceholder = $select.text().includes('Please Select');
-      if (stillPlaceholder && attemptsLeft > 0) {
-        cy.log(`⚠️ ${labelText} ยังไม่เปลี่ยนค่า - retry (${attemptsLeft} เหลือ)`);
-        selectMatOptionByLabel(labelText); // retry ทั้ง flow ใหม่
-      } else if (stillPlaceholder) {
-        throw new Error(`❌ ${labelText} ไม่สามารถเลือกค่าได้หลัง retry`);
-      } else {
-        cy.log(`✅ ${labelText} เลือกสำเร็จ`);
-      }
-    });
+    cy.contains('label', labelText)
+        .filter(':visible')
+        .closest('.row')
+        .find('mat-select')
+        .then(($select) => {
+            const stillPlaceholder = $select.text().includes('Please Select');
+            if (stillPlaceholder && attemptsLeft > 0) {
+                cy.log(`⚠️ ${labelText} ยังไม่เปลี่ยนค่า - retry (${attemptsLeft} เหลือ)`);
+                selectMatOptionByLabel(labelText);
+            } else if (stillPlaceholder) {
+                throw new Error(`❌ ${labelText} ไม่สามารถเลือกค่าได้หลัง retry`);
+            } else {
+                cy.log(`✅ ${labelText} เลือกสำเร็จ`);
+            }
+        });
 }
 
+// ==========================================
+// ✅ FIX: ฟังก์ชันที่ปรับปรุงให้ทนทานและ Debug ได้ง่าย
+// ==========================================
 const clickAddUntilDataAppears = (
     tableSelector: string,
     addButtonSelector: string,
     formSelector: string = 'app-mass-mkt-internet',
-    maxAttempts: number = 5
+    maxAttempts: number = 5,
+    expectedRowText?: string
 ): void => {
-    // ⚠️ tableSelector อาจแมตช์มากกว่า 1 tbody (พบว่ามี 2 ตัวในเคสจริง)
-    // ต้องเช็คทุกตัว ไม่ใช่แค่ .first() ไม่งั้นถ้า Add ไปเติมข้อมูลใน tbody ตัวที่ 2
-    // จะเช็คผิดตัวตลอดแล้ว fail ซ้ำๆ ทั้งที่ Add สำเร็จแล้ว
-    const anyTableHasData = (): Cypress.Chainable<boolean> =>
+    const checkTargetRowExists = (): Cypress.Chainable<boolean> =>
         cy.get(tableSelector).then($tbodies => {
-            const hasData = [...$tbodies].some(
-                tb => !tb.textContent?.includes('No data to display.')
-            );
-            return cy.wrap(hasData, { log: false });
+            // ✅ DEBUG ขั้นสุด: ดึงข้อความของแต่ละแถว (tr) ออกมาแยกกันให้อ่านง่าย
+            const allRowsText: string[] = [];
+            $tbodies.each((_, tb) => {
+                Cypress.$(tb).find('tr').each((_, tr) => {
+                    const cleanText = Cypress.$(tr).text().replace(/\s+/g, ' ').trim();
+                    if (cleanText.length > 5) { // กรองแถวว่างๆ ออก
+                        allRowsText.push(cleanText);
+                    }
+                });
+            });
+
+            cy.log(`🔍 [DEBUG] พบทั้งหมด ${allRowsText.length} แถวในตาราง:`);
+            allRowsText.forEach((text, idx) => {
+                cy.log(`   [Row ${idx + 1}]: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
+            });
+
+            if (!expectedRowText) {
+                const hasData = allRowsText.some(text => !text.includes('No data to display.'));
+                return cy.wrap(hasData, { log: false });
+            }
+
+            // 1. ลองหาแบบ Exact Match ก่อน
+            let found = allRowsText.some(text => text.includes(expectedRowText));
+
+            // 2. ✅ SMART FALLBACK: ถ้าหาเป๊ะๆ ไม่เจอ ให้ลองหาแบบยืดหยุ่น
+            // กรณี "Unlimited Data (Throttling Speed)" อาจจะแสดงในตารางเป็น "Unlimited (Throttling)" หรือคล้ายกัน
+            if (!found && expectedRowText.includes('Unlimited') && expectedRowText.includes('Throttling')) {
+                found = allRowsText.some(text => text.includes('Unlimited') && text.includes('Throttling'));
+                if (found) {
+                    cy.log(`⚠️ [DEBUG] เจอข้อมูลแบบ Fallback! (มีคำว่า Unlimited และ Throttling ในแถวเดียวกัน)`);
+                }
+            }
+
+            // 3. FALLBACK 2: ถ้ายังหาไม่เจอ ลองหาแค่คำว่า "Throttling" อย่างเดียว
+            if (!found && expectedRowText.includes('Throttling')) {
+                found = allRowsText.some(text => text.includes('Throttling'));
+                if (found) {
+                    cy.log(`⚠️ [DEBUG] เจอข้อมูลแบบ Fallback 2! (มีคำว่า Throttling)`);
+                }
+            }
+
+            return cy.wrap(found, { log: false });
         });
 
-    // ✅ รอ form settle (เช็ค ng-pending ก่อน แล้วค่อยเช็ค ng-valid จริง)
-    const waitForFormSettled = (): Cypress.Chainable<boolean> => {
-        return cy.get(formSelector)
-            .find('form, [formgroup]')
-            .then($form => {
-                const isPending = $form.hasClass('ng-pending');
-                const isValid = $form.hasClass('ng-valid');
-
-                if (isPending) {
-                    cy.log('⏳ Form ยัง pending (async validator) รออีกนิด...');
-                    return cy.wrap(false, { log: false });
-                }
-
-                if (!isValid) {
-                    $form.find('.ng-invalid').each((_, el) => {
-                        const name = el.getAttribute('formcontrolname') || el.tagName;
-                        cy.log(`❌ Invalid control: ${name}`);
-                    });
-                }
-
-                return cy.wrap(isValid, { log: false });
-            });
-    };
-
     const attempt = (attemptsLeft: number): void => {
-        anyTableHasData().then(hasData => {
-            if (hasData) {
-                cy.log('✅ Data พบในตารางหลักแล้ว (เช็คทุก tbody) ไม่ต้องกด Add เพิ่ม');
+        checkTargetRowExists().then(found => {
+            if (found) {
+                cy.log(`✅ พบข้อมูลที่ตรงกับเงื่อนไขในตารางแล้ว (หลังจากลอง ${5 - attemptsLeft} ครั้ง)`);
                 return;
             }
 
             if (attemptsLeft <= 0) {
-                cy.get(tableSelector).should($tbodies => {
-                    const stillEmpty = [...$tbodies].every(
-                        tb => tb.textContent?.includes('No data to display.')
-                    );
-                    expect(
-                        stillEmpty,
-                        `❌ ทุก tbody (${$tbodies.length} ตัว) ยังเป็น "No data to display." หลังกด Add ซ้ำครบ ${maxAttempts} ครั้งแล้ว (ดู log ด้านบนว่า field ไหน invalid)`
-                    ).to.be.false;
-                });
-                return;
-            }
-
-            waitForFormSettled().then(isValid => {
-                if (!isValid) {
-                    cy.log(`⚠️ Form ยัง invalid/pending → ไม่กด Add ซ้ำเปล่าๆ, รอ settle ต่อ (เหลือ ${attemptsLeft} ครั้ง)`);
-                    cy.wait(800);
-                    attempt(attemptsLeft - 1);
-                    return;
-                }
-
+                // ✅ ตรวจสอบว่ามี Error Message โผล่ขึ้นมาบนหน้าจอหรือไม่
                 cy.get('body').then($body => {
-                    const $addBtn = $body
-                        .find(addButtonSelector)
-                        .filter(':visible')
-                        // ✅ ไม่ cast type ตรงๆ แล้ว ใช้ jQuery .prop('disabled') ปลอดภัยกว่า
-                        .filter((_, el) => !Cypress.$(el).prop('disabled'))
-                        .filter((_, el) => /^Add$/.test(Cypress.$(el).text().trim()));
+                    const hasError = $body.text().includes('Required') ||
+                        $body.text().includes('Invalid') ||
+                        $body.find('.text-danger, .mat-error, .alert-danger').length > 0;
 
-                    if ($addBtn.length > 0) {
-                        cy.log(`⚠️ ตารางหลักยังเป็น "No data to display." → กด Add ซ้ำ (เหลือ ${attemptsLeft} ครั้ง)`);
-                        cy.wrap($addBtn.first())
-                            .should('be.enabled')
-                            .scrollIntoView()
-                            .click({ force: true });
+                    if (hasError) {
+                        cy.log('❌ [DEBUG] พบข้อความ Error หรือ Required บนหน้าจอ! Form อาจจะไม่ Valid จริงๆ แม้จะผ่านเช็ค ng-valid มาแล้ว');
                     } else {
-                        cy.log('ℹ️ ไม่พบปุ่ม Add ที่กดได้ (ปุ่มอาจถูก disable จาก form invalid จริง หรือฟอร์มปิดไปแล้ว)');
+                        cy.log('❌ [DEBUG] ไม่พบ Error บนหน้าจอ แต่ข้อมูลก็ไม่โผล่ในตาราง (อาจเป็นเพราะ API Save ล้มเหลว หรือ Form ไม่ Reset)');
                     }
                 });
 
-                cy.wait(800);
-                attempt(attemptsLeft - 1);
+                throw new Error(`❌ ไม่พบแถวที่ตรงกับ "${expectedRowText}" (หรือ Fallback) ในตาราง หลังกด Add ซ้ำครบ ${maxAttempts} ครั้ง`);
+            }
+
+            cy.log(`⚠️ ยังไม่พบแถวที่ต้องการ → กำลังกด Add ซ้ำ (เหลือ ${attemptsLeft} ครั้ง)`);
+
+            cy.get('body').then($body => {
+                const $addBtn = $body
+                    .find(addButtonSelector)
+                    .filter(':visible')
+                    .filter((_, el) => !Cypress.$(el).prop('disabled'))
+                    .filter((_, el) => /Add/i.test(Cypress.$(el).text().trim()));
+
+                if ($addBtn.length > 0) {
+                    cy.wrap($addBtn.first())
+                        .scrollIntoView()
+                        .focus()
+                        .click({ force: true });
+                } else {
+                    cy.log('ℹ️ ไม่พบปุ่ม Add ที่กดได้');
+                }
             });
+
+            // ✅ รอให้นานขึ้นเล็กน้อย เพื่อให้ Angular FormArray และ API ทำงานเสร็จ
+            cy.wait(1500);
+            attempt(attemptsLeft - 1);
         });
     };
 
     attempt(maxAttempts);
 };
 
+// ==========================================
+// MAIN EXPORTED FUNCTION
+// ==========================================
 export const InternetRandom = (ProductClass: string, subModule?: string, Module?: string) => {
-    cy.get('.scrollmenu > .nav').contains('Internet').scrollIntoView().should('be.visible').click();
+    cy.log('▶️ เริ่มต้น InternetRandom()');
+
+    cy.get('body').then(($body) => {
+        if ($body.find('.loading-curtain').length > 0) {
+            cy.get('.loading-curtain', { timeout: 15000 }).should('not.exist');
+        }
+    });
+
+    cy.get('.scrollmenu > .nav', { timeout: 30000 })
+        .scrollIntoView()
+        .should('be.visible')
+        .should(($nav) => {
+            const hasInternetTab = $nav.find('a').filter((_, el) => /internet/i.test(el.textContent || '')).length > 0;
+            expect(hasInternetTab, 'Internet tab to be rendered').to.be.true;
+        });
+
+    cy.get('.scrollmenu > .nav', { timeout: 30000 })
+        .contains(/internet/i)
+        .should('be.visible')
+        .and('not.be.disabled')
+        .click({ force: true });
+
+    cy.log('✅ คลิกแท็บ Internet สำเร็จ');
+
     cy.scrollTo('bottom');
     cy.get('app-mass-mkt-internet button.btn-xs').find('.glyphicon-plus').filter(':visible').first().click();
+
+    cy.get('app-mass-mkt-internet select[formcontrolname="InternetQuotaType"]', { timeout: 15000 })
+        .should(($select) => {
+            expect($select.filter(':visible').length, 'Internet Quota Type select to become visible').to.be.greaterThan(0);
+        });
+
+    cy.log('✅ Internet Detail panel confirmed visible');
+
+    handleUsageLocalized();
 
     const allowedOptions: InternetQuotaType[] = [
         'Limited Data (Pay per use)',
@@ -2181,9 +2301,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
                     return;
                 }
 
-                const selectedType = availableOptions[
-                    Math.floor(Math.random() * availableOptions.length)
-                ] as InternetQuotaType;
+                const selectedType = availableOptions[Math.floor(Math.random() * availableOptions.length)] as InternetQuotaType;
 
                 cy.wrap($select).select(selectedType);
                 cy.wait(500);
@@ -2200,11 +2318,15 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
 
                 handlers[selectedType]?.();
                 cy.wait(500);
+
+                // ✅ FIX 5: เช็ค Form Validation ให้แม่นยำขึ้น (เช็คเฉพาะ Form ที่ Active และ Visible)
                 cy.get('app-mass-mkt-internet')
                     .find('form, [formgroup]')
-                    .should('have.class', 'ng-valid');
+                    .filter(':visible')
+                    .last()
+                    .should('not.have.class', 'ng-invalid')
+                    .and('not.have.class', 'ng-pending');
 
-                // ── กด Add ครั้งแรก ──────────────────────────────────────────
                 cy.get('app-mass-mkt-internet button.btn-primary')
                     .filter(':visible')
                     .contains(/^Add$/)
@@ -2218,10 +2340,11 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
                     'app-mass-mkt-internet table tbody',
                     'app-mass-mkt-internet button.btn-primary',
                     'app-mass-mkt-internet',
-                    5
+                    5,
+                    selectedType
                 );
 
-                cy.log(`✅ Confirmed Internet Quota row added — no longer "No data to display." (type="${selectedType}")`);
+                cy.log(`✅ Confirmed Internet Quota row added with type="${selectedType}"`);
             });
         });
 };

@@ -160,79 +160,78 @@ export const RandomNonHumanTouchPoint = (subModule?: string): void => {
                 return;
             }
 
-            cy.get('select[formcontrolname="availableListBox"]')
+            cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
+                .should('exist')
                 .select(finalSelection, { force: true });
 
-            cy.get('button.str')
-                .should('not.be.disabled')
+            cy.get('ng2-dual-list-box button.str', { timeout: 20000 })
+                .should('exist')
+                .and('not.be.disabled')
                 .click({ force: true });
         });
 
         // -----------------------------------------------------------
         // STEP 4: Loop เพื่อกรอกข้อมูล (Edit) ในแต่ละแถว
         // -----------------------------------------------------------
-        cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 })
-            .should('have.length.greaterThan', 0);
+        const editNextApplicableRow = (): void => {
+            cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 }).then($rows => {
+                const targetRows = [...$rows].filter($row => {
+                    const firstCellText = $row.querySelector('td')?.textContent?.trim() ?? '';
+                    return firstCellText === 'USSD Direct Specify' || firstCellText === 'USSD Interactive Specify Menu';
+                });
 
-        cy.get('table tbody tr.ng-star-inserted')
-            .each($row => {
-                if ($row.find('td').length === 0) {
-                    cy.log('⚠️ Skipping empty row (no <td> elements found)');
+                if (targetRows.length === 0) {
+                    cy.log('✅ No remaining USSD rows to edit');
                     return;
                 }
 
-                cy.wrap($row)
-                    .find('td')
-                    .first()
-                    .invoke('text')
-                    .then(raw => {
-                        const channel = raw.trim();
-                        if (!channel) return;
+                const row = targetRows[0];
+                const channel = row.querySelector('td')?.textContent?.trim() ?? '';
 
-                        // ✅ ทำเฉพาะแถว USSD Direct Specify / USSD Interactive Specify Menu
-                        if (
-                            channel !== 'USSD Direct Specify' &&
-                            channel !== 'USSD Interactive Specify Menu'
-                        ) {
-                            return;
-                        }
+                if (!channel) {
+                    cy.log('⚠️ Skipping empty row after re-query');
+                    return;
+                }
 
-                        cy.log(`✏️ Edit Non-Human Touch Point: ${channel}`);
+                cy.log(`✏️ Edit Non-Human Touch Point: ${channel}`);
 
-                        cy.wrap($row)
-                            .find('button[title="Edit"]')
-                            .should('be.visible')
-                            .click({ force: true });
+                cy.wrap(row)
+                    .find('button[title="Edit"]', { timeout: 20000 })
+                    .should('be.visible')
+                    .click({ force: true });
 
-                        let sub = '';
-                        let unsub = '';
+                let sub = '';
+                let unsub = '';
 
-                        do {
-                            // ✅ สุ่มใหม่เสมอต่อแถว/ต่อ PO — ไม่มี caching
-                            sub = generateAccessNumberWithFormat();
-                            unsub = generateAccessNumberWithFormat();
-                        } while (sub === unsub);
+                do {
+                    sub = generateAccessNumberWithFormat();
+                    unsub = generateAccessNumberWithFormat();
+                } while (sub === unsub);
 
-                        cy.get('input[formcontrolname="subscribeAccessNumber"]', { timeout: 20000 })
-                            .should('be.visible')
-                            .clear()
-                            .type(sub);
+                cy.get('input[formcontrolname="subscribeAccessNumber"]', { timeout: 20000 })
+                    .should('be.visible')
+                    .clear()
+                    .type(sub);
 
-                        cy.get('input[formcontrolname="unsubscribeAccessNumber"]')
-                            .should('be.visible')
-                            .clear()
-                            .type(unsub);
+                cy.get('input[formcontrolname="unsubscribeAccessNumber"]', { timeout: 20000 })
+                    .should('be.visible')
+                    .clear()
+                    .type(unsub);
 
-                        cy.log(`📱 Subscribe: ${sub}, Unsubscribe: ${unsub}`);
+                cy.log(`📱 Subscribe: ${sub}, Unsubscribe: ${unsub}`);
 
-                        // กด Update
-                        cy.contains('button', 'Update', { timeout: 20000 })
-                            .should('be.visible')
-                            .click({ force: true });
+                cy.contains('button', 'Update', { timeout: 20000 })
+                    .should('be.visible')
+                    .click({ force: true });
 
-                        // รอให้ UI / Form ปิดลงก่อนวนลูปไปแก้แถวถัดไป
-                        cy.wait(500);
-                    });
+                cy.wait(500);
+                editNextApplicableRow();
             });
+        };
+
+        cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 })
+            .should('have.length.greaterThan', 0);
+
+        editNextApplicableRow();
     });
 };

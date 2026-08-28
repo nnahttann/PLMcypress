@@ -11,20 +11,41 @@ const ALL_PRIORITY_QUOTA_TYPES = [
 const QUOTA_TYPES_WITHOUT_ROW_PRIORITY: string[] = [
 ];
 
-let priorityDigitLevel = 5;
+// ── Unique priority generator ──────────────────────────────────────────────
+// เดิม priorityDigitLevel เป็น module-level counter ที่ลดจาก 5 หลักลงมาเรื่อยๆ
+// ทุกครั้งที่เรียก และไม่เคย reset — พอถูกเรียกเกิน ~5 ครั้งต่อการรัน (เกิดขึ้น
+// แน่นอน เพราะมีทั้ง top-level fields 3 ช่อง + inner Internet Quota rows
+// หลายแถวต่อ quota type) มันจะเหลือแค่เลขหลักเดียว (1-9) ตลอดไป ทำให้ค่า
+// priority ชนกันได้ง่ายมากถ้า backend ต้องการค่า unique ต่อ record
+//
+// เปลี่ยนมาใช้ used-value tracking + สุ่มในช่วงกว้างคงที่ (5 หลัก) แล้ว retry
+// ถ้าเจอค่าที่เคยใช้ไปแล้วในรอบนี้ — รับประกัน unique ภายในการรันเดียว โดยไม่
+// ลดทอนช่วงตัวเลขลง
+const usedPriorities = new Set<string>();
+
+export const resetPriorityGenerator = (): void => {
+    usedPriorities.clear();
+};
 
 const randomPriority = (): string => {
-    const digits = Math.max(priorityDigitLevel, 1);
-    const min = digits === 1 ? 1 : Math.pow(10, digits - 1);
-    const max = Math.pow(10, digits) - 1;
+    const MIN = 10000;
+    const MAX = 99999;
+    const MAX_ATTEMPTS = 50;
 
-    const value = Cypress._.random(min, max);
-
-    if (priorityDigitLevel > 1) {
-        priorityDigitLevel--;
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+        const value = String(Cypress._.random(MIN, MAX));
+        if (!usedPriorities.has(value)) {
+            usedPriorities.add(value);
+            return value;
+        }
     }
 
-    return String(value);
+    // fallback แทบไม่มีทางเกิด (โอกาสชน 50 ครั้งติดในช่วง 90000 ค่า) — กันไว้
+    // ไม่ให้ฟังก์ชัน hang หรือ throw กลางเทสต์
+    const fallback = String(Date.now()).slice(-5);
+    usedPriorities.add(fallback);
+    cLog(`⚠️ [randomPriority] ชนค่าเดิมซ้ำ ${MAX_ATTEMPTS} ครั้ง — ใช้ fallback timestamp-based = ${fallback}`);
+    return fallback;
 };
 const normalizeQuotaText = (text: string): string =>
     (text || '').replace(/\s+/g, ' ').trim();
@@ -68,6 +89,11 @@ const getActiveScope = ($root: JQuery): JQuery => {
     const $activePane = $root.find('.tab-pane.active');
     return $activePane.length ? $activePane : $root;
 };
+// Helper that logs to both Cypress UI and the browser console
+const cLog = (msg: string): void => {
+    Cypress.log({ name: 'cLog', message: msg });
+    console.log(msg);
+};
 const assertOuterQuotaHeaderReady = ($comp: JQuery): void => {
     const $scope = getActiveScope($comp);
 
@@ -101,19 +127,16 @@ const tryFillPriority = (
 ): void => {
     const $input = $pb
         .find(`input[formcontrolname="${formControlName}"]`)
+        .filter((_i, el) => {
+            return (
+                Cypress.$(el).parentsUntil($pb[0]).filter('[hidden]').length === 0 &&
+                Cypress.$(el).is(':visible')
+            );
+        })
         .first();
 
     if (!$input.length) {
-        cy.log(`ℹ️ [tryFillPriority] "${label}" — ไม่พบ input ใน DOM`);
-        return;
-    }
-
-    const $hiddenAncestorWithinPb = $input
-        .parentsUntil($pb[0])
-        .filter('[hidden]');
-
-    if ($hiddenAncestorWithinPb.length > 0) {
-        cy.log(`ℹ️ [tryFillPriority] "${label}" — section ถูกซ่อน (hidden ancestor), ข้าม`);
+        cLog(`ℹ️ [tryFillPriority] "${label}" — ไม่พบ input ที่ visible ใน DOM`);
         return;
     }
 
@@ -126,11 +149,9 @@ const tryFillPriority = (
         .trigger('change', { force: true, bubbles: true })
         .blur({ force: true });
 
-    cy.log(`✅ [tryFillPriority] "${label}" = ${val}`);
+    cLog(`✅ [tryFillPriority] "${label}" = ${val}`);
 };
 
-// ✅ อ่านค่า InternetQuotaType ที่เลือกอยู่ปัจจุบันจาก native <select>
-// (เก็บไว้เผื่อใช้ debug/log — ไม่ได้ใช้ตัดสินใจ skip อีกต่อไป)
 const getCurrentQuotaTypeValue = ($pb: JQuery): string => {
     const $select = $pb
         .find('select[formcontrolname="InternetQuotaType"]')
@@ -141,9 +162,6 @@ const getCurrentQuotaTypeValue = ($pb: JQuery): string => {
     return String($select.val() || '').trim();
 };
 
-// ✅ poll หา visible priority input แบบไม่ throw ถ้าไม่เจอ
-// ใช้แทน .should() + expect ที่ hard-fail ทั้ง test เมื่อ quota type บางแบบ
-// ไม่มี per-row priority input เลย (defensive fallback)
 const pollForVisiblePriorityInput = (
     maxAttempts: number,
     onFound: ($input: JQuery) => void,
@@ -160,7 +178,7 @@ const pollForVisiblePriorityInput = (
             }
 
             if (n >= maxAttempts) {
-                cy.log(
+                cLog(
                     `⚠️ [pollForVisiblePriorityInput] ไม่พบ priority input หลังรอ ${maxAttempts} รอบ — quota type นี้อาจไม่มี per-row priority — ข้ามแถว`
                 );
                 onNotFound();
@@ -176,17 +194,17 @@ const pollForVisiblePriorityInput = (
 };
 
 const safeClickCancel = (): void => {
-    cy.log('🔍 [safeClickCancel] หาปุ่ม Cancel...');
+    cLog('🔍 [safeClickCancel] หาปุ่ม Cancel...');
 
     cy.get(INTERNET_COMPONENT, { timeout: 8000 }).then(($comp) => {
         if (!isInternetDetailPanelOpen($comp)) {
-            cy.log('ℹ️ [safeClickCancel] panel ปิดอยู่แล้ว — ข้าม');
+            cLog('ℹ️ [safeClickCancel] panel ปิดอยู่แล้ว — ข้าม');
             return;
         }
 
         const $pb = getInternetDetailPanelBody($comp);
         if (!$pb.length) {
-            cy.log('ℹ️ [safeClickCancel] ไม่พบ panel-body — ข้าม');
+            cLog('ℹ️ [safeClickCancel] ไม่พบ panel-body — ข้าม');
             return;
         }
 
@@ -199,7 +217,7 @@ const safeClickCancel = (): void => {
             .first();
 
         if (!$cancelBtn.length) {
-            cy.log('ℹ️ [safeClickCancel] ไม่พบปุ่ม Cancel ที่ visible — ข้าม');
+            cLog('ℹ️ [safeClickCancel] ไม่พบปุ่ม Cancel ที่ visible — ข้าม');
             return;
         }
 
@@ -208,7 +226,7 @@ const safeClickCancel = (): void => {
             .should('be.visible')
             .click({ force: true });
 
-        cy.log('✅ [safeClickCancel] กด Cancel แล้ว');
+        cLog('✅ [safeClickCancel] กด Cancel แล้ว');
     });
 
     // ✅ แยก chain — retry อิสระ ไม่ติด snapshot ใน .then ด้านบน
@@ -229,7 +247,7 @@ const safeClickCancel = (): void => {
         ).to.be.true;
     });
 
-    cy.log('✅ [safeClickCancel] confirmed panel ปิดแล้ว');
+    cLog('✅ [safeClickCancel] confirmed panel ปิดแล้ว');
 };
 
 const shouldCopyDeductFailEnhancement = (): boolean => {
@@ -239,7 +257,7 @@ const shouldCopyDeductFailEnhancement = (): boolean => {
 
     const result = module === 'PRE' && priceType === 'recurring' && productClass === 'main';
 
-    cy.log(
+    cLog(
         `🔎 [shouldCopyDeductFailEnhancement] module="${module}", priceType="${priceType}", productClass="${productClass}" → ${result}`
     );
 
@@ -250,7 +268,7 @@ const runCopyDeductFailIfNeeded = (): void => {
     if (shouldCopyDeductFailEnhancement()) {
         CopyDeductFail('enhancement');
     } else {
-        cy.log('⚠️ ข้าม CopyDeductFail("enhancement") — เงื่อนไขไม่ตรง (ต้องเป็น Module=PRE, PriceType=recurring, ProductClass=main)');
+        cLog('⚠️ ข้าม CopyDeductFail("enhancement") — เงื่อนไขไม่ตรง (ต้องเป็น Module=PRE, PriceType=recurring, ProductClass=main)');
     }
 };
 
@@ -286,13 +304,13 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
 
     const processTab = (index: number): void => {
         if (index >= mainTabs.length) {
-            cy.log('🎉 All tabs processed successfully.');
+            cLog('🎉 All tabs processed successfully.');
             return;
         }
 
         const tabName = mainTabs[index];
         const componentSelector = COMPONENT_MAP[pageType][tabName];
-        cy.log(`\n🔄 [${pageType}] Processing [${index + 1}/${mainTabs.length}]: "${tabName}"`);
+        cLog(`\n🔄 [${pageType}] Processing [${index + 1}/${mainTabs.length}]: "${tabName}"`);
 
         cy.get(tabBarSelector).then(($tabs) => {
             const $match = $tabs.filter((_, el) =>
@@ -303,7 +321,7 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
                 const seenLabels = [...new Set(
                     $tabs.toArray().map((el) => el.textContent?.trim()).filter(Boolean)
                 )];
-                cy.log(`⚠️ Main tab "${tabName}" not found — skipping. Visible labels: ${seenLabels.join(', ')}`);
+                cLog(`⚠️ Main tab "${tabName}" not found — skipping. Visible labels: ${seenLabels.join(', ')}`);
                 processTab(index + 1);
                 return;
             }
@@ -312,7 +330,7 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
 
             cy.get('body').then(($body) => {
                 if (!$body.find(componentSelector).length) {
-                    cy.log(`⚠️ Component "${componentSelector}" not found — skipping.`);
+                    cLog(`⚠️ Component "${componentSelector}" not found — skipping.`);
                     processTab(index + 1);
                     return;
                 }
@@ -329,9 +347,9 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
 
                         if ($btn.length > 0) {
                             cy.wrap($btn.first()).click({ force: true });
-                            cy.log(`✅ Copied Deduct Success → Deduct Fail for "${tabName}"`);
+                            cLog(`✅ Copied Deduct Success → Deduct Fail for "${tabName}"`);
                         } else {
-                            cy.log(`⚠️ No "Copy From Deduct Success" button in "${tabName}" — skipping.`);
+                            cLog(`⚠️ No "Copy From Deduct Success" button in "${tabName}" — skipping.`);
                         }
                     });
                 });
@@ -352,7 +370,7 @@ export const CopyDeductFail = (pageType: 'mass-market' | 'enhancement'): void =>
 const COMPONENT = 'app-mass-enh-vertical-app';
 
 export function checkAndFillContentType(): void {
-    cy.log('🚀 checkAndFillContentType started');
+    cLog('🚀 checkAndFillContentType started');
 
     const targetTabs: Array<{
         name: string;
@@ -394,12 +412,12 @@ export function checkAndFillContentType(): void {
 
     const processTab = (index: number): void => {
         if (index >= targetTabs.length) {
-            cy.log('🎉 All tabs processed');
+            cLog('🎉 All tabs processed');
             return;
         }
 
         const tabConfig = targetTabs[index];
-        cy.log(`🔍 [${index + 1}/${targetTabs.length}] Looking for tab: "${tabConfig.name}"`);
+        cLog(`🔍 [${index + 1}/${targetTabs.length}] Looking for tab: "${tabConfig.name}"`);
 
         cy.get('body').then(($body) => {
             const $tab = $body.find('ul.nav.nav-tabs li a').filter((_i, el) => {
@@ -407,15 +425,15 @@ export function checkAndFillContentType(): void {
             });
 
             if (!$tab.length) {
-                cy.log(`⚠️ Tab "${tabConfig.name}" not found, skipping to next tab...`);
+                cLog(`⚠️ Tab "${tabConfig.name}" not found, skipping to next tab...`);
                 processTab(index + 1);
                 return;
             }
 
-            cy.log(`✅ Found tab: "${tabConfig.name}"`);
+            cLog(`✅ Found tab: "${tabConfig.name}"`);
             cy.wrap($tab).click({ force: true });
             cy.wait(500);
-            cy.log(`✅ Clicked tab: ${tabConfig.name}`);
+            cLog(`✅ Clicked tab: ${tabConfig.name}`);
 
             cy.get('body').then(($b) => {
                 const $container = $b.find(tabConfig.containerSelector).filter((_i, el) => {
@@ -423,18 +441,18 @@ export function checkAndFillContentType(): void {
                 });
 
                 if (!$container.length) {
-                    cy.log(`⚠️ Container "${tabConfig.containerSelector}" not found, skipping...`);
+                    cLog(`⚠️ Container "${tabConfig.containerSelector}" not found, skipping...`);
                     processTab(index + 1);
                     return;
                 }
 
-                cy.log(`✅ Container found: ${tabConfig.containerSelector}`);
+                cLog(`✅ Container found: ${tabConfig.containerSelector}`);
 
                 const $editButtons = $container.find(tabConfig.editButtonSelector);
-                cy.log(`📋 [${tabConfig.name}] Edit buttons found: ${$editButtons.length}`);
+                cLog(`📋 [${tabConfig.name}] Edit buttons found: ${$editButtons.length}`);
 
                 if ($editButtons.length === 0) {
-                    cy.log(`⚠️ No Edit button found in ${tabConfig.name}, skipping...`);
+                    cLog(`⚠️ No Edit button found in ${tabConfig.name}, skipping...`);
                     processTab(index + 1);
                     return;
                 }
@@ -443,12 +461,12 @@ export function checkAndFillContentType(): void {
 
                 const processNextEditButton = (): void => {
                     if (currentEditIndex >= $editButtons.length) {
-                        cy.log(`✅ [${tabConfig.name}] All ${$editButtons.length} Edit buttons processed`);
+                        cLog(`✅ [${tabConfig.name}] All ${$editButtons.length} Edit buttons processed`);
                         processTab(index + 1);
                         return;
                     }
 
-                    cy.log(`📌 [${tabConfig.name}] Processing Edit button ${currentEditIndex + 1}/${$editButtons.length}`);
+                    cLog(`📌 [${tabConfig.name}] Processing Edit button ${currentEditIndex + 1}/${$editButtons.length}`);
 
                     cy.get('body').then(($b2) => {
                         const $freshContainer = $b2.find(tabConfig.containerSelector).filter((_i, el) => {
@@ -459,7 +477,7 @@ export function checkAndFillContentType(): void {
                             .eq(currentEditIndex);
 
                         if (!$currentBtn.length) {
-                            cy.log(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} disappeared, skipping...`);
+                            cLog(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} disappeared, skipping...`);
                             currentEditIndex++;
                             processNextEditButton();
                             return;
@@ -467,7 +485,7 @@ export function checkAndFillContentType(): void {
 
                         const isHidden = Cypress.$($currentBtn).closest('[hidden]').length > 0;
                         if (isHidden) {
-                            cy.log(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} is hidden, skipping...`);
+                            cLog(`⚠️ [${tabConfig.name}] Edit button #${currentEditIndex + 1} is hidden, skipping...`);
                             currentEditIndex++;
                             processNextEditButton();
                             return;
@@ -475,7 +493,7 @@ export function checkAndFillContentType(): void {
 
                         cy.wrap($currentBtn).click({ force: true });
                         cy.wait(500);
-                        cy.log(`✅ [${tabConfig.name}] Clicked Edit button #${currentEditIndex + 1}`);
+                        cLog(`✅ [${tabConfig.name}] Clicked Edit button #${currentEditIndex + 1}`);
 
                         cy.get('body').then(($b3) => {
                             const $freshContainer2 = $b3.find(tabConfig.containerSelector).filter((_i, el) => {
@@ -486,10 +504,10 @@ export function checkAndFillContentType(): void {
                                 return Cypress.$(el).closest('[hidden]').length === 0;
                             });
 
-                            cy.log(`📋 [${tabConfig.name}] Visible Content Type selects: ${$visibleSelects.length}`);
+                            cLog(`📋 [${tabConfig.name}] Visible Content Type selects: ${$visibleSelects.length}`);
 
                             if (!$visibleSelects.length) {
-                                cy.log(`⚠️ [${tabConfig.name}] No visible Content Type select found`);
+                                cLog(`⚠️ [${tabConfig.name}] No visible Content Type select found`);
                                 currentEditIndex++;
                                 processNextEditButton();
                                 return;
@@ -505,7 +523,7 @@ export function checkAndFillContentType(): void {
                                 selectedValue === '0: null' ||
                                 select.selectedIndex <= 0;
 
-                            cy.log(`[${tabConfig.name}] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`);
+                            cLog(`[${tabConfig.name}] Content Type value: "${selectedValue}" | isEmpty: ${isEmpty}`);
 
                             if (isEmpty) {
                                 const validOptions: HTMLOptionElement[] = Array.from(select.options || []).filter(
@@ -518,10 +536,10 @@ export function checkAndFillContentType(): void {
                                         opt.value !== ''
                                 );
 
-                                cy.log(`📋 [${tabConfig.name}] Valid options: ${validOptions.length}`);
+                                cLog(`📋 [${tabConfig.name}] Valid options: ${validOptions.length}`);
 
                                 if (validOptions.length === 0) {
-                                    cy.log(`⚠️ [${tabConfig.name}] No valid options to select`);
+                                    cLog(`⚠️ [${tabConfig.name}] No valid options to select`);
                                     currentEditIndex++;
                                     processNextEditButton();
                                     return;
@@ -532,7 +550,7 @@ export function checkAndFillContentType(): void {
 
                                 cy.wrap($select).select(randomOption.value, { force: true });
                                 cy.wait(600);
-                                cy.log(`✅ [${tabConfig.name}] Selected: "${randomOption.text?.trim() || 'Unknown'}"`);
+                                cLog(`✅ [${tabConfig.name}] Selected: "${randomOption.text?.trim() || 'Unknown'}"`);
 
                                 cy.get('body').then(($b4) => {
                                     const $freshContainer3 = $b4.find(tabConfig.containerSelector).filter((_i, el) => {
@@ -547,14 +565,14 @@ export function checkAndFillContentType(): void {
                                             );
                                         });
 
-                                    cy.log(`📋 [${tabConfig.name}] Update button found: ${$updateBtn.length}`);
+                                    cLog(`📋 [${tabConfig.name}] Update button found: ${$updateBtn.length}`);
 
                                     if ($updateBtn.length) {
                                         cy.wrap($updateBtn.first()).click({ force: true });
-                                        cy.log(`✅ [${tabConfig.name}] Clicked Update button`);
+                                        cLog(`✅ [${tabConfig.name}] Clicked Update button`);
                                         cy.wait(500);
                                     } else {
-                                        cy.log(`⚠️ [${tabConfig.name}] Update button not found`);
+                                        cLog(`⚠️ [${tabConfig.name}] Update button not found`);
                                     }
 
                                     currentEditIndex++;
@@ -563,7 +581,7 @@ export function checkAndFillContentType(): void {
                             } else {
                                 const currentText: string =
                                     select.options[select.selectedIndex]?.text?.trim() || 'Unknown';
-                                cy.log(`✅ [${tabConfig.name}] Content Type already has value: "${currentText}"`);
+                                cLog(`✅ [${tabConfig.name}] Content Type already has value: "${currentText}"`);
                                 currentEditIndex++;
                                 processNextEditButton();
                             }
@@ -911,20 +929,6 @@ const updatePriorityInPanel = (): void => {
             return;
         }
 
-        // ✅ FIX: เดิม skip inner Edit loop ทั้งหมดถ้า quota type อยู่ใน
-        // QUOTA_TYPES_WITHOUT_ROW_PRIORITY (เช่น "Unlimited Data
-        // (Throttling Speed)" / "Unlimited Data (Fixed Speed)") โดยสมมติว่า
-        // priority ถูกกรอกผ่าน top-level field ใน Step 1 ไปแล้ว
-        //
-        // แต่จาก DOM จริง คอลัมน์ Priority ใน "Internet Quota" table (inner
-        // table) เป็นคนละ field กับ fixedSpeedPriority /
-        // internetThrottlingSpeedPriority — คอลัมน์นี้ต้องกด Edit ต่อแถว
-        // เพื่อกรอก input[formcontrolname="priority"] แยกต่างหาก
-        //
-        // จึงเปลี่ยนมาเช็คจาก DOM จริงแทนว่า inner table section มีอยู่และ
-        // มีแถวข้อมูลให้กรอกหรือไม่ (ไม่ตัดสินใจจาก quota type string อีก
-        // ต่อไป) ส่วน pollForVisiblePriorityInput ที่มีอยู่แล้วจะเป็นตัว
-        // fallback เองถ้าบางแถวไม่มี priority input จริง ๆ
         const currentQuotaType = getCurrentQuotaTypeValue($pb);
         cy.log(`ℹ️ [Step 2] quota type = "${currentQuotaType}" (ใช้เพื่อ log เท่านั้น ไม่ใช้ตัดสินใจ skip)`);
 
@@ -945,7 +949,7 @@ const updatePriorityInPanel = (): void => {
         cy.log(`📊 [Step 2] พบ ${rowCount} แถวใน Internet Quota table — จะวน process ทุกแถว`);
 
         cy.wrap(Array.from({ length: rowCount }, (_, i) => i)).each((rowIdx: number) => {
-            cy.log(`\n➡️ [Internet Quota row ${rowIdx + 1}/${rowCount}] เริ่ม`);
+            cLog(`\n➡️ [Internet Quota row ${rowIdx + 1}/${rowCount}] เริ่ม`);
 
             // -- คลิก Edit ของแถวนี้ (re-query DOM สดทุกครั้ง) --
             cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should('exist').then(($comp2) => {
@@ -998,7 +1002,7 @@ const updatePriorityInPanel = (): void => {
                         .trigger('change', { force: true, bubbles: true })
                         .blur({ force: true });
 
-                    cy.log(`✅ [row ${rowIdx + 1}] กรอก priority (sub-form) = ${val}`);
+                    cLog(`✅ [row ${rowIdx + 1}] กรอก priority (sub-form) = ${val}`);
 
                     cy.get(INTERNET_COMPONENT, { timeout: 15000 })
                         .should(($comp4) => {
@@ -1024,7 +1028,7 @@ const updatePriorityInPanel = (): void => {
                                 .scrollIntoView()
                                 .click({ force: true });
 
-                            cy.log(`✅ [row ${rowIdx + 1}] คลิก inner Update`);
+                            cLog(`✅ [row ${rowIdx + 1}] คลิก inner Update`);
                         });
 
                     // -- confirm sub-form ปิดแล้วก่อนไปแถวถัดไป (กัน race condition) --
@@ -1040,12 +1044,12 @@ const updatePriorityInPanel = (): void => {
                         ).to.eq(0);
                     });
 
-                    cy.log(`✅ [row ${rowIdx + 1}] เสร็จสิ้น — พร้อม row ถัดไป`);
+                    cLog(`✅ [row ${rowIdx + 1}] เสร็จสิ้น — พร้อม row ถัดไป`);
                 },
                 () => {
                     // ไม่เจอ priority input เลยหลัง poll ครบ — cancel sub-form (ถ้ามี)
                     // แล้วปล่อยให้ .each ไป row ถัดไปตามปกติ
-                    cy.log(`⚠️ [row ${rowIdx + 1}] ไม่มี priority input ให้กรอก — cancel sub-form แล้วข้าม`);
+                    cLog(`⚠️ [row ${rowIdx + 1}] ไม่มี priority input ให้กรอก — cancel sub-form แล้วข้าม`);
                     safeClickCancel();
                 }
             );
@@ -1086,6 +1090,21 @@ const updatePriorityInPanel = (): void => {
         cy.log('✅ [Step 5] คลิก outer Update เรียบร้อย');
     });
 
+    // ── Step 6: รอให้ Update settle ก่อนออกจาก function (กัน Cancel มาชนกับ save ที่ยังไม่เสร็จ) ──
+    cy.get(INTERNET_COMPONENT, { timeout: 20000 }).should(($comp) => {
+        const stillOpen = isInternetDetailPanelOpen($comp);
+        // ยอมรับได้ 2 สภาวะหลัง Update: panel ปิดไปแล้ว (สำเร็จ) หรือยังเปิดอยู่แต่
+        // ไม่มี priority input ค้างให้กรอก (แปลว่า inner sub-form ปิดหมดแล้ว รอแค่ outer save)
+        if (!stillOpen) return;
+
+        const $pb = getInternetDetailPanelBody($comp);
+        const $stillOpenPriorityInput = getVisiblePriorityInput($pb);
+        expect(
+            $stillOpenPriorityInput.length,
+            'ไม่ควรมี priority sub-form ค้างเปิดอยู่หลังกด outer Update'
+        ).to.eq(0);
+    });
+
     cy.log('🏁 [updatePriorityInPanel] เสร็จสิ้นทุก step');
 };
 
@@ -1093,6 +1112,9 @@ const updatePriorityInPanel = (): void => {
 // ----------------------------------------------------------------------------
 export const checkAndUpdatePriority = (): void => {
     cy.log('🚀 [checkAndUpdatePriority] เริ่มต้น');
+
+    // reset ทุกครั้งที่เริ่ม flow ใหม่ กัน used-value set ค้างข้ามการรัน/สเปคก่อนหน้า
+    resetPriorityGenerator();
 
     // ── คลิก Tab Internet + ทำงานทั้งหมดภายใน .then() เดียวกัน ──────────────
     cy.get('body').then(($body) => {
@@ -1145,13 +1167,13 @@ export const checkAndUpdatePriority = (): void => {
                 // 🔎 DEBUG: dump ทุกแถวใน outer quota table เพื่อดู text จริง
                 //     ก่อนที่จะถูก filter ด้วย isKnownQuotaType
                 const $allRowsDebug = $outerTable.find('tbody tr');
-                cy.log(`🔎 [DEBUG] จำนวนแถวทั้งหมดใน tbody (ก่อน filter): ${$allRowsDebug.length}`);
+                cLog(`🔎 [DEBUG] จำนวนแถวทั้งหมดใน tbody (ก่อน filter): ${$allRowsDebug.length}`);
 
                 $allRowsDebug.each((i, el) => {
                     const rawText = Cypress.$(el).find('td').first().text();
                     const normalized = normalizeQuotaText(rawText);
                     const matched = isKnownQuotaType(normalized);
-                    cy.log(
+                    cLog(
                         `🔎 [DEBUG row ${i + 1}] raw="${rawText}" | normalized="${normalized}" | matched=${matched}`
                     );
                 });
@@ -1168,18 +1190,24 @@ export const checkAndUpdatePriority = (): void => {
                         );
                     }).length;
 
-                cy.log(`📊 พบ ${rowCount} แถวที่ต้องประมวลผล`);
+                cLog(`📊 พบ ${rowCount} แถวที่ต้องประมวลผล`);
 
                 if (!rowCount) {
                     cy.log('✅ ไม่มีแถวที่ต้องอัปเดต priority');
                     return;
                 }
 
+                // ── รายชื่อ quota type ที่ทำไปแล้วในรอบนี้ — กันข้ามซ้ำ/ตกหล่นถ้า
+                //    table re-sort ตำแหน่งแถวหลังกด Update (index-based .eq() อาจ
+                //    ชี้ไปคนละแถวถ้าลำดับเปลี่ยน) ใช้ quota type text เป็น key แทน
+                //    เพื่อ detect กรณีนี้และ log เตือนแทนที่จะทำแถวผิดเงียบๆ
+                const processedQuotaTypes: string[] = [];
+
                 // ── Loop by loopIdx (0-based) — re-query DOM ทุก iteration ──
                 cy.wrap(Array.from({ length: rowCount }, (_, i) => i)).each(
                     (loopIdx: number) => {
-                        cy.log(`\n──────────────────────────────────────────`);
-                        cy.log(`🔄 [${loopIdx + 1}/${rowCount}] เริ่ม iteration`);
+                        cLog(`\n──────────────────────────────────────────`);
+                        cLog(`🔄 [${loopIdx + 1}/${rowCount}] เริ่ม iteration`);
 
                         cy.get(INTERNET_COMPONENT, { timeout: 10000 })
                             .should('exist')
@@ -1222,8 +1250,23 @@ export const checkAndUpdatePriority = (): void => {
                                     return;
                                 }
 
-                                const quotaTypeText = $targetRow.find('td').first().text().trim();
-                                cy.log(`📋 [${loopIdx + 1}] quota type = "${quotaTypeText}"`);
+                                const quotaTypeText = normalizeQuotaText(
+                                    $targetRow.find('td').first().text()
+                                );
+                                cLog(`📋 [${loopIdx + 1}] quota type = "${quotaTypeText}"`);
+
+                                // ⚠️ Safety check: ถ้า quota type ที่ index นี้เคยถูก process
+                                // ไปแล้วในรอบนี้ (จาก loopIdx อื่น) แปลว่า table น่าจะ re-sort
+                                // ตำแหน่งแถวไปหลังกด Update ก่อนหน้า — log เตือนไว้เพื่อ debug
+                                // (ไม่ throw เพราะยังพอประมวลผลต่อได้ แต่ผลลัพธ์อาจไม่ตรงที่ตั้งใจ)
+                                if (processedQuotaTypes.includes(quotaTypeText)) {
+                                    cLog(
+                                        `⚠️⚠️ [${loopIdx + 1}] quota type "${quotaTypeText}" ถูก process ไปแล้วก่อนหน้า — ` +
+                                        `sensor ว่า table อาจ re-sort ตำแหน่งแถวหลัง Update ทำให้ index-based .eq(${loopIdx}) ` +
+                                        `ชี้ไปแถวที่เคยทำไปแล้วแทนที่จะเป็นแถวใหม่ — ตรวจสอบผลลัพธ์การรันนี้`
+                                    );
+                                }
+                                processedQuotaTypes.push(quotaTypeText);
 
                                 const $editBtn = $targetRow.find('button.btn-warning').first();
 
@@ -1237,7 +1280,7 @@ export const checkAndUpdatePriority = (): void => {
                                     .should('be.visible')
                                     .click({ force: true });
 
-                                cy.log(`✅ [${loopIdx + 1}] คลิก Edit แล้ว`);
+                                cLog(`✅ [${loopIdx + 1}] คลิก Edit แล้ว`);
                             });
 
                         cy.get(INTERNET_COMPONENT, { timeout: 15000 }).should(($comp3) => {
@@ -1247,7 +1290,7 @@ export const checkAndUpdatePriority = (): void => {
                             ).to.be.true;
                         });
 
-                        cy.log(`✅ [${loopIdx + 1}] Internet Detail panel เปิดแล้ว`);
+                        cLog(`✅ [${loopIdx + 1}] Internet Detail panel เปิดแล้ว`);
 
                         cy.get(INTERNET_COMPONENT, { timeout: 10000 }).should(($comp) => {
                             const $pb = getInternetDetailPanelBody($comp);
@@ -1291,11 +1334,11 @@ export const checkAndUpdatePriority = (): void => {
                             assertOuterQuotaHeaderReady($comp5);
                         });
 
-                        cy.log(`✅ [${loopIdx + 1}] เสร็จสิ้น — พร้อม iteration ถัดไป`);
+                        cLog(`✅ [${loopIdx + 1}] เสร็จสิ้น — พร้อม iteration ถัดไป`);
                     }
                 );
 
-                cy.log('✅ [checkAndUpdatePriority] ทำครบทุกแถวแล้ว');
+                cLog('✅ [checkAndUpdatePriority] ทำครบทุกแถวแล้ว');
             });
     });
 };

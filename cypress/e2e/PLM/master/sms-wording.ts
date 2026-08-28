@@ -35,12 +35,17 @@ const getLangKey = (lang: string, poolData: Record<string, string[]>): string =>
   return 'EN';
 };
 
+// FIX: strip trailing punctuation/parentheses noise before matching so labels like
+// "Chinese (CHI):" or "Chinese - CHI" still resolve instead of silently falling back to EN.
 const getLangCodeFromLabel = ($el: JQuery<HTMLElement>): string => {
   const $container = $el.closest('.col-md-6, .col-md-12');
-  const labelText = ($container.find('label').first().text() || '').trim();
-  const match = labelText.match(/([A-Z]{2,4})\s*:?\s*$/);
+  const rawLabel = ($container.find('label').first().text() || '').trim();
+  const cleaned = rawLabel.replace(/[()]/g, ' ').trim();
+
+  const match = cleaned.match(/([A-Z]{2,4})\s*:?\s*$/) || cleaned.match(/\b([A-Z]{2,4})\b(?!.*[A-Z]{2,4})/);
   if (match) return match[1];
-  cy.log(`⚠️ [WARN] Cannot detect lang code from label "${labelText}"`);
+
+  cy.log(`⚠️ [WARN] Cannot detect lang code from label "${rawLabel}"`);
   return 'EN';
 };
 
@@ -116,8 +121,13 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     });
   };
 
-  const safeWithSection = (sel: string, label: string, fn: ($el: JQuery<HTMLElement>) => void) => {
-    cy.get('body').then(($body) => {
+  // FIX: safeWithSection now optionally waits for the selector to render before giving up,
+  // instead of only taking a single synchronous body snapshot. Session 4-6 flags/radios
+  // are Angular-rendered and can appear a beat after the tab switch — the old sync-only
+  // check could misfire "not found or hidden" and silently skip a field that would have
+  // shown up a moment later.
+  const safeWithSection = (sel: string, label: string, fn: ($el: JQuery<HTMLElement>) => void, waitForIt = false) => {
+    const run = ($body: JQuery<HTMLElement>) => {
       const $allTargets = $body.find(sel);
       const $target = $allTargets.filter((_, el) => isVisible(Cypress.$(el)));
 
@@ -131,6 +141,21 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       cy.wait(WAIT);
       fn($target);
       cy.wait(WAIT);
+    };
+
+    if (!waitForIt) {
+      cy.get('body').then(($body) => run($body));
+      return;
+    }
+
+    cy.get('body').then(($body) => {
+      const readyNow = $body.find(sel).filter((_, el) => isVisible(Cypress.$(el))).length > 0;
+      if (readyNow) { run($body); return; }
+
+      cy.log(`⏳ [WAIT] ${label} (${sel}) not rendered yet, waiting...`);
+      cy.get('body', { timeout: 8000 }).should(($b) => {
+        expect($b.find(sel).filter((_, el) => isVisible(Cypress.$(el))).length, `${label} should appear`).to.be.greaterThan(0);
+      }).then(($b) => run($b));
     });
   };
 
@@ -150,12 +175,8 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         }
 
         if (hasValue && !forceRetype && !isExtraLangSlot) {
-          const shouldClear = Math.random() < 0.5;
-          if (!shouldClear) {
-            cy.log(`🎲 Keep existing value (randomly skipped)`);
-            return;
-          }
-          cy.log(`🎲 Clear and retype (randomly chosen)`);
+          cy.log(`🔒 Keep existing value (stable mode)`);
+          return;
         }
 
         cy.wrap($el).focus().clear({ force: true });
@@ -252,6 +273,20 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     }) as unknown as Cypress.Chainable<'Send' | "Don't Send" | null>;
   };
 
+  // FIX: prefer the radio's own value/id/formcontrolvalue over parsing sibling label text.
+  // Angular Material radios normally carry [value]="'Yes'|'No'" — reading it directly is
+  // exact-match and immune to helper text / whitespace inside the closest wrapping div,
+  // which previously caused silent "no match, nothing clicked" failures.
+  const matchesTargetValue = ($radio: JQuery<HTMLElement>, target: 'Yes' | 'No'): boolean => {
+    const attrVal = ($radio.attr('value') || ($radio.prop('value') as string) || '').trim();
+    if (attrVal === target) return true;
+
+    const $label = $radio.closest('label, div');
+    const labelText = $label.text().trim();
+    // exact match first, then "starts with" to tolerate trailing helper text
+    return labelText === target || new RegExp(`^${target}\\b`).test(labelText);
+  };
+
   const handleRadioAndText = (radioSel: string, textSel: string, poolData: Record<string, string[]>, maxEn: number, maxTh: number, hasExtraLangs: boolean, forceNo: boolean = false, extraLangs: string[] = []) => {
     cy.get('body').then(($body) => {
       const $allRadios = $body.find(radioSel);
@@ -261,6 +296,8 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       if ($visibleRadios.length === 0) {
         if ($visibleTextFields.length > 0) {
           cy.log(`👻 [WARN] Radio ${radioSel} is hidden/missing but TextFields are visible. Forcing type to prevent "is required" error...`);
+          // legitimate force: there is no radio to tell us "System Default", so the text
+          // fields MUST be filled or the form blocks submit. Unrelated to hasExtraLangs.
           fillAndEnforce(textSel, poolData, maxEn, maxTh, hasExtraLangs, extraLangs, true, false);
         } else {
           cy.log(`👻 [SKIP] Both Radio ${radioSel} and TextFields ${textSel} are hidden/missing`);
@@ -274,14 +311,22 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
         if (forceNo && hasExtraLangs) { defaultVal = 'No'; cy.log(`🌍 [Forced] Default Wording = No`); }
         else { defaultVal = Math.random() < 0.3 ? 'No' : 'Yes'; cy.log(`🎲 Default Wording = ${defaultVal}`); }
 
+        let clicked = false;
         $vRadios.each((_, radioEl) => {
           const $radio = Cypress.$(radioEl);
-          const $label = $radio.closest('label, div');
-          if ($label.text().trim() === defaultVal) cy.wrap($label).click({ force: true });
+          if (matchesTargetValue($radio, defaultVal)) {
+            cy.wrap($radio.closest('label, div')).click({ force: true });
+            clicked = true;
+          }
         });
+        if (!clicked) cy.log(`⚠️ [WARN] No radio option matched "${defaultVal}" for ${radioSel} — check label markup`);
 
         cy.wait(WAIT);
-        if (defaultVal === 'No') processTextFields(textSel, poolData, maxEn, maxTh, hasExtraLangs, hasExtraLangs, false, extraLangs);
+        // FIX: forceRetype here is a plain flag for "user chose custom wording, so type it"
+        // — it is NOT tied to hasExtraLangs. Existing EN/TH text is retyped only when this
+        // radio branch explicitly picked "No" (custom wording), never just because extra
+        // languages happen to be selected elsewhere on the form.
+        if (defaultVal === 'No') processTextFields(textSel, poolData, maxEn, maxTh, hasExtraLangs, true, false, extraLangs);
         else cy.log(`✅ Using System Default`);
 
         enforceNotEmpty(textSel, poolData, maxEn, maxTh, hasExtraLangs, extraLangs);
@@ -308,15 +353,11 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
     const hasValue = !isEmpty(currentVal);
 
     if (hasValue) {
-      const shouldKeep = Math.random() < 0.8; // 80% keep, 20% overwrite
-      if (shouldKeep) {
-        cy.log(`🔒 Keep existing ${label} value: "${currentVal}"`);
-        return;
-      }
-      cy.log(`🎲 Overwrite existing ${label} value (randomly chosen)`);
-    } else {
-      cy.log(`⌨️ ${label} is empty → setting new value`);
+      cy.log(`🔒 Keep existing ${label} value: "${currentVal}"`);
+      return;
     }
+
+    cy.log(`⌨️ ${label} is empty → setting new value`);
     retypeFn();
   };
 
@@ -427,13 +468,19 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
       ];
       basicFields.forEach(([sel, pool, maxEn, maxTh, required]) => {
         if (required) waitUntilFieldReady(sel, `Basic Field(${sel})`);
+        // FIX: forceRetype = false (was `useGenerate` implicitly via protectGenerated logic
+        // only) — basic fields always respect "keep existing value" unless truly empty.
         processTextFields(sel, pool, maxEn, maxTh, hasExtraLangs, false, useGenerate, selectedExtraLangs);
         if (required) enforceNotEmpty(sel, pool, maxEn, maxTh, hasExtraLangs, selectedExtraLangs);
       });
 
       cy.log('👋 SESSION 4: SMS Greeting & Delete');
+      // FIX: wait for the flag select to actually render before deciding it's missing.
+      waitUntilFieldReady(SEL.greetingFlag, 'Greeting Flag', 8000);
       safeSelectFlag(SEL.greetingFlag, 'Greeting').then((v) => {
-        if (v === 'Send') fillAndEnforce(SEL.greetingText, pools.greeting, 250, 250, hasExtraLangs, selectedExtraLangs, hasExtraLangs, false);
+        // FIX: forceRetype = false, not hasExtraLangs — stop wiping existing EN/TH text
+        // just because extra languages were picked earlier in Session 1.
+        if (v === 'Send') fillAndEnforce(SEL.greetingText, pools.greeting, 250, 250, hasExtraLangs, selectedExtraLangs, false, false);
       });
       safeSelectFlag(SEL.confirmSubFlag, 'Confirm Sub');
       runFlagThenRadioText(SEL.deleteFlag, 'Delete', SEL.deleteRadio, SEL.deleteText, pools.delete, hasExtraLangs, selectedExtraLangs);
@@ -481,7 +528,8 @@ const _smsWordingLogic = (type: 'POST' | 'PRE'): void => {
 
       cy.log('📢 SESSION 6: SMS Promote Package');
       safeSelectFlag(SEL.promoteFlag, 'Promote Pack').then((v) => {
-        if (v === 'Send') fillAndEnforce(SEL.promoteText, pools.promotePack, 250, 250, hasExtraLangs, selectedExtraLangs, hasExtraLangs, false);
+        // FIX: forceRetype = false (was hasExtraLangs) — same stable-mode fix as Greeting.
+        if (v === 'Send') fillAndEnforce(SEL.promoteText, pools.promotePack, 250, 250, hasExtraLangs, selectedExtraLangs, false, false);
       });
 
       if (type === 'POST') {

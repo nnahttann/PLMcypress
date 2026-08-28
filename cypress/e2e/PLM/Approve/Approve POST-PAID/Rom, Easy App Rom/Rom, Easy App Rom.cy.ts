@@ -28,7 +28,7 @@ beforeEach(() => {
 // ========================
 // Rom, Easy App Rom - Main
 // ========================
-describe.only('Rom, Easy App Rom - POST-PAID Main', () => {
+describe('Rom, Easy App Rom - POST-PAID Main', () => {
   const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
 
   priceTypes.forEach((priceType) => {

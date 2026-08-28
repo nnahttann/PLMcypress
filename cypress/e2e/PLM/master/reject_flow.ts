@@ -14,8 +14,6 @@ import {
     approveProjectSPADSup, approveProjectSPADDOER, approveProjectSPADTester, approveProjectSPADdeploy,
     approveProjectCGMD, approveProjectCGMDtester,
 } from '../master/approval-flows';
-// ✅ ทางเข้า CKS ตัวจริง — ไม่ใช่ beforeapproveCKS (นั่นคือ MKT-side ที่เรียก CKS อีกที)
-// standardCksPoEnhancementFlow ทำ login+claim+navigate+enhance-PO-loop+beforeApprove+finalStep ครบในตัว
 import { standardCksPoEnhancementFlow } from '../master/cks-role';
 import type { GetProjectNameFn } from '../master/config';
 

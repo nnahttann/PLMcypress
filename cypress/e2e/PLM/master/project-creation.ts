@@ -58,13 +58,12 @@ const getAbbreviation = (word: string | undefined): string => {
 };
 
 const generateUniqueId = (): string => {
-    const now = new Date();
-    const h = String(now.getHours()).padStart(2, '0');
-    const s = String(now.getSeconds()).padStart(2, '0');
-    const mm = String(now.getMinutes()).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    return `${month}${day} ${h}${mm}`;
+    const nowDate = new Date();
+    const h = String(nowDate.getHours()).padStart(2, '0');
+    const mm = String(nowDate.getMinutes()).padStart(2, '0');
+    const d = String(nowDate.getDate()).padStart(2, '0');
+    const m = String(nowDate.getMonth() + 1).padStart(2, '0');
+    return `${m}${d} ${h}${mm}`;
 };
 
 const buildUniqueName = (baseName: string, identifier: string, maxLength: number): string => {
@@ -116,10 +115,10 @@ const generateProjectNames = (
         touchPoint?.runHumanTouchPoint && touchPoint?.runNonHumanTouchPoint
             ? 'BTP'
             : touchPoint?.runHumanTouchPoint
-            ? 'HTP'
-            : touchPoint?.runNonHumanTouchPoint
-            ? 'NHTP'
-            : '';
+                ? 'HTP'
+                : touchPoint?.runNonHumanTouchPoint
+                    ? 'NHTP'
+                    : '';
 
     const projectIdentifier = touchPointTag
         ? `PRJ ${touchPointTag} ${timeId}`
@@ -135,56 +134,31 @@ const generateProjectNames = (
 const selectOptionSafely = (
     selector: string,
     targetText: string,
-    options: { timeout?: number; retries?: number } = {}
+    options: { timeout?: number } = {}
 ): void => {
-    const { timeout = 15000, retries = 3 } = options;
+    const { timeout = 15000 } = options;
     const normalize = (s: string) => (s || '').trim().replace(/\s+/g, ' ');
+    const target = normalize(targetText);
 
-    const attempt = (retriesLeft: number): void => {
-        cy.get(selector, { timeout }).should('be.visible').and('not.be.disabled');
-
-        cy.get(`${selector} option`, { timeout }).should('have.length.greaterThan', 0);
-
-        cy.get(`${selector} option`).then(($opts) => {
-            const target = normalize(targetText);
+    cy.get(selector, { timeout })
+        .should('be.visible')
+        .and('not.be.disabled')
+        .find('option')
+        .should('have.length.greaterThan', 0)
+        .then(($opts) => {
             const optArr = [...$opts] as HTMLOptionElement[];
-
-            // 1) exact match on trimmed visible text
-            let match = optArr.find((o) => normalize(o.textContent || '') === target);
-
-            // 2) exact match on the option's value attribute
-            if (!match) {
-                match = optArr.find((o) => normalize(o.value) === target);
-            }
-
-            // 3) fallback: text contains target (handles minor formatting drift)
-            if (!match) {
-                match = optArr.find((o) => normalize(o.textContent || '').includes(target));
-            }
+            let match = optArr.find((o) => normalize(o.textContent || '') === target) ||
+                optArr.find((o) => normalize(o.value) === target) ||
+                optArr.find((o) => normalize(o.textContent || '').includes(target));
 
             if (!match) {
-                const dump = optArr
-                    .map((o) => `value="${o.value}" text="${normalize(o.textContent || '')}"`)
-                    .join(' | ');
-                cy.log(`⚠️ [selectOptionSafely] No match for "${targetText}" in ${selector}. Options: ${dump}`);
-
-                if (retriesLeft > 0) {
-                    cy.wait(1000);
-                    attempt(retriesLeft - 1);
-                    return;
-                }
-
-                throw new Error(
-                    `❌ selectOptionSafely: could not find option matching "${targetText}" in ${selector}. Available: ${dump}`
-                );
+                const dump = optArr.map((o) => `value="${o.value}" text="${normalize(o.textContent || '')}"`).join(' | ');
+                throw new Error(`❌ selectOptionSafely: could not find "${targetText}" in ${selector}. Available: ${dump}`);
             }
 
-            cy.get(selector).select(match!.value);
-            cy.get(selector).should('have.value', match!.value);
+            cy.get(selector).select(match.value);
+            cy.get(selector).should('have.value', match.value);
         });
-    };
-
-    attempt(retries);
 };
 
 // ========================
@@ -219,8 +193,10 @@ const createProjectBase = (
 
     cy.get('input[formcontrolname="projectName"]').blur();
 
+    // ✅ FIX: ใช้ {selectall}{backspace} เพื่อความเสถียรของ Angular Date Picker
     cy.get('input[aria-label="Date input field"]')
         .click()
+        .type('{selectall}{backspace}')
         .type(formattedDateString, { delay: 30 });
     cy.get('input[aria-label="Date input field"]').should('have.value', formattedDateString);
 
@@ -265,6 +241,7 @@ const createProjectBase = (
 
     return finalProjectName;
 };
+
 // ========================
 // CREATE PO BASE
 // ========================
@@ -288,8 +265,6 @@ const createPOBase = (
 
     cy.wait('@createPO', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
-    // ให้เวลา Angular router/backend ประมวลผลหลัง POST ก่อนเช็ค hash
-    // ถ้ามี loading curtain ระหว่าง navigate ให้รอจนกว่ามันจะหายไปก่อน
     cy.get('body').then(($body) => {
         if ($body.find('.loading-curtain').length > 0) {
             cy.get('.loading-curtain', { timeout: 120000 }).should('not.exist');
@@ -314,19 +289,12 @@ const pickMultiple = <T>(arr: T[], count: number): T[] => {
 
 const cleanEnglishText = (str: string): string => {
     if (!str) return '';
-    return str
-        .replace(/[^\x00-\x7F\s]/g, '')
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return str.replace(/[^\x00-\x7F\s]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
 };
 
 const cleanThaiText = (str: string): string => {
     if (!str) return '';
-    return str
-        .replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim();
+    return str.replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '').replace(/\s+/g, ' ').trim();
 };
 
 const limit = (str: string, maxLen: number): string => {
@@ -344,30 +312,26 @@ const limit = (str: string, maxLen: number): string => {
 
 const selectMultipleFromDualList = (controlName: string, maxSelections: number): void => {
     cy.get(`select[formcontrolname="${controlName}"]`).then(($select) => {
-        const optionCount = $select.find('option').length;
+        const $options = $select.find('option');
+        const optionCount = $options.length;
         const actualMax = Math.min(maxSelections, optionCount);
         const numberOfSelections = Math.floor(Math.random() * actualMax) + 1;
 
-        const selectedIndices = new Set<number>();
-        while (selectedIndices.size < numberOfSelections) {
-            selectedIndices.add(Math.floor(Math.random() * optionCount));
-        }
+        // สุ่มค่า value แทนการสุ่ม index เพื่อป้องกันปัญหา DOM Shift
+        const allValues = [...$options].map(o => (o as HTMLOptionElement).value);
+        const shuffledValues = Cypress._.shuffle(allValues).slice(0, numberOfSelections);
 
-        selectedIndices.forEach((index: number) => {
-            cy.get(`select[formcontrolname="${controlName}"] option`)
-                .eq(index)
+        shuffledValues.forEach((val) => {
+            // หา element ใหม่ทุกครั้งที่คลิก เพื่อความชัวร์
+            cy.get(`select[formcontrolname="${controlName}"] option[value="${val}"]`)
+                .should('exist')
                 .dblclick({ force: true });
         });
     });
 };
 
-const limitAndCleanEN = (str: string, maxLen: number): string => {
-    return limit(cleanEnglishText(str), maxLen);
-};
-
-const limitAndCleanTH = (str: string, maxLen: number): string => {
-    return limit(cleanThaiText(str), maxLen);
-};
+const limitAndCleanEN = (str: string, maxLen: number): string => limit(cleanEnglishText(str), maxLen);
+const limitAndCleanTH = (str: string, maxLen: number): string => limit(cleanThaiText(str), maxLen);
 
 // ====================================================================
 // WORDING POOLS
@@ -377,84 +341,59 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
     const promotionLevels = ['Mobile', 'Account', 'Non-Mobile'] as const;
     const randomPromotion = promotionLevels[Math.floor(Math.random() * promotionLevels.length)];
 
-    cy.get('select[formcontrolname="promotionLevel"]')
-        .select(randomPromotion)
-        .should('have.value', randomPromotion);
+    cy.get('select[formcontrolname="promotionLevel"]').select(randomPromotion).should('have.value', randomPromotion);
 
     const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
     const pOName = poName || 'ServicePO';
-
     const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
 
-    cy.get('textarea[formcontrolname="wordingInStatementEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
-    cy.get('textarea[formcontrolname="wordingInStatementTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
+    cy.get('textarea[formcontrolname="wordingInStatementEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
+    cy.get('textarea[formcontrolname="wordingInStatementTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
 
     const smsFlags = ['Send', "Don't Send"];
     const randomSmsFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
     cy.get('select[formcontrolname="smsGreetingSendFlag"]').select(randomSmsFlag);
 
     if (randomSmsFlag === 'Send') {
-        cy.get('textarea[formcontrolname="smsGreetingEn"]')
-            .clear().type(limitAndCleanEN(pickRandom(pools.smsGreeting.EN), 400));
-        cy.get('textarea[formcontrolname="smsGreetingTh"]')
-            .clear().type(limitAndCleanTH(pickRandom(pools.smsGreeting.TH), 400));
+        cy.get('textarea[formcontrolname="smsGreetingEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.smsGreeting.EN), 400));
+        cy.get('textarea[formcontrolname="smsGreetingTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.smsGreeting.TH), 400));
     }
 
     const randomDeleteFlag = smsFlags[Math.floor(Math.random() * smsFlags.length)];
     cy.get('select[formcontrolname="smsDeleteSendFlag"]').select(randomDeleteFlag);
 
     if (randomDeleteFlag === 'Send') {
-        cy.get('textarea[formcontrolname="smsDeleteEn"]')
-            .clear().type(limitAndCleanEN(pickRandom(pools.smsDelete.EN), 250));
-        cy.get('textarea[formcontrolname="smsDeleteTh"]')
-            .clear().type(limitAndCleanTH(pickRandom(pools.smsDelete.TH), 250));
+        cy.get('textarea[formcontrolname="smsDeleteEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.smsDelete.EN), 250));
+        cy.get('textarea[formcontrolname="smsDeleteTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.smsDelete.TH), 250));
     }
 
-    cy.get('textarea[formcontrolname="descriptionEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
-    cy.get('textarea[formcontrolname="descriptionTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
+    cy.get('textarea[formcontrolname="descriptionEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
+    cy.get('textarea[formcontrolname="descriptionTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
 
-    cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
+    cy.get('input[formcontrolname="discountRevenueCode"]').type('{selectall}{backspace}').type('APCP-009');
 
     selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
 
     const conditionCount = Math.floor(Math.random() * 5) + 2;
     const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
-    cy.get('textarea[formcontrolname="otherCondition"]')
-        .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
+    cy.get('textarea[formcontrolname="otherCondition"]').type('{selectall}{backspace}').type(limitAndCleanEN(selectedConditions.join(' '), 1000));
 
-    cy.get('textarea[formcontrolname="memoDescription"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
+    cy.get('textarea[formcontrolname="memoDescription"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
 const fillCashBackPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
     const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
     const pOName = poName || 'CashBackPO';
-
     const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
 
-    cy.get('textarea[formcontrolname="shortPromotionNameEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.shortPromotionName.EN), 100));
-    cy.get('textarea[formcontrolname="shortPromotionNameTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.shortPromotionName.TH), 100));
-
-    cy.get('textarea[formcontrolname="promotionDescriptionEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.promotionDescription.EN), 500));
-    cy.get('textarea[formcontrolname="promotionDescriptionTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.promotionDescription.TH), 500));
-
-    cy.get('textarea[formcontrolname="greetingLetterEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.greetingLetter.EN), 500));
-    cy.get('textarea[formcontrolname="greetingLetterTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.greetingLetter.TH), 500));
-
-    cy.get('textarea[formcontrolname="yourPackageNameEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.yourPackageName.EN), 100));
-    cy.get('textarea[formcontrolname="yourPackageNameTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.yourPackageName.TH), 100));
+    cy.get('textarea[formcontrolname="shortPromotionNameEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.shortPromotionName.EN), 100));
+    cy.get('textarea[formcontrolname="shortPromotionNameTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.shortPromotionName.TH), 100));
+    cy.get('textarea[formcontrolname="promotionDescriptionEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.promotionDescription.EN), 500));
+    cy.get('textarea[formcontrolname="promotionDescriptionTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.promotionDescription.TH), 500));
+    cy.get('textarea[formcontrolname="greetingLetterEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.greetingLetter.EN), 500));
+    cy.get('textarea[formcontrolname="greetingLetterTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.greetingLetter.TH), 500));
+    cy.get('textarea[formcontrolname="yourPackageNameEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.yourPackageName.EN), 100));
+    cy.get('textarea[formcontrolname="yourPackageNameTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.yourPackageName.TH), 100));
 
     selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
 };
@@ -466,45 +405,38 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
 
     const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
     const pOName = poName || 'StandardPO';
-
     const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
 
-    cy.get('textarea[formcontrolname="wordingInStatementEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
-    cy.get('textarea[formcontrolname="wordingInStatementTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
+    cy.get('textarea[formcontrolname="wordingInStatementEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.wordingInStatement.EN), 250));
+    cy.get('textarea[formcontrolname="wordingInStatementTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.wordingInStatement.TH), 250));
+    cy.get('textarea[formcontrolname="descriptionEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
+    cy.get('textarea[formcontrolname="descriptionTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
 
-    cy.get('textarea[formcontrolname="descriptionEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.description.EN), 500));
-    cy.get('textarea[formcontrolname="descriptionTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.description.TH), 500));
-
-    cy.get('input[formcontrolname="discountRevenueCode"]').clear().type('APCP-009');
+    cy.get('input[formcontrolname="discountRevenueCode"]').type('{selectall}{backspace}').type('APCP-009');
     selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
 
     const conditionCount = Math.floor(Math.random() * 5) + 2;
     const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
-    cy.get('textarea[formcontrolname="otherCondition"]')
-        .clear().type(limitAndCleanEN(selectedConditions.join(' '), 1000));
+    cy.get('textarea[formcontrolname="otherCondition"]').type('{selectall}{backspace}').type(limitAndCleanEN(selectedConditions.join(' '), 1000));
 
-    cy.get('textarea[formcontrolname="memoDescription"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
+    cy.get('textarea[formcontrolname="memoDescription"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.memoDescription.EN), 500));
 };
 
 const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectName?: string, poName?: string): void => {
     const pName = projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`;
     const pOName = poName || 'CashBackDiscount';
-
     const pools = createPOWordingPools(pName, pOName, Module, PriceType);
 
     const durationOptions = [1, 3, 6, 12, 24, 36];
     const randomDuration = durationOptions[Math.floor(Math.random() * durationOptions.length)];
-    cy.get('input[formcontrolname="duration"]').clear().type(randomDuration.toString());
-    cy.get('button[class*="btn-primary"][type="button"]').first().click();
+    cy.get('input[formcontrolname="duration"]').type('{selectall}{backspace}').type(randomDuration.toString());
+
+    // ✅ FIX: ใช้ contains เพื่อความแม่นยำ แทนการใช้ .first() ที่อาจเปลี่ยนตำแหน่ง
+    cy.contains('button.btn-primary[type="button"]', 'Add').first().click();
 
     const durationFromOptions = [0, 1, 2, 3];
     const randomDurationFrom = durationFromOptions[Math.floor(Math.random() * durationFromOptions.length)];
-    cy.get('input[formcontrolname="durationFrom"]').clear().type(randomDurationFrom.toString());
+    cy.get('input[formcontrolname="durationFrom"]').type('{selectall}{backspace}').type(randomDurationFrom.toString());
 
     cy.get('select[formcontrolname="discountType"]')
         .find('option:not([disabled])')
@@ -515,41 +447,40 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
             }
         });
 
-    cy.get('textarea[formcontrolname="discountNameEn"]')
-        .clear().type(limitAndCleanEN(pickRandom(pools.discountName.EN), 100));
-    cy.get('textarea[formcontrolname="discountNameTh"]')
-        .clear().type(limitAndCleanTH(pickRandom(pools.discountName.TH), 100));
+    cy.get('textarea[formcontrolname="discountNameEn"]').type('{selectall}{backspace}').type(limitAndCleanEN(pickRandom(pools.discountName.EN), 100));
+    cy.get('textarea[formcontrolname="discountNameTh"]').type('{selectall}{backspace}').type(limitAndCleanTH(pickRandom(pools.discountName.TH), 100));
 
     const randomIndex = Math.floor(Math.random() * 2);
     cy.get('input[formcontrolname="marginalDiscount"]').eq(randomIndex).check({ force: true });
-    cy.get('button[class*="btn-primary"][type="button"]').eq(1).click();
+
+    cy.contains('button.btn-primary[type="button"]', 'Add').eq(1).click(); // สมมติว่ามีปุ่ม Add 2 ปุ่มในหน้านี้
+
     cy.get('input[formcontrolname="prorate"]').eq(randomIndex).check({ force: true });
 
     const getRandomNumber = (min: number, max: number): number => Math.floor(Math.random() * (max - min + 1)) + min;
 
     if (randomIndex === 0) {
         const cashbackTypes = Math.floor(Math.random() * 2);
-
         if (cashbackTypes === 0) {
             cy.get('input[formcontrolname="cashBackType"]').first().check({ force: true });
             const totalUsage = getRandomNumber(1000, 5000);
             const cashBackExc = getRandomNumber(50, 500);
-            cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(totalUsage.toString());
-            cy.get('input[formcontrolname="cashBackExcVat"]').clear().type(cashBackExc.toString());
-            cy.get('input[formcontrolname="cashBackIncVat"]').clear().type(Math.round(cashBackExc * 1.07).toString());
+            cy.get('input[formcontrolname="totalUsageFromExcVat"]').type('{selectall}{backspace}').type(totalUsage.toString());
+            cy.get('input[formcontrolname="cashBackExcVat"]').type('{selectall}{backspace}').type(cashBackExc.toString());
+            cy.get('input[formcontrolname="cashBackIncVat"]').type('{selectall}{backspace}').type(Math.round(cashBackExc * 1.07).toString());
         } else {
             cy.get('input[formcontrolname="cashBackType"]').last().check({ force: true });
-            cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
-            cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
+            cy.get('input[formcontrolname="totalUsageFromExcVat"]').type('{selectall}{backspace}').type(getRandomNumber(1000, 5000).toString());
+            cy.get('input[formcontrolname="cashBackPercent"]').type('{selectall}{backspace}').type(getRandomNumber(1, 20).toString());
         }
     } else {
         cy.get('input[formcontrolname="cashBackType"]').last().check({ force: true });
-        cy.get('input[formcontrolname="totalUsageFromExcVat"]').clear().type(getRandomNumber(1000, 5000).toString());
-        cy.get('input[formcontrolname="cashBackPercent"]').clear().type(getRandomNumber(1, 20).toString());
+        cy.get('input[formcontrolname="totalUsageFromExcVat"]').type('{selectall}{backspace}').type(getRandomNumber(1000, 5000).toString());
+        cy.get('input[formcontrolname="cashBackPercent"]').type('{selectall}{backspace}').type(getRandomNumber(1, 20).toString());
     }
-    cy.wait(2000);
+    cy.wait(1000);
     cy.get('button.btn.btn-primary').contains('Add').should('be.visible').click();
-    cy.wait(2000);
+    cy.wait(1000);
     cy.get('button.btn.btn-primary').contains('Add').should('be.visible').click();
 };
 
@@ -562,8 +493,8 @@ const setPriceVAT = (): void => {
     cy.get('input[formcontrolname="priceExcludingVAT"]')
         .should('be.visible')
         .type(randomCharge, { force: true });
-
 };
+
 // ========================
 // BACK BASIC INFO
 // ========================
@@ -596,7 +527,6 @@ export const backBacicInfo = (): void => {
 // ========================
 
 export const addFile = (): void => {
-
     cy.get('input[type="file"]', { timeout: 30000 }).should('exist');
 
     cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/1.txt', 'binary').then((fileContent) => {
@@ -610,13 +540,24 @@ export const addFile = (): void => {
         );
     });
 
-
     beforeapproveMKT();
 };
 
 // ========================
 // PROJECT BASIC INFORMATION COMPLETE
 // ========================
+
+const getEntropySeed = (): number => {
+    const timeEntropy = (Date.now() % 100000) / 100000;
+    const perfEntropy = (typeof performance !== 'undefined' ? performance.now() % 1000 : 0) / 1000;
+    const combined = (Math.random() + timeEntropy + perfEntropy) % 1;
+    return combined;
+};
+
+const getRandomInt = (min: number, max: number): number => {
+    const combined = getEntropySeed();
+    return Math.floor(combined * (max - min + 1)) + min;
+};
 
 export const ProjectBasicInformationComplete = (
     PriceType: PriceType,
@@ -628,13 +569,7 @@ export const ProjectBasicInformationComplete = (
     const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
     const { projectName, poName, prefixName } = generateProjectNames(
-        prefix,
-        Module,
-        subModule,
-        PriceType,
-        ProductClass,
-        undefined,
-        Plugin,
+        prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin,
         { runHumanTouchPoint, runNonHumanTouchPoint }
     );
 
@@ -648,13 +583,17 @@ export const ProjectBasicInformationComplete = (
     Cypress.env('hasYoutubePremium', false);
     Cypress.env('hasCloudGame', false);
 
-    const poCount = 2;
+    const targetGroupOptions = [
+        'Change Charge Type (Convert)', 'Existing', 'New', 'Port In (Mobile Number Port)', 'Renew / Recall from Terminate'
+    ];
 
-    const poEnvKey = ProductClass === 'main' ? 'formattedDateMainPONAME' : 'formattedDateOntopPONAME';
-    const poNames: string[] = [];
-
+    const isPrepaidMain = Module === 'PRE' && ProductClass === 'main';
+    const isMainProductClass = ProductClass === 'main';
+    const poCount = 1;
     cy.log(`🎲 Randomly selected to create ${poCount} PO(s)`);
 
+    const poNames: string[] = [];
+    const poTargetGroupsMap: string[][] = [];
     const sharedTimeId = generateUniqueId();
 
     for (let i = 0; i < poCount; i++) {
@@ -665,12 +604,12 @@ export const ProjectBasicInformationComplete = (
         cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
 
         createPOBase(currentPoName, 'Product Offering');
-        cy.wait(3000);
+        cy.wait(5000);
 
         const priceTypeMap: Record<PriceType, string> = { onetime: '1: One-Time', recurring: '2: Recurring', usage: '3: Usage' };
-
         const productClassMapMobile: Record<ProductClass, string> = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
         const productClassMapEnterMusic: Record<'ontop' | 'ontopextra', string> = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
+
         const productValue = (Module === 'ENTER' || Module === 'MUSIC')
             ? productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra']
             : productClassMapMobile[ProductClass];
@@ -679,182 +618,104 @@ export const ProjectBasicInformationComplete = (
         selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
 
         if (ProductClass === 'main') {
-            const defaultItems = ['Internet', 'MMS', 'SMS', 'Voice'];
-            const retrySelectProductClass = (attemptsLeft: number) => {
-                cy.contains('.panel-heading', '*Product Specification').scrollIntoView().closest('.panel').within(() => {
-                    cy.get('select[formcontrolname="selectedListBox"]').then($select => {
-                        const selected = [...$select.find('option')].map(el => el.textContent?.trim() || '');
-                        const hasAllDefaults = defaultItems.every(d => selected.includes(d));
-                        cy.wrap(hasAllDefaults).as('defaultsReady');
-                    });
-                });
-
-                cy.get('@defaultsReady').then(hasAllDefaults => {
-                    if (hasAllDefaults) {
-                        cy.log(`✅ default items confirmed`);
-                    } else if (attemptsLeft > 0) {
-                        cy.log(`⚠️ default items missing (${attemptsLeft} retries left)`);
-                        selectOptionSafely('select[formcontrolname="productClass"]', productClassMapMobile['ontop']);
-                        selectOptionSafely('select[formcontrolname="productClass"]', productValue);
-                        cy.get('select[formcontrolname="priceType"]').should('exist').and('not.be.disabled');
-                        selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
-                        retrySelectProductClass(attemptsLeft - 1);
-                    } else {
-                        cy.log(`❌ default items still missing after retries`);
-                    }
-                });
-            };
-            cy.wait(500);
-            retrySelectProductClass(3);
+            cy.wait(1000);
+            cy.contains('.panel-heading', '*Product Specification').scrollIntoView().closest('.panel').within(() => {
+                cy.get('select[formcontrolname="selectedListBox"]').should('exist');
+            });
         }
+        const keepMainDefaults = isMainProductClass && getRandomInt(1, 10) <= 8;
 
         if (autoSetDuration) {
-            const realisticDurations: Record<string, number[]> = {
-                'hours': [2, 3, 4, 6, 8, 12, 18, 24, 36, 48, 72, 96, 120],
-                'days': [2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 270, 365],
-                'months': [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
-                'month_midnight': [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
-                'bill cycle': [2, 3, 4, 6, 9, 12, 18, 24],
-                'year': [2, 3, 4, 5, 6, 7, 8, 9, 10],
-            };
+            // ตรวจสอบก่อนว่าฟอร์มมีค่า default อยู่แล้วหรือไม่ (ทั้ง packageDuration และ packageDurationUnit)
+            // ถ้าไม่มี default เลย ต้องบังคับสุ่มค่าเสมอ ไม่ว่าผลของ keepMainDefaults roll จะเป็นอย่างไร
+            cy.get('input[formcontrolname="packageDuration"]').invoke('val').then((durationVal) => {
+                const hasDurationValue = !!String(durationVal ?? '').trim();
 
-            cy.log(`⏱️ autoSetDuration=true, entering packageDurationUnit selection`);
+                cy.get('select[formcontrolname="packageDurationUnit"]').filter(':visible').invoke('val').then((unitVal) => {
+                    const hasUnitValue = !!String(unitVal ?? '').trim();
+                    const hasDefault = hasDurationValue && hasUnitValue;
 
-            const stripIndexPrefix = (raw: string): string => raw.replace(/^\d+:\s*/, '').trim();
+                    const shouldRandomizeDuration = !hasDefault || (isMainProductClass ? !keepMainDefaults : true);
 
-            const waitForStableOptions = (attemptsLeft: number, prevSignature: string | null): void => {
-                cy.get('select[formcontrolname="packageDurationUnit"]')
-                    .filter(':visible')
-                    .should('have.length', 1)
-                    .find('option:not([disabled])')
-                    .should('have.length.greaterThan', 0)
-                    .then($options => {
-                        const labels = [...$options].map(o => stripIndexPrefix((o as HTMLOptionElement).text));
-                        const signature = labels.join('|');
+                    if (shouldRandomizeDuration) {
+                        const realisticDurations: Record<string, number[]> = {
+                            'hours': [2, 3, 4, 6, 8, 12, 18, 24, 36, 48, 72, 96, 120],
+                            'days': [2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 270, 365],
+                            'months': [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
+                            'month_midnight': [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
+                            'bill cycle': [2, 3, 4, 6, 9, 12, 18, 24],
+                            'year': [2, 3, 4, 5, 6, 7, 8, 9, 10],
+                        };
 
-                        if (signature === prevSignature) {
-                            cy.log(`✅ packageDurationUnit options stable: [${labels.join(', ')}]`);
-                            pickAndSelect(labels);
-                        } else if (attemptsLeft > 0) {
-                            cy.log(`⏳ packageDurationUnit options still changing, waiting... (${attemptsLeft} left)`);
-                            cy.wait(400);
-                            waitForStableOptions(attemptsLeft - 1, signature);
-                        } else {
-                            cy.log(`⚠️ options never stabilized after retries, proceeding anyway with: [${labels.join(', ')}]`);
-                            pickAndSelect(labels);
-                        }
-                    });
-            };
+                        cy.log(`⏱️ autoSetDuration=true, entering packageDurationUnit selection${!hasDefault ? ' (no default value present — forcing randomize)' : (isMainProductClass ? ' (main: 20% randomize roll hit)' : '')}`);
+                        const stripIndexPrefix = (raw: string): string => raw.replace(/^\d+:\s*/, '').trim();
 
-            const pickAndSelect = (stableLabels: string[]): void => {
-                const targetLabel = stableLabels[Math.floor(Math.random() * stableLabels.length)];
-                const unitText = targetLabel.toLowerCase();
+                        cy.get('select[formcontrolname="packageDurationUnit"]')
+                            .filter(':visible')
+                            .should('have.length', 1)
+                            .find('option:not([disabled])')
+                            .should('have.length.greaterThan', 0)
+                            .then($options => {
+                                const labels = [...$options].map(o => stripIndexPrefix((o as HTMLOptionElement).text));
+                                const targetLabel = labels[getRandomInt(0, labels.length - 1)];
+                                const unitText = targetLabel.toLowerCase();
+                                const matchedKey = Object.keys(realisticDurations).find(key => unitText.includes(key) || key.includes(unitText));
+                                const possibleDurations = matchedKey ? realisticDurations[matchedKey] : [2, 3, 7, 14, 30, 60, 90];
+                                const randomDuration = possibleDurations[getRandomInt(0, possibleDurations.length - 1)];
 
-                const matchedKey = Object.keys(realisticDurations).find(key =>
-                    unitText.includes(key) || key.includes(unitText)
-                );
-                const possibleDurations = matchedKey ? realisticDurations[matchedKey] : [2, 3, 7, 14, 30, 60, 90];
-                const randomDuration = possibleDurations[Math.floor(Math.random() * possibleDurations.length)];
+                                cy.get('select[formcontrolname="packageDurationUnit"]')
+                                    .filter(':visible')
+                                    .find('option:not([disabled])')
+                                    .then($opts => {
+                                        const match = [...$opts].find(o => stripIndexPrefix((o as HTMLOptionElement).text) === targetLabel) as HTMLOptionElement | undefined;
+                                        if (match) {
+                                            cy.get('select[formcontrolname="packageDurationUnit"]').filter(':visible').select(match.value, { force: true });
+                                            cy.log(`✅ packageDurationUnit confirmed: ${targetLabel}`);
+                                        }
+                                    });
 
-                const selectAndVerify = (attemptsLeft: number): void => {
-                    cy.get('select[formcontrolname="packageDurationUnit"]')
-                        .filter(':visible')
-                        .should('have.length', 1)
-                        .find('option:not([disabled])')
-                        .then($options => {
-                            const match = [...$options].find(
-                                o => stripIndexPrefix((o as HTMLOptionElement).text) === targetLabel
-                            ) as HTMLOptionElement | undefined;
+                                cy.get('input[formcontrolname="packageDuration"]').type('{selectall}{backspace}').type(randomDuration.toString());
+                                cy.log(`🗓️ Package Duration set to: ${randomDuration} ${targetLabel}`);
+                            });
 
-                            if (!match) {
-                                if (attemptsLeft > 0) {
-                                    cy.log(`⚠️ "${targetLabel}" not found in current options, retrying — ${attemptsLeft} left`);
-                                    cy.wait(400);
-                                    selectAndVerify(attemptsLeft - 1);
-                                    return;
-                                }
-                                throw new Error(`packageDurationUnit: "${targetLabel}" never reappeared in options after retries`);
-                            }
-
-                            cy.get('select[formcontrolname="packageDurationUnit"]')
-                                .filter(':visible')
-                                .select(match.value, { force: true });
-
-                            cy.get('select[formcontrolname="packageDurationUnit"]')
-                                .filter(':visible')
-                                .then($select => {
-                                    const currentRaw = $select.val() as string;
-                                    const currentLabelMatches = currentRaw != null && stripIndexPrefix(currentRaw) === targetLabel;
-                                    if (currentRaw === match.value || currentLabelMatches) {
-                                        cy.log(`✅ packageDurationUnit confirmed: ${targetLabel}`);
-                                    } else if (attemptsLeft > 0) {
-                                        cy.log(`⚠️ packageDurationUnit not set yet (got "${currentRaw}"), retrying — ${attemptsLeft} left`);
-                                        cy.wait(400);
-                                        selectAndVerify(attemptsLeft - 1);
-                                    } else {
-                                        throw new Error(
-                                            `packageDurationUnit: failed to select "${targetLabel}" after retries — stuck at "${currentRaw}"`
-                                        );
-                                    }
-                                });
-                        });
-                };
-
-                selectAndVerify(4);
-
-                cy.get('input[formcontrolname="packageDuration"]').clear().type(randomDuration.toString());
-                cy.log(`🗓️ Package Duration set to: ${randomDuration} ${targetLabel}`);
-            };
-
-            waitForStableOptions(5, null);
-
-            cy.get('.col-md-8 > .btn').click();
+                        cy.get('.col-md-8 > .btn').click();
+                    } else {
+                        cy.log(`✅ Keeping default packageDuration/packageDurationUnit (main, has default value, 80% roll — no override)`);
+                    }
+                });
+            });
         }
 
         if (subModule === 'PRE') {
-            const shouldRandomizeBillCycle = Math.random() < 0.8;
+            const shouldRandomizeBillCycle = isMainProductClass ? !keepMainDefaults : (getRandomInt(1, 10) <= 8);
 
-            if (!shouldRandomizeBillCycle) {
-                cy.log('📌 Keeping default Bill Cycle value (no randomization this run)');
-            } else {
+            if (shouldRandomizeBillCycle) {
                 const realisticBillCycles = [1, 5, 7, 10, 15, 20, 25, 28];
-                const randomBillCycle = realisticBillCycles[Math.floor(Math.random() * realisticBillCycles.length)];
+                const randomBillCycle = realisticBillCycles[getRandomInt(0, realisticBillCycles.length - 1)];
 
                 cy.get('input[formcontrolname="packageBillCycle"]')
                     .should('be.visible')
-                    .clear()
+                    .type('{selectall}{backspace}')
                     .type(randomBillCycle.toString());
-
-                const realisticBillCycleUnits = ['Day', 'Days', 'Date', 'Month', 'Months'];
 
                 cy.get('select[formcontrolname="packageBillCycleUnit"] option:not([disabled])')
                     .should('have.length.greaterThan', 0)
                     .then($options => {
                         const availableOptions = $options.map((_, el) => (el as HTMLOptionElement).value).get();
-                        let matchedUnit = realisticBillCycleUnits.find(unit =>
-                            availableOptions.includes(unit) ||
-                            availableOptions.includes(unit.toLowerCase()) ||
-                            availableOptions.includes(unit.toUpperCase())
-                        );
+                        const realisticBillCycleUnits = ['Day', 'Days', 'Date', 'Month', 'Months'];
+                        let matchedUnit = realisticBillCycleUnits.find(unit => availableOptions.includes(unit) || availableOptions.includes(unit.toLowerCase()));
 
-                        if (!matchedUnit) {
-                            matchedUnit = availableOptions[0];
-                            cy.log(`⚠️ No realistic unit found. Fallback to: ${matchedUnit}`);
-                        }
-
+                        if (!matchedUnit) matchedUnit = availableOptions[0];
                         cy.get('select[formcontrolname="packageBillCycleUnit"]').select(matchedUnit);
                         cy.log(`🗓️ Bill Cycle set to: ${randomBillCycle} ${matchedUnit}`);
                     });
+            } else if (isMainProductClass) {
+                cy.log(`✅ Keeping default packageBillCycle/packageBillCycleUnit (main, 80% roll — no override)`);
             }
         }
-        const isMultiDurationEligible =
-            PriceType?.toString().trim().toLowerCase() === 'recurring' ||
-            PriceType?.toString().trim().toLowerCase() === 'usage';
 
-        const randomValue = Math.random();
-        const useMultiDuration = isMultiDurationEligible && randomValue < 0.5;
-
-        cy.log(`🔍 PriceType="${PriceType}" | isMultiDurationEligible=${isMultiDurationEligible} | randomValue=${randomValue.toFixed(3)} | useMultiDuration=${useMultiDuration}`);
+        const isMultiDurationEligible = PriceType?.toString().trim().toLowerCase() === 'recurring' || PriceType?.toString().trim().toLowerCase() === 'usage';
+        const useMultiDuration = isMultiDurationEligible && getEntropySeed() < 0.5;
 
         if (useMultiDuration) {
             cy.log(`🎲 Multi Duration randomly selected: Yes (PriceType=${PriceType})`);
@@ -871,29 +732,31 @@ export const ProjectBasicInformationComplete = (
 
         if (Module === 'PRE' && (ProductClass === 'ontop' || ProductClass === 'ontopextra')) {
             cy.get('input[formcontrolname="allowMvpn"]').should('exist').then(($radios) => {
-                cy.wrap($radios).eq(Math.floor(Math.random() * $radios.length)).check();
+                cy.wrap($radios).eq(getRandomInt(0, $radios.length - 1)).check();
             });
         }
-        targetgroup();
+
+        let groupsForThisPo: string[] = [];
+        if (isPrepaidMain) {
+            const groupCountForThisPo = getRandomInt(1, targetGroupOptions.length);
+            groupsForThisPo = pickMultiple(targetGroupOptions, groupCountForThisPo);
+            cy.log(`🎯 PO [${i + 1}/${poCount}] เลือก ${groupCountForThisPo} targetgroup: ${groupsForThisPo.join(', ')}`);
+        }
+        poTargetGroupsMap.push(groupsForThisPo);
+        targetgroup(isPrepaidMain ? groupsForThisPo : undefined);
+
         InternalShare();
         SharingPartner();
         RevenueSharing();
         ChargePartner();
         RunMassMktTabs();
 
-        if (runHumanTouchPoint) {
-            cy.log(`🤝 Running RandomHumanTouchPoint for subModule: ${subModule}`);
-            RandomHumanTouchPoint(subModule);
-        }
+        if (runHumanTouchPoint) RandomHumanTouchPoint(subModule);
+        if (runNonHumanTouchPoint) RandomNonHumanTouchPoint(subModule);
 
-        if (runNonHumanTouchPoint) {
-            cy.log(`🤖 Running RandomNonHumanTouchPoint for subModule: ${subModule}`);
-            RandomNonHumanTouchPoint(subModule);
-        }
-        if ((Module !== 'POST') && subModule === 'PRE' && PriceType === 'recurring') {
+        if ((Module === 'PRE' || Module === 'ENTER' || Module === 'MUSIC') && PriceType === 'recurring') {
             RetryPattern();
         }
-
         if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
             CopyDeductFail('mass-market');
         }
@@ -913,15 +776,12 @@ export const ProjectBasicInformationComplete = (
     Cypress.env('currentProductClass', ProductClass);
     Cypress.env('currentProjectName', projectName);
     Cypress.env('currentPoName', poNames[0] || poName);
-
-    cy.log(`✅ All ${poCount} PO(s) processed. Finalizing...`);
-
     Cypress.env('allPoNames', poNames);
     Cypress.env('poCount', poCount);
+    Cypress.env('poTargetGroupsMap', poTargetGroupsMap);
 
     backBacicInfo();
     addFile();
-
 };
 
 // ========================
@@ -947,7 +807,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     const formattedDate = date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
     cy.intercept('GET', '/PLMSpringBoot/api/**').as('getRequest');
-    cy.get('input[aria-label="Date input field"]').type(formattedDate);
+    cy.get('input[aria-label="Date input field"]').type('{selectall}{backspace}').type(formattedDate);
     cy.get('input[aria-label="Date input field"]').should('have.value', formattedDate);
     cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
 
@@ -956,7 +816,6 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
 
-    // ✅ เก็บ Project Code ลง ENV + ProjectManager (มี project เดียวต่อรัน ไม่ต้องส่ง index)
     cy.get('input[formcontrolname="projectCode"]', { timeout: 15000 })
         .should('be.visible')
         .invoke('val')
@@ -986,7 +845,9 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
         cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
 
-        cy.get(':nth-child(4) > .btn').click({ force: true });
+        // ✅ FIX: เปลี่ยนจาก nth-child ที่เสี่ยงพัง เป็นการใช้ contains หรือ class ที่ชัดเจน
+        cy.contains('button', /add|create/i).first().click({ force: true });
+
         cy.get('input[formcontrolname="productName"]').type(currentPoName);
         Cypress.env('poName', currentPoName);
 
@@ -999,11 +860,10 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
         cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
         cy.wait('@getProject', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-        cy.wait(5000);
+        cy.wait(2000);
 
         if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
             const priceTypeMap: Record<string, string> = { onetime: 'One-Time', recurring: 'Recurring', usage: 'Usage' };
-            // ✅ FIX: ใช้ selectOptionSafely แทน .select() ตรงๆ (จุดเสี่ยงเดียวกัน)
             selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
         }
 
@@ -1040,6 +900,10 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     cy.log(`✅ All ${poCount} PO(s) processed. Finalizing...`);
 };
 
+// ========================
+// MODIFY LOGIC
+// ========================
+
 interface SelectedPORow {
     poName: string;
     projectName: string;
@@ -1065,9 +929,7 @@ const selectAvailablePORows = (
             if (!priceTypeToken && !productClassToken) return true;
 
             const cells = $row.find('td');
-            const rowText = (
-                Cypress.$(cells[2]).text() + ' ' + Cypress.$(cells[3]).text()
-            ).toUpperCase().replace(/\s+/g, ' ');
+            const rowText = (Cypress.$(cells[2]).text() + ' ' + Cypress.$(cells[3]).text()).toUpperCase().replace(/\s+/g, ' ');
 
             const matchesPriceType = priceTypeToken ? rowText.includes(priceTypeToken) : true;
             const matchesProductClass = productClassToken ? rowText.includes(productClassToken) : true;
@@ -1076,9 +938,7 @@ const selectAvailablePORows = (
         });
 
         if (availableRows.length === 0) {
-            throw new Error(
-                `❌ No available (non-locked) PO rows found matching PriceType="${PriceType}" ProductClass="${ProductClass}"`
-            );
+            throw new Error(`❌ No available (non-locked) PO rows found matching PriceType="${PriceType}" ProductClass="${ProductClass}"`);
         }
 
         const actualCount = Math.min(count, availableRows.length);
@@ -1088,7 +948,6 @@ const selectAvailablePORows = (
 
         const shuffled = Cypress._.shuffle(Array.from(availableRows));
         const targetRows = shuffled.slice(0, actualCount);
-
         const selected: SelectedPORow[] = [];
 
         targetRows.forEach((row) => {
@@ -1112,9 +971,7 @@ const searchProductOfferingByPO = (
     PriceType?: PriceType,
     ProductClass?: ProductClass
 ): Cypress.Chainable<SelectedPORow[]> => {
-    cy.contains('button', 'Search Product Offering')
-        .should('be.visible')
-        .click();
+    cy.contains('button', 'Search Product Offering').should('be.visible').click();
 
     cy.get('select[formcontrolname="poSubGroup"]')
         .should('be.visible')
@@ -1133,7 +990,7 @@ const searchProductOfferingByPO = (
 
         cy.get('my-date-picker[formcontrolname="commercialLaunchDateFrom"] input[aria-label="Date input field"]')
             .should('be.visible')
-            .clear()
+            .type('{selectall}{backspace}')
             .type(formattedFromDate, { delay: 30 });
         cy.get('my-date-picker[formcontrolname="commercialLaunchDateFrom"] input[aria-label="Date input field"]')
             .should('have.value', formattedFromDate);
@@ -1154,9 +1011,7 @@ const searchProductOfferingByPO = (
             const isLastAttempt = attemptIndex >= monthsBackOptions.length - 1;
 
             if (matchCount < poCount && !isLastAttempt) {
-                cy.log(
-                    `⚠️ Found only ${matchCount}/${poCount} matching PO within ${monthsBack} month(s), widening search...`
-                );
+                cy.log(`⚠️ Found only ${matchCount}/${poCount} matching PO within ${monthsBack} month(s), widening search...`);
                 return trySearchWithMonthsBack(attemptIndex + 1);
             }
 
@@ -1165,47 +1020,33 @@ const searchProductOfferingByPO = (
                 const productClassToken = ProductClass ? getAbbreviation(ProductClass).toUpperCase() : null;
 
                 cy.log(`🔎 Expected priceTypeToken: "${priceTypeToken}" | productClassToken: "${productClassToken}"`);
-
                 $rows.slice(0, 8).each((_, row) => {
                     const cells = Cypress.$(row).find('td');
-                    const poName = Cypress.$(cells[2]).text().trim().replace(/\s+/g, ' ');
-                    const projectName = Cypress.$(cells[3]).text().trim().replace(/\s+/g, ' ');
-                    cy.log(`Sample → PO: "${poName}" | Project: "${projectName}"`);
+                    cy.log(`Sample → PO: "${Cypress.$(cells[2]).text().trim()}" | Project: "${Cypress.$(cells[3]).text().trim()}"`);
                 });
 
-                throw new Error(
-                    `❌ No available PO found matching PriceType="${PriceType}" ProductClass="${ProductClass}" even after searching back ${monthsBack} months`
-                );
+                throw new Error(`❌ No available PO found matching criteria even after searching back ${monthsBack} months`);
             }
 
             if (matchCount < poCount) {
-                cy.log(
-                    `⚠️ Requested ${poCount} PO(s) but only found ${matchCount} even after searching back ${monthsBack} months (max range) — proceeding with ${matchCount}`
-                );
+                cy.log(`⚠️ Requested ${poCount} PO(s) but only found ${matchCount} — proceeding with ${matchCount}`);
             }
 
             return selectAvailablePORows(poCount, PriceType, ProductClass);
         });
     };
-    return trySearchWithMonthsBack(0).then((selected) => {
-        cy.contains('button', 'Modify')
-            .should('be.visible')
-            .and('not.be.disabled')
-            .click();
 
+    return trySearchWithMonthsBack(0).then((selected) => {
+        cy.contains('button', 'Modify').should('be.visible').and('not.be.disabled').click();
         return cy.wrap(selected, { log: false });
     });
 };
 
-const countMatchingRows = (
-    $rows: JQuery<HTMLElement>,
-    PriceType?: PriceType,
-    ProductClass?: ProductClass
-): number => {
+const countMatchingRows = ($rows: JQuery<HTMLElement>, PriceType?: PriceType, ProductClass?: ProductClass): number => {
     const priceTypeToken = PriceType ? getAbbreviation(PriceType).toUpperCase() : null;
     const productClassToken = ProductClass ? getAbbreviation(ProductClass).toUpperCase() : null;
-
     let count = 0;
+
     $rows.each((_, row) => {
         const $row = Cypress.$(row);
         const $firstCell = $row.find('td').eq(0);
@@ -1213,28 +1054,21 @@ const countMatchingRows = (
         const hasCheckbox = $firstCell.find('input[formcontrolname="checkbox"]').length > 0;
 
         if (!hasCheckbox || hasLockIcon) return;
-
-        if (!priceTypeToken && !productClassToken) {
-            count++;
-            return;
-        }
+        if (!priceTypeToken && !productClassToken) { count++; return; }
 
         const cells = $row.find('td');
-        const rowText = (
-            Cypress.$(cells[2]).text() + ' ' + Cypress.$(cells[3]).text()
-        ).toUpperCase().replace(/\s+/g, ' ');
+        const rowText = (Cypress.$(cells[2]).text() + ' ' + Cypress.$(cells[3]).text()).toUpperCase().replace(/\s+/g, ' ');
 
-        const matchesPriceType = priceTypeToken ? rowText.includes(priceTypeToken) : true;
-        const matchesProductClass = productClassToken ? rowText.includes(productClassToken) : true;
-
-        if (matchesPriceType && matchesProductClass) count++;
+        if ((priceTypeToken ? rowText.includes(priceTypeToken) : true) &&
+            (productClassToken ? rowText.includes(productClassToken) : true)) {
+            count++;
+        }
     });
-
     return count;
 };
 
 const closeSuccessModal = (): void => {
-    cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
+    cy.contains('.modal-title', 'Save Result', { timeout: 60000 })
         .closest('.modal-content')
         .find('.modal-footer button.btn-danger')
         .should('be.visible')
@@ -1253,7 +1087,6 @@ export const ProjectBasicInformationCompleteModify = (
     const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
     const { projectName, poName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
-
     const projectIndex = ProductClass === 'main' ? 0 : 1;
     const actualProjectName = createProjectBase(credentials, projectName, Module, subModule, 'Modify By PO', projectIndex);
 
@@ -1277,16 +1110,15 @@ export const ProjectBasicInformationCompleteModify = (
         Cypress.env('currentProductClass', ProductClass);
         Cypress.env('currentProjectName', actualProjectName);
 
-        cy.location('hash', { timeout: 6000000 }).should('include', 'product-offering-detail');
+        cy.location('hash', { timeout: 60000 }).should('include', 'product-offering-detail');
 
-        // รอ loading curtain หาย
         cy.get('body').then(($body) => {
             if ($body.find('.loading-curtain').length > 0) {
-                cy.get('.loading-curtain', { timeout: 600000 }).should('not.exist');
+                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
             }
         });
 
-        cy.wait(3000); // รอ UI settle
+        cy.wait(2000);
 
         cy.get('div.drawer1', { timeout: 30000 })
             .should('exist')
@@ -1299,55 +1131,32 @@ export const ProjectBasicInformationCompleteModify = (
                     throw new Error('❌ ไม่พบ PO ใน Sidebar หลังคลิก Modify');
                 }
 
-                cy.wrap(Array.from({ length: actualPOCount })).each((_: any, index: number) => {
+                // ✅ FIX: ใช้ cy.each แทนการ wrap array ธรรมดา เพื่อให้ Cypress จัดการ Queue ได้ถูกต้อง
+                Cypress._.times(actualPOCount, (index: number) => {
                     cy.log(`🔄 [${index + 1}/${actualPOCount}] Processing PO in sidebar...`);
 
                     if (index > 0) {
-                        cy.log(`🔀 Switching to PO at index ${index}...`);
-
                         cy.get('body').then(($body) => {
                             if ($body.find('.loading-curtain').length > 0) {
                                 cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
                             }
                         });
-                        cy.wait(2000);
+                        cy.wait(1000);
 
-                        cy.get('div.drawer1')
-                            .find('a.button')
-                            .then($links => {
-                                if (index < $links.length) {
-                                    const targetText = Cypress.$($links[index]).text().trim();
-                                    cy.log(`✅ Clicking PO at index ${index}: "${targetText}"`);
-                                    cy.wrap($links.eq(index)).should('be.visible').click({ force: true });
-                                } else {
-                                    throw new Error(
-                                        `❌ Index ${index} out of range. มี PO ${$links.length} ตัวใน Sidebar`
-                                    );
-                                }
-                            });
-
-                        cy.wait(3000);
-                        cy.get('body').then(($body) => {
-                            if ($body.find('.loading-curtain').length > 0) {
-                                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
-                            }
-                        });
+                        // ✅ FIX: ดึง Element สดใหม่ทุกครั้งที่คลิก ป้องกัน Detached DOM Error
+                        cy.get('div.drawer1').find('a.button').eq(index).should('be.visible').click({ force: true });
+                        cy.wait(1000);
                     }
 
                     selectModifySections(1, 3).then((sections) => {
                         cy.log(`📝 Selected sections for PO ${index + 1}: ${sections.join(', ')}`);
-
                         fillSelectedModifySections(sections, index);
                     });
 
                     if (index < actualPOCount - 1) {
-                        cy.contains('button', 'Save')
-                            .should('be.visible')
-                            .and('not.be.disabled')
-                            .click();
-
+                        cy.contains('button', 'Save').should('be.visible').and('not.be.disabled').click();
                         closeSuccessModal();
-                        cy.wait(2000);
+                        cy.wait(1000);
                     }
                 });
             }).then(() => {
