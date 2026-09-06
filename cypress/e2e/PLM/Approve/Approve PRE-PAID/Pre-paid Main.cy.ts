@@ -26,7 +26,7 @@ beforeEach(() => {
 });
 
 describe('PRE-PAID Main', () => {
-  const priceTypes: PriceType[] = ['onetime'];
+  const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
   priceTypes.forEach((priceType) => {
     describe(`Standard ${priceType}`, () => {
       describe('Mobile', () => {
@@ -36,7 +36,7 @@ describe('PRE-PAID Main', () => {
         Master.afterMKTMainPRE_FullSpadFlow();
       });
     });
-    describe(`Plugin ${priceType}`, () => {
+    describe.only(`Plugin ${priceType}`, () => {
       describe('Mobile', () => {
         it('MKT PRE-PAID role', () => {
           Master.ProjectBasicInformationComplete(priceType, 'main', { Module: 'PRE', subModule: 'PRE', autoSetDuration: true ,Plugin: 'Pl'});

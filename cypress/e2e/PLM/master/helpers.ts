@@ -5,27 +5,46 @@ import { Module } from './config';
 // ========================
 
 export const selectRandomOption = (labelName: string): void => {
-    cy.contains('label', labelName)
+    // Escape special characters (เช่น วงเล็บ) เพื่อป้องกัน Regex Error
+    const escapedLabel = labelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    cy.contains('label', new RegExp(`^\\s*${escapedLabel}\\s*:?\\s*$`))
         .parent()
         .next('div')
         .find('mat-select')
         .click()
         .then(() => {
-            // ✅ FIX: เพิ่ม .filter(':visible') เพื่อป้องกันการคลิก option ที่ซ่อนอยู่หรือค้างจาก dropdown อื่น
-            cy.get('mat-option').filter(':visible').then($options => {
-                const randomIndex = Math.floor(Math.random() * $options.length);
-                cy.wrap($options[randomIndex]).click({ force: true });
-            });
+            // รอให้ Angular Material Overlay Render ตัวเลือกออกมา
+            cy.get('cdk-overlay-container mat-option')
+                .should('be.visible')
+                .then(($options) => {
+                    // กรองตัวเลือกที่เป็น Placeholder, ค่าว่าง, หรือ Disabled ทิ้งไป
+                    const validOptions = $options.toArray().filter((opt) => {
+                        const text = (opt.textContent || '').trim().toLowerCase();
+                        const isDisabled = opt.classList.contains('mat-option-disabled');
+                        return !isDisabled &&
+                            text.length > 0 &&
+                            !text.includes('select') &&
+                            !text.includes('please') &&
+                            !text.includes('choose') &&
+                            !text.startsWith('--');
+                    });
+
+                    if (validOptions.length === 0) {
+                        throw new Error(`No valid options found for "${labelName}" (all might be placeholders or empty).`);
+                    }
+                    const randomIndex = Math.floor(Math.random() * validOptions.length);
+                    cy.wrap(validOptions[randomIndex]).click({ force: true });
+                });
         });
 };
-
 export const handleAddToUSMP = (): void => {
     cy.get('body').then(($body) => {
         if ($body.find('button:contains("Add to USMP")').length > 0) {
             cy.log('🟢 Found Add to USMP button, clicking...');
             cy.contains('button', 'Add to USMP').click();
             cy.wait(5000);
-            
+
             cy.get('.modal.fade.in, .mat-dialog-container', { timeout: 10000 })
                 .last()
                 .should('be.visible')
@@ -49,23 +68,30 @@ export const scrollAndWait = (ms: number = 2000): void => {
 };
 
 export const clickYesIfExists = (timeout: number = 10000, position: 'first' | 'last' = 'last'): void => {
-    cy.wait(500);
-    
-    cy.get('body').then(($body) => {
-        const hasYesBtn = $body.find('.modal:visible button:contains("Yes"), .mat-dialog-container:visible button:contains("Yes"), button:contains("Yes")').length > 0;
-        
-        if (hasYesBtn) {
-            cy.get('button')
-                .contains('Yes', { timeout })
-                .then(($btn) => {
-                    cy.wrap($btn).eq(position === 'first' ? 0 : -1).click({ force: true });
-                });
-        } else {
-            cy.log('ℹ️ No "Yes" button found in DOM, skipping click.');
-        }
-    });
-};
+    const deadline = Date.now() + timeout;
+    const pollIntervalMs = 300;
+    const poll = (): void => {
+        cy.get('body').then(($body) => {
+            const $yesBtns = $body.find(
+                '.modal:visible button:contains("Yes"), .mat-dialog-container:visible button:contains("Yes"), button:contains("Yes")'
+            );
 
+            if ($yesBtns.length > 0) {
+                cy.wrap($yesBtns).eq(position === 'first' ? 0 : -1).should('be.visible').click({ force: true });
+                return;
+            }
+
+            if (Date.now() < deadline) {
+                cy.wait(pollIntervalMs);
+                poll();
+            } else {
+                cy.log(`ℹ️ No "Yes" button found in DOM after polling ${timeout}ms, skipping click.`);
+            }
+        });
+    };
+
+    poll();
+};
 export const getRandomPhone = (): string => {
     return `0${Math.floor(8 + Math.random() * 2)}${Math.floor(10000000 + Math.random() * 90000000)}`;
 };
@@ -143,7 +169,7 @@ export const searchInTableWithPagination = (
                 if ($firstBtn.length > 0) {
                     cy.log(`⏮️ Reset pagination ไปยังหน้าแรกสำหรับ "${sectionHeader}" ก่อนเริ่มค้นหา`);
                     cy.wrap($firstBtn.first()).find('a').click();
-                    
+
                     cy.get('h3')
                         .contains(sectionHeader)
                         .parent()
@@ -250,4 +276,73 @@ export const searchInTableWithPagination = (
     };
 
     resetAndSearch();
+};
+const normalizeText = (text: string) => {
+    return text.replace(/\s+/g, ' ').trim();
+};
+
+const getVisibleEnabledButtonByText = (label: string) => {
+    return Cypress.$('button')
+        .filter((_, el) => {
+            const text = normalizeText(Cypress.$(el).text());
+            return text.includes(label);
+        })
+        .filter((_, el) => {
+            const $el = Cypress.$(el);
+
+            return (
+                $el.is(':visible') &&
+                !$el.prop('disabled') &&
+                $el.attr('aria-disabled') !== 'true'
+            );
+        });
+};
+
+export const waitForVisibleEnabledButton = (
+    label: string,
+    timeout = 120000,
+    interval = 500
+): Cypress.Chainable<boolean> => {
+    const startedAt = Date.now();
+
+    const check = (): Cypress.Chainable<boolean> => {
+        const $btn = getVisibleEnabledButtonByText(label);
+
+        if ($btn.length > 0) {
+            return cy.wrap(true, { log: false });
+        }
+
+        if (Date.now() - startedAt >= timeout) {
+            return cy.wrap(false, { log: false });
+        }
+
+        return cy.wait(interval, { log: false }).then(check);
+    };
+
+    return check();
+}
+
+export const waitForLoadingOverlayHidden = (timeout = 120000) => {
+    cy.document({ timeout }).its('readyState').should('eq', 'complete');
+
+    cy.get('body', { timeout }).should(($body) => {
+        /**
+         * ถ้าระบบมี loading selector เฉพาะ ให้แก้ตรงนี้ให้ตรงของจริง
+         * เช่น .loading, .spinner, [class*="loading"]
+         */
+        const loadingSelectors = [
+            '.loading',
+            '.spinner',
+            '[class*="loading"]',
+            '[class*="spinner"]',
+            '.ngx-spinner-overlay',
+            '.MuiBackdrop-root',
+        ];
+
+        const hasVisibleLoading = loadingSelectors.some((selector) => {
+            return $body.find(selector).filter(':visible').length > 0;
+        });
+
+        expect(hasVisibleLoading, 'loading overlay should be hidden').to.be.false;
+    });
 };

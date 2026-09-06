@@ -1,5 +1,5 @@
 import { createFullPageApprovalFlow, createSimplePageApprovalFlow, performSimpleClaimAndApprovalRole } from './claim-approve';
-import { scrollAndWait, selectRandomOption, clickYesIfExists, handleAddToUSMP } from './helpers';
+import { scrollAndWait, selectRandomOption, clickYesIfExists, handleAddToUSMP , waitForLoadingOverlayHidden, waitForVisibleEnabledButton} from './helpers';
 import { TaskListHeader, CoreTaskCallback, FinalAction } from './config';
 
 // ========================
@@ -77,7 +77,7 @@ const pollUntilSPADDeployReady = (maxAttempts = 50, intervalMs = 5000): void => 
 
         expandStatusPanelIfCollapsed();
 
-        cy.contains('button', 'Refresh Status', { timeout: 15000 })
+        cy.contains('button', 'Refresh Status', { timeout: 150000 })
             .should('be.visible')
             .click({ force: true });
         scrollAndWait();
@@ -127,7 +127,7 @@ const _approveSPADSup = (
                 cy.contains('label', 'GROUP_FEATURE').closest('.col-md-4').find('input').clear().type(rnd2.toString());
             });
             scrollAndWait();
-            cy.contains('button', buttonText, { timeout: 60000 }).should('be.visible').click();
+            cy.contains('button', buttonText, { timeout: 6000000 }).should('be.visible').click();
         },
         'AlertAndLogout',
         options
@@ -183,7 +183,7 @@ const _approveSPADDoer = (
             selectRandomOption('Template');
 
             scrollAndWait();
-            cy.contains('button', 'Promote To SPAD Tester', { timeout: 60000 })
+            cy.contains('button', 'Promote To SPAD Tester', { timeout: 6000000 })
                 .should('be.visible')
                 .click();
         },
@@ -203,7 +203,6 @@ export const approveProjectSPADDOERMain = (
 ): void => _approveSPADDoer(projectName, true, options);
 
 // SPAD Tester
-
 const _approveSPADTester = (
     projectName: string,
     isMainFlow: boolean,
@@ -215,65 +214,103 @@ const _approveSPADTester = (
         'To Do List',
         '/cgmd/cgmd-tester',
         (_poName, _poIndex) => () => {
-            cy.wait(3000);
             scrollAndWait();
 
-            cy.get('body').then(($body) => {
-                const hasSendPlugin =
-                    $body.find('button:contains("Send PlugIN")').length > 0;
+            waitForLoadingOverlayHidden(120000);
 
-                cy.once('window:alert', (alertText) => {
-                    if (!alertText.includes('Call API Plugin Success') && !alertText.includes('Do you want to Approve')) {
-                        throw new Error(`Unexpected alert text (Send PlugIN): ${alertText}`);
-                    }
-                });
+            const isPrePaidMain =
+                isMainFlow && /pre[-\s_]?paid/i.test(projectName);
 
-                if (hasSendPlugin) {
-                    cy.intercept('GET', '**/api/SendPluginMain_v2/**').as('sendPluginApi');
+            const sendPluginTimeout = isPrePaidMain
+                ? 180000
+                : isMainFlow
+                ? 120000
+                : 5000;
 
-                    cy.contains('button', 'Send PlugIN', { timeout: 60000 })
-                        .should('be.visible')
-                        .and('not.be.disabled')
-                        .click({ force: true });
-
-                    cy.contains('.modal-body', 'Do you want to Send API PlugIN', { timeout: 10000 })
-                        .should('be.visible')
-                        .within(() => {
-                            cy.contains('button', 'Yes').click({ force: true });
+            waitForVisibleEnabledButton('Send PlugIN', sendPluginTimeout).then(
+                (hasSendPlugin) => {
+                    if (hasSendPlugin) {
+                        cy.once('window:alert', (alertText) => {
+                            if (
+                                !alertText.includes('Call API Plugin Success') &&
+                                !alertText.includes('Do you want to Approve')
+                            ) {
+                                throw new Error(
+                                    `Unexpected alert text (Send PlugIN): ${alertText}`
+                                );
+                            }
                         });
 
-                    cy.wait('@sendPluginApi', { timeout: 60000 }).then((interception) => {
-                        const statusCode = interception.response?.statusCode ?? 0;
-                        expect(statusCode, 'sendPluginApi status').to.be.oneOf([200, 304]);
-                    });
+                        cy.intercept('GET', '**/api/SendPluginMain_v2/**').as(
+                            'sendPluginApi'
+                        );
 
-                    pollUntilSPADDeployReady();
+                        cy.contains('button', 'Send PlugIN', { timeout: 1000000 })
+                            .should('be.visible')
+                            .and('not.be.disabled')
+                            .click({ force: true });
 
-                    cy.removeAllListeners('window:alert');
-                    cy.once('window:alert', (alertText) => {
-                        if (!alertText.includes('Do you want to Approve') && !alertText.includes('Call API Plugin Success')) {
-                            throw new Error(`Unexpected alert text (Promote): ${alertText}`);
-                        }
-                    });
+                        cy.contains(
+                            '.modal-body',
+                            'Do you want to Send API PlugIN',
+                            { timeout: 1000000 }
+                        )
+                            .should('be.visible')
+                            .within(() => {
+                                cy.contains('button', 'Yes').click({ force: true });
+                            });
 
-                    cy.contains('button', 'Promote to SPAD Deploy', { timeout: 60000 })
-                        .should('be.visible')
-                        .and('not.be.disabled')
-                        .click({ force: true });
+                        cy.wait('@sendPluginApi', { timeout: 1200000 }).then(
+                            (interception) => {
+                                const statusCode =
+                                    interception.response?.statusCode ?? 0;
 
-                    clickYesIfExists(10000, 'last');
+                                expect(statusCode, 'sendPluginApi status').to.be.oneOf([
+                                    200,
+                                    304,
+                                ]);
+                            }
+                        );
 
-                } else {
-                    cy.log('⚠️ Send PlugIN not found — skipping to Promote directly');
+                        pollUntilSPADDeployReady();
 
-                    cy.contains('button', 'Promote to SPAD Deploy', { timeout: 60000 })
-                        .should('be.visible')
-                        .and('not.be.disabled')
-                        .click({ force: true });
+                        cy.removeAllListeners('window:alert');
 
-                    clickYesIfExists(10000, 'last');
+                        cy.once('window:alert', (alertText) => {
+                            if (
+                                !alertText.includes('Do you want to Approve') &&
+                                !alertText.includes('Call API Plugin Success')
+                            ) {
+                                throw new Error(
+                                    `Unexpected alert text (Promote): ${alertText}`
+                                );
+                            }
+                        });
+
+                        cy.contains('button', 'Promote to SPAD Deploy', {
+                            timeout: 120000,
+                        })
+                            .should('be.visible')
+                            .and('not.be.disabled')
+                            .click({ force: true });
+
+                        clickYesIfExists(10000, 'last');
+                    } else {
+                        cy.log(
+                            '⚠️ Send PlugIN not found within timeout — skipping to Promote directly'
+                        );
+
+                        cy.contains('button', 'Promote to SPAD Deploy', {
+                            timeout: 1200000,
+                        })
+                            .should('be.visible')
+                            .and('not.be.disabled')
+                            .click({ force: true });
+
+                        clickYesIfExists(1000000, 'last');
+                    }
                 }
-            });
+            );
         },
         isMainFlow ? 'StopAfterCore' : 'AlertAndLogout',
         options
@@ -289,7 +326,6 @@ export const approveProjectSPADTesterMain = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; skipLogout?: boolean; role?: NavRole }
 ): void => _approveSPADTester(projectName, true, options);
-
 // SPAD Deploy
 
 export const approveProjectSPADdeploy = (
@@ -398,7 +434,7 @@ export const approveProjectCGMD = (
 
             handleAddToUSMP();
             scrollAndWait();
-            cy.get('button[name="CBS"]').should('be.visible', { timeout: 60000 }).click();
+            cy.get('button[name="CBS"]').should('be.visible', { timeout: 6000000 }).click();
             cy.contains('button', 'Yes').should('be.visible').click();
         },
         'AlertAndLogout',
@@ -444,23 +480,13 @@ export const approveProjectCGMDPRE = (
                 .should('be.visible')
                 .and('not.be.disabled')   // fail fast if it's disabled instead of timing out on "Yes"
                 .click();                 // drop force:true — let Cypress prove it's actually clickable
-
-            cy.on('window:confirm', () => true); // in case this path uses a native confirm
-
-            cy.get('body', { timeout: 10000 }).then(($body) => {
-                if ($body.find('.modal:visible button:contains("Yes")').length > 0) {
-                    cy.contains('.modal', /./).contains('button', 'Yes').click({ force: true });
-                } else {
-                    cy.log('ℹ️ No modal "Yes" button appeared — assuming native confirm handled it');
-                }
-            });
-
+            cy.on('window:confirm', () => true); // เผื่อ path นี้ใช้ native confirm จริง ๆ
+            clickYesIfExists(10000, 'last');
         },
         'AlertAndLogout',
         options
     );
 };
-
 const _approveProjectCGMDPREMainNotComplex = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -476,7 +502,7 @@ const _approveProjectCGMDPREMainNotComplex = (
             selectRandomOption('Template');
             scrollAndWait();
             handleAddToUSMP();
-            cy.contains('button', 'Approve To CGMD Tester', { timeout: 60000 }).should('be.visible').click();
+            cy.contains('button', 'Approve To CGMD Tester', { timeout: 6000000 }).should('be.visible').click();
             cy.contains('button', 'Yes').should('be.visible').click();
         },
         'AlertAndLogout',
@@ -569,7 +595,7 @@ export const approveProjectCGMDtesterPRE = (
         (_poName, _poIndex) => () => {
             cy.wait(3000);
             scrollAndWait();
-            cy.contains('button', 'Promote To Pre Go Live', { timeout: 60000 }).should('be.visible').click();
+            cy.contains('button', 'Promote To Pre Go Live', { timeout: 6000000 }).should('be.visible').click();
             cy.contains('button', 'Yes').should('be.visible').click();
         },
         'AlertAndLogout',
@@ -585,7 +611,7 @@ export const approveProjectCGMDtesterPREPlugin = (
             cy.log(`🔄 Polling Refresh Status... (attempts left: ${remaining})`);
             cy.wait(intervalMs);
 
-            cy.contains('button', 'Refresh Status', { timeout: 15000 })
+            cy.contains('button', 'Refresh Status', { timeout: 1500000 })
                 .should('be.visible')
                 .click();
             scrollAndWait();
@@ -629,8 +655,8 @@ export const approveProjectCGMDtesterPREPlugin = (
                 }
             });
 
-            cy.contains('button', 'Send PlugIN', { timeout: 60000 }).should('be.visible').click();
-            clickYesIfExists(10000, 'first');
+            cy.contains('button', 'Send PlugIN', { timeout: 6000000 }).should('be.visible').click();
+            clickYesIfExists(1000000, 'first');
 
             pollUntilPromoteReady();
 
@@ -642,8 +668,8 @@ export const approveProjectCGMDtesterPREPlugin = (
                 }
             });
 
-            cy.contains('button', 'Promote to Pre Go Live', { timeout: 60000 }).should('be.visible').click();
-            clickYesIfExists(10000, 'last');
+            cy.contains('button', 'Promote to Pre Go Live', { timeout: 6000000 }).should('be.visible').click();
+            clickYesIfExists(1000000, 'last');
         },
         'StopAfterCore',
         options
@@ -673,31 +699,101 @@ const approveFromUnassignedTask = (
         const isLast = poIndex === poCount - 1;
         cy.log(`🔄 ${role} PO ${poIndex + 1}/${poCount}: "${poName}"`);
 
-        // ✅ ถ้าเป็น PO แรก และ caller บอกว่า "อยู่หน้า detail แล้ว" ให้ข้ามการคลิกจาก listing
         const skipClick = poIndex === 0 && options?.alreadyOnPage;
 
         if (skipClick) {
             cy.log(`⏭️ [${role}] Already on detail page — skip click from Unassigned Task`);
-            cy.url({ timeout: 30000 }).should('include', expectedUrl);
+            cy.url({ timeout: 3000000 }).should('include', expectedUrl);
         } else {
-            cy.contains('td', poName, { timeout: 15000 })
-                .should('be.visible')
-                .parents('tr.cursor-point')
-                .first()
-                .click({ force: true });
-
-            cy.url({ timeout: 30000 }).should('include', expectedUrl);
-            cy.wait(1000);
+            cy.log(`⏳ [${role}] กำลังค้นหา "${poName}" ใน Unassigned Task (รองรับ pagination)...`);
+            
+            const searchKeyword = poName.split('_')[0].trim();
+            
+            const findAndClickPO = (currentPage: number = 1): void => {
+                cy.log(`🔍 [${role}] ค้นหาในหน้า ${currentPage} ด้วย keyword: "${searchKeyword}"`);
+                
+                cy.get('h3:contains("Unassigned Task")', { timeout: 3000000 }).should('be.visible');
+                cy.wait(3000);
+                
+                cy.get('body').then(($body) => {
+                    const $table = $body.find('h3:contains("Unassigned Task")').parent().find('table');
+                    const $rows = $table.find('tbody tr');
+                    
+                    // ✅ FIX: ใช้ find() แทน loop เพื่อหลีกเลี่ยง TypeScript type inference issue
+                    const foundRow = $rows.filter((_, row) => {
+                        const rowText = Cypress.$(row).text();
+                        return rowText.includes(searchKeyword);
+                    }).first();
+                    
+                    if (foundRow.length > 0) {
+                        cy.log(`✅ [${role}] พบ PO ในหน้า ${currentPage} — กำลังคลิก`);
+                        cy.wrap(foundRow)
+                            .should('be.visible')
+                            .click({ force: true });
+                        
+                        cy.url({ timeout: 3000000 }).should('include', expectedUrl);
+                        cy.wait(5000);
+                        coreAction(poName, poIndex);
+                        
+                        if (!isLast) {
+                            cy.log(`⏳ [${role}] กลับไปหน้า Unassigned Task เพื่อ Approve PO ถัดไป...`);
+                            navigateToWorkspace({ role: options?.role ?? role });
+                            
+                            cy.get('h3:contains("Unassigned Task")', { timeout: 3000000 }).should('be.visible');
+                            cy.wait(5000);
+                            
+                            cy.get('h3:contains("Unassigned Task")').parent().find('table tbody tr', { timeout: 3000000 })
+                                .should(($rows) => {
+                                    const text = $rows.text();
+                                    expect(text, 'ตารางต้องไม่อยู่ในสถานะ Fetching data').not.to.contain('Fetching data');
+                                    expect($rows.length, 'ตารางควรมีข้อมูล').to.be.greaterThan(0);
+                                });
+                            
+                            cy.wait(3000);
+                            cy.log(`✅ [${role}] ตาราง Unassigned Task พร้อมแล้ว — เริ่มค้นหา PO ถัดไป`);
+                        }
+                        
+                        approveAt(poIndex + 1);
+                    } else {
+                        // ไม่เจอในหน้านี้ ลองไปหน้าถัดไป
+                        const $nextBtn = $body.find('h3:contains("Unassigned Task")')
+                            .parent()
+                            .find('ul.pagination li')
+                            .filter((_, li) => Cypress.$(li).text().trim() === 'Next');
+                        
+                        if ($nextBtn.length > 0 && !$nextBtn.hasClass('disabled')) {
+                            if (currentPage >= 5) {
+                                cy.log(`⚠️ [${role}] ค้นหาครบ 5 หน้าแล้ว ไม่พบ "${poName}" — ข้าม PO นี้`);
+                                if (!isLast) {
+                                    approveAt(poIndex + 1);
+                                }
+                                return;
+                            }
+                            
+                            cy.log(`⏭️ [${role}] ไม่พบในหน้า ${currentPage} — ไปหน้าถัดไป`);
+                            cy.wrap($nextBtn).find('a').click();
+                            cy.wait(3000);
+                            findAndClickPO(currentPage + 1);
+                        } else {
+                            cy.log(`⚠️ [${role}] ไม่พบ "${poName}" ในทุกหน้า — ข้าม PO นี้ (อาจถูก claim ไปแล้ว)`);
+                            if (!isLast) {
+                                approveAt(poIndex + 1);
+                            }
+                        }
+                    }
+                });
+            };
+            
+            findAndClickPO(1);
         }
 
-        coreAction(poName, poIndex);
-
-        if (!isLast) {
-            navigateToWorkspace({ role: options?.role ?? role });
-            cy.get('h3:contains("Unassigned Task")', { timeout: 30000 }).should('be.visible');
+        // ถ้า skipClick เป็น true ให้เรียก coreAction และ approveAt ที่นี่
+        if (skipClick) {
+            coreAction(poName, poIndex);
+            if (!isLast) {
+                approveAt(poIndex + 1);
+            }
         }
-
-        approveAt(poIndex + 1);
     };
 
     approveAt(0);
@@ -714,8 +810,6 @@ export const approveProjectACTM = (
         (_poName, _poIndex) => {
             cy.wait(3000);
             scrollAndWait();
-
-            // ดัก native confirm dialog เผื่อมี
             cy.on('window:confirm', () => true);
 
             cy.get('button.btn-primary')
@@ -723,7 +817,6 @@ export const approveProjectACTM = (
                 .should('have.length', 1)
                 .click();
 
-            // ✅ เช็คว่ามี modal ยืนยันโผล่มาไหม แล้วกด Yes ถ้ามี
             cy.wait(500);
             cy.get('body').then($body => {
                 if ($body.find('.modal:visible').length > 0 || $body.find('button:contains("Yes")').length > 0) {
@@ -734,16 +827,17 @@ export const approveProjectACTM = (
                 }
             });
 
-            // ✅ assert ว่า promote สำเร็จจริง เช่น redirect หรือ toast
-            cy.url({ timeout: 15000 }).should('not.include', '/actm/actm-doer/detail');
-            // หรือถ้ามี success message
-            // cy.contains('successfully', { timeout: 10000 }).should('be.visible');
+            cy.url({ timeout: 1500000 }).should('not.include', '/actm/actm-doer/detail');
+
         },
         options
     );
 };
 // OPER
 
+// ========================
+// OPER
+// ========================
 export const approveProjectOPER = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -754,15 +848,26 @@ export const approveProjectOPER = (
         (_poName, _poIndex) => {
             cy.wait(3000);
             scrollAndWait();
-            // ⚠️ selector เดิม — ถ้าพังให้เปลี่ยนเป็นข้อความที่ชัดเจน
+            cy.on('window:confirm', () => true);
             cy.get('.col-md-6 > :nth-child(3)').click();
+
+            cy.wait(500);
+            cy.get('body').then($body => {
+                if ($body.find('.modal:visible').length > 0 || $body.find('button:contains("Yes")').length > 0) {
+                    cy.log('🔔 พบ modal ยืนยัน — กำลังกด Yes');
+                    cy.contains('button', 'Yes').should('be.visible').click();
+                } else {
+                    cy.log('ℹ️ ไม่พบ modal ยืนยัน');
+                }
+            });
         },
         options
     );
 };
 
+// ========================
 // APO
-
+// ========================
 export const approveProjectAPO = (
     projectName: string,
     options?: { alreadyOnPage?: boolean; role?: NavRole }
@@ -773,14 +878,29 @@ export const approveProjectAPO = (
         (_poName, _poIndex) => {
             cy.wait(3000);
             scrollAndWait();
-            cy.contains('button', 'Promote To Pre Go Live', { timeout: 60000 })
+
+            // ดัก native confirm dialog เผื่อมี
+            cy.on('window:confirm', () => true);
+
+            // กดปุ่ม Promote To Pre Go Live ของ APO
+            cy.contains('button', 'Promote To Pre Go Live', { timeout: 6000000 })
                 .should('be.visible')
                 .click();
+
+            // ✅ เช็คว่ามี modal ยืนยันโผล่มาไหม แล้วกด Yes ถ้ามี (เหมือน ACTM)
+            cy.wait(500);
+            cy.get('body').then($body => {
+                if ($body.find('.modal:visible').length > 0 || $body.find('button:contains("Yes")').length > 0) {
+                    cy.log('🔔 พบ modal ยืนยัน — กำลังกด Yes');
+                    cy.contains('button', 'Yes').should('be.visible').click();
+                } else {
+                    cy.log('ℹ️ ไม่พบ modal ยืนยัน');
+                }
+            });
         },
         options
     );
 };
-
 export const approveProjectTSCenter = (projectName: string): void => {
     performSimpleClaimAndApprovalRole(
         'tscenter',

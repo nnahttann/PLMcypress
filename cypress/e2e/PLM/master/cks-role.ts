@@ -10,6 +10,32 @@ const {
 } = env;
 
 // ========================
+// PO COUNT GUARDS
+// แนะนำ: ย้าย 2 ฟังก์ชันนี้ไป config.ts แล้ว import ใช้ร่วมกับ claim-approve.ts
+// ========================
+
+/**
+ * อ่าน poCount แบบปลอดภัย — กัน 0 / NaN / "" / undefined
+ */
+export const resolvePoCount = (fallback = 1): number => {
+    const raw = Number(Cypress.env('poCount'));
+    return Number.isFinite(raw) && raw > 0 ? raw : fallback;
+};
+
+/**
+ * เขียน poCount แบบมี guard — ปฏิเสธค่า <= 0 เพื่อไม่ให้ทับค่าดีที่ flow ก่อนหน้า set ไว้
+ */
+export const setPoCount = (count: number, source: string): void => {
+    const prev = Number(Cypress.env('poCount')) || 0;
+    if (!Number.isFinite(count) || count <= 0) {
+        cy.log(`⚠️ [${source}] พยายาม set poCount = ${count} — ปฏิเสธ, คงค่าเดิม (${prev})`);
+        return;
+    }
+    Cypress.env('poCount', count);
+    cy.log(`✅ [${source}] poCount = ${count} (เดิม ${prev})`);
+};
+
+// ========================
 // HELPERS
 // ========================
 
@@ -56,7 +82,6 @@ export const getTomorrowDateString = (): string => {
 };
 
 const waitForProjectPageLoad = (timeout = 6000000): void => {
-
     cy.wait(['@getProject', '@getHistory', '@getNote'], { timeout: 6000000 });
 
     cy.get('@getAttachment', { timeout: 10000000 }).then(
@@ -68,6 +93,41 @@ const waitForProjectPageLoad = (timeout = 6000000): void => {
             }
         },
     );
+};
+
+/**
+ * ✅ FIX: scrape ชื่อ PO แบบทนทาน — รองรับ h3/h4/label และ span ว่าง
+ * คืน array ว่างได้ (caller ต้องมี fallback เสมอ)
+ */
+const scrapePoNamesFromCksDoer = (): string[] => {
+    const poNames: string[] = [];
+    const LABEL_RE = /PLM\s*PO\s*Name/i;
+
+    Cypress.$('h3, h4, h5, label, .panel-heading').each((_, el) => {
+        const $el = Cypress.$(el);
+        const fullText = ($el.text() || '').replace(/\s+/g, ' ').trim();
+        if (!LABEL_RE.test(fullText)) return;
+
+        // 1) ลองหยิบจาก span ก่อน
+        let value = $el.find('span').text().replace(/\s+/g, ' ').trim();
+
+        // 2) ถ้า span ว่าง — ตัดเอาข้อความหลัง ":" ออกมาแทน
+        if (!value) {
+            const afterColon = fullText.split(':').slice(1).join(':').trim();
+            value = afterColon;
+        }
+
+        // 3) ถ้ายังว่าง — ลองดู element ถัดไป
+        if (!value) {
+            value = $el.next().text().replace(/\s+/g, ' ').trim();
+        }
+
+        if (value && !LABEL_RE.test(value)) {
+            poNames.push(value);
+        }
+    });
+
+    return [...new Set(poNames)];
 };
 
 // ========================
@@ -87,7 +147,8 @@ export const executeCKSRole = (
             : projectNameStrategy === 'standard'
                 ? getStandardProjectName
                 : getOntopProjectName;
-        cy.log(String(Cypress.env('poCount')));
+
+        cy.log(`🔢 poCount ขาเข้า CKS: ${resolvePoCount(0)} (raw: ${Cypress.env('poCount')})`);
         standardCksPoEnhancementFlow(getProjectName, customSteps, beforeApprove);
     });
 
@@ -154,31 +215,32 @@ export const standardCksPoEnhancementFlow = (
         registerProjectPageIntercepts();
         waitForProjectPageLoad(60000);
 
-        // ✅ FIX: ดึงรายชื่อ PO ทั้งหมดจากหน้า CKS Doer (h3 PLM PO Name) ก่อนกด Enhance PO
-        cy.get('h3').then($h3s => {
-            const poNames: string[] = [];
-            $h3s.each((_, el) => {
-                const text = Cypress.$(el).text();
-                if (text.includes('PLM PO Name')) {
-                    const spanText = Cypress.$(el).find('span').text().trim();
-                    if (spanText) {
-                        poNames.push(spanText);
-                    }
-                }
-            });
-            Cypress.env('allPoNames', poNames);
-            Cypress.env('poCount', poNames.length);
-            cy.log(`📋 Collected ${poNames.length} PO Names from CKS Doer page: ${JSON.stringify(poNames)}`);
-        });
-
-        cy.get('button.btn-sample')
+        // ✅ FIX หลัก: ใช้จำนวนปุ่ม "Enhance PO" เป็นแหล่งความจริง
+        // ส่วน scrape ชื่อ PO เป็นแค่ข้อมูลเสริม — ถ้าพังจะไม่ทับ env ด้วย 0 อีกต่อไป
+        cy.get('button.btn-sample', { timeout: 300000 })
             .filter((_, el) => el.textContent?.trim() === 'Enhance PO')
             .then(($buttons) => {
-                const actualCount = $buttons.length;
-                cy.log(`🔢 Actual Enhance PO buttons found: ${actualCount}`);
+                const buttonCount = $buttons.length;
+                const poNames = scrapePoNamesFromCksDoer();
 
-                Cypress._.times(actualCount, (index) => {
-                    enhanceSinglePO(index, actualCount, customStepsCallback);
+                cy.log(`🔢 Enhance PO buttons: ${buttonCount} | scraped PO names: ${poNames.length}`);
+
+                if (poNames.length > 0) {
+                    Cypress.env('allPoNames', poNames);
+                    cy.log(`📋 PO Names: ${JSON.stringify(poNames)}`);
+                } else {
+                    cy.log(`⚠️ scrape ชื่อ PO ไม่ได้ — คง allPoNames เดิม: ${JSON.stringify(Cypress.env('allPoNames'))}`);
+                }
+
+                // ใช้ชื่อที่ scrape ได้ก่อน ถ้าไม่มีก็ fallback เป็นจำนวนปุ่ม
+                setPoCount(poNames.length || buttonCount, 'CKS:enhancePO');
+
+                if (buttonCount === 0) {
+                    throw new Error('❌ ไม่พบปุ่ม "Enhance PO" บนหน้า CKS Doer');
+                }
+
+                Cypress._.times(buttonCount, (index) => {
+                    enhanceSinglePO(index, buttonCount, customStepsCallback);
                 });
             });
     });
@@ -312,10 +374,12 @@ const backToCksDoer = (registerBeforeBack: boolean = false): void => {
     cy.contains('button', 'Yes', { timeout: 150000 }).should('be.visible').click();
 
     cy.url({ timeout: 600000 }).should('include', '/new-flow/home/newcks/cks-doer');
-    cy.get('body', { timeout: 600000    }).should('be.visible');
+    cy.get('body', { timeout: 600000 }).should('be.visible');
 };
 
+// ========================
 // MAIN EXPORT
+// ========================
 
 const clickApproveButton = (specificLabel: string | undefined, timeout: number): void => {
     const candidates = specificLabel ? [specificLabel, 'Approve'] : ['Approve'];
@@ -407,8 +471,15 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
         );
     }
 
+    // ✅ FIX: กันไม่ให้ flow เดินต่อแบบ "เขียวหลอก" ตอน poCount = 0
+    cy.then(() => {
+        const count = resolvePoCount(0);
+        expect(count, '❌ poCount = 0 ก่อน Claim/Approve — env ถูกเขียนทับหรือไม่เคยถูก set')
+            .to.be.greaterThan(0);
+    });
+
     cy.log(`🔑 Using projectName : ${finalProjectName}`);
-    cy.log(`🔑 PO count          : ${Cypress.env('poCount')}`);
+    cy.log(`🔑 PO count          : ${resolvePoCount()}`);
     cy.log(`🔑 PO names          : ${JSON.stringify(Cypress.env('allPoNames'))}`);
 
     ClaimProject(finalProjectName, { claimBy: 'project' });
@@ -447,6 +518,10 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
         .should('be.visible')
         .click();
 };
+
+// ========================
+// DATE UTILITIES
+// ========================
 
 const fmtDate = (d: Date): string => {
     const dd = String(d.getDate()).padStart(2, '0');

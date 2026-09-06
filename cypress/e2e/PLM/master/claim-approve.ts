@@ -50,13 +50,30 @@ const getSectionContainer = (headerText: string): Cypress.Chainable<JQuery<HTMLE
     return cy.contains('h3', headerText).parent() as unknown as Cypress.Chainable<JQuery<HTMLElement>>;
 };
 
-const waitForKeywordInToDo = (keyword: string): void => {
-    getTableContainer('To Do List')
-        .find('tbody tr', { timeout: TIMEOUT.NAV })
-        .should(($rows) => {
-            expect($rows.text()).not.to.contain('Fetching data');
-            expect($rows.text()).to.include(keyword);
+const waitForKeywordInToDo = (keyword: string, maxAttempts = 30): void => {
+    cy.log(`⏳ รอให้ "${keyword}" โผล่ใน To Do List (Live DOM Polling)...`);
+
+    const check = (attemptsLeft: number) => {
+        cy.get('body', { log: false }).then(($body) => {
+            const $todoTable = $body.find('h3:contains("To Do List")').parent().find('table');
+            const tableText = $todoTable.find('tbody tr').text();
+
+            const isFetching = tableText.includes('Fetching data');
+            const hasKeyword = tableText.includes(keyword);
+            if (!isFetching && hasKeyword) {
+                cy.log(`✅ พบ "${keyword}" ใน To Do List แล้ว (อยู่ด้านบน)`);
+                // รอ 1 วินาทีให้ Angular Render แถวใหม่และ Animation เสร็จสมบูรณ์
+                cy.wait(3000, { log: false });
+                return;
+            }
+            if (attemptsLeft <= 0) {
+                throw new Error(`❌ ไม่พบ "${keyword}" ใน To Do List หลัง Claim (รอครบ ${maxAttempts} วินาทีแล้ว)`);
+            }
+            cy.wait(3000, { log: false }).then(() => check(attemptsLeft - 1));
         });
+    };
+
+    check(maxAttempts); // เริ่ม_poll (สูงสุด 30 วินาที)
 };
 
 // ========================
@@ -69,27 +86,46 @@ export const registerApprovalPageIntercepts = (): void => {
 };
 
 // ========================
-// SMART WAIT HELPERS
+// SMART WAIT HELPERS - IMPROVED
 // ========================
+/**
+ * ✅ FIXED: รอให้ตารางโหลดเสร็จสมบูรณ์ (รองรับ Angular Rendering Delay)
+ * ไม่ได้เช็คแค่ "Fetching data" หายไป แต่รอให้ข้อมูลจริงถูก Render ลง DOM
+ */
 const waitForTableReady = (headerText: string, timeoutMs: number = TIMEOUT.NAV): Cypress.Chainable => {
+    // 1. รอ Loading Indicator หายไป
     getTableContainer(headerText).then(($container) => {
         if ($container.find(LOADER_SELECTOR).length > 0) {
             cy.wrap($container).find(LOADER_SELECTOR, { timeout: timeoutMs }).should('not.exist');
         }
     });
 
+    // 2. รอให้ข้อความ 'Fetching data' หายไป
     return getTableContainer(headerText)
         .find('tbody tr', { timeout: timeoutMs })
         .should(($rows) => {
             const text = $rows.text();
-            expect(text).not.to.contain('Fetching data');
+            expect(text, 'ตารางต้องไม่อยู่ในสถานะ Fetching data').not.to.contain('Fetching data');
+
             const isEmptyState = /no data|ไม่พบข้อมูล|empty/i.test(text);
             if (!isEmptyState) {
+                // 3. ✅ ตรวจสอบว่ามีข้อมูลจริง Render ลง DOM แล้ว
+                const hasRealData = $rows.toArray().some(tr => {
+                    const rowText = Cypress.$(tr).text().trim();
+                    return rowText.length > 5 &&
+                        !rowText.includes('No data to display') &&
+                        !rowText.includes('Fetching');
+                });
+
                 expect($rows.length, `Expected rows in "${headerText}" unless it's empty`).to.be.greaterThan(0);
+                expect(hasRealData, `ตาราง "${headerText}" ควรมีแถวข้อมูลที่ Render เสร็จแล้ว`).to.be.true;
             }
+        })
+        .then(() => {
+            // 4. ✅ เพิ่ม Safety Wait ให้ Angular Change Detection ทำงานเสร็จ
+            cy.wait(500, { log: false });
         });
 };
-
 const retryFindRowInTable = (
     headerText: string,
     keyword: string,
@@ -98,19 +134,21 @@ const retryFindRowInTable = (
 ): Cypress.Chainable<boolean> => {
     cy.log(`🔄 [${attempt}/${maxAttempts}] Finding "${keyword}" in "${headerText}"`);
 
-    return waitForTableReady(headerText).then(($rows) => {
-        const found = $rows.toArray().some((row: HTMLElement) => rowMatchesKeyword(row, keyword));
-        if (found) {
-            cy.log(`✅ Found "${keyword}" on attempt ${attempt}`);
-            return cy.wrap<boolean>(true);
-        }
-        if (attempt >= maxAttempts) {
-            cy.log(`❌ "${keyword}" not found after ${maxAttempts} attempts`);
-            return cy.wrap<boolean>(false);
-        }
-        cy.wait(Math.min(800 * attempt, 4000));
-        waitForLoadingState();
-        return retryFindRowInTable(headerText, keyword, maxAttempts, attempt + 1);
+    return waitForTableReady(headerText).then(() => {
+        return getTableContainer(headerText).find('tbody tr').then(($rows) => {
+            const found = $rows.toArray().some((row: HTMLElement) => rowMatchesKeyword(row, keyword));
+            if (found) {
+                cy.log(`✅ Found "${keyword}" on attempt ${attempt}`);
+                return cy.wrap<boolean>(true);
+            }
+            if (attempt >= maxAttempts) {
+                cy.log(`❌ "${keyword}" not found after ${maxAttempts} attempts`);
+                return cy.wrap<boolean>(false);
+            }
+            cy.wait(Math.min(800 * attempt, 4000));
+            waitForLoadingState();
+            return retryFindRowInTable(headerText, keyword, maxAttempts, attempt + 1);
+        });
     });
 };
 
@@ -307,7 +345,13 @@ const performApprovalRole = (
     user: string,
     pass: string,
     approveFunction: ApproveFunction,
-    options?: { searchBy?: 'project' | 'po'; assignee?: string; billingSystem?: string; role?: NavRole }
+    options?: {
+        searchBy?: 'project' | 'po';
+        assignee?: string;
+        billingSystem?: string;
+        role?: NavRole;
+        approveFunctionHandlesAllPOs?: boolean;
+    }
 ): void => {
     loginAndWaitReady(user, pass);
 
@@ -317,8 +361,9 @@ const performApprovalRole = (
     const searchBy = options?.searchBy ?? 'po';
     const navRole: NavRole = options?.role ?? 'CGMD';
     const taskHeader: TaskListHeader = EXPECTED_HEADER[navRole];
+    const approveFunctionHandlesAllPOs = options?.approveFunctionHandlesAllPOs ?? true;
 
-    cy.log(`📋 Project: ${projectNamePONAME} | 🔁 Total PO: ${poCount} | 🔍 Search: ${searchBy} | 🎭 Role: ${navRole}`);
+    cy.log(`📋 Project: ${projectNamePONAME} | 🔁 Total PO: ${poCount} | 🔍 Search: ${searchBy} | 🎭 Role: ${navRole} | 🧭 handlesAllPOs: ${approveFunctionHandlesAllPOs}`);
 
     const getKeyword = (index: number): string => {
         if (searchBy === 'project') return projectNamePONAME;
@@ -328,12 +373,49 @@ const performApprovalRole = (
 
     const processedRowTexts = new Set<string>();
 
-    const approveAllPOs = (): void => {
+    const approveOnceLettingFunctionHandleAllPOs = (): void => {
+        const keyword = getKeyword(0);
+        cy.log(`🔑 [Approve] keyword: "${keyword}" — approveFunction จะจัดการ PO ทั้งหมด (${poCount}) เอง`);
+
+        cy.url().then((currentUrl) => {
+            if (currentUrl.includes('/login')) {
+                loginAndWaitReady(user, pass);
+                navigateToWorkspace({ role: navRole });
+            } else if (!currentUrl.includes('/workspace-home/workspace')) {
+                navigateToWorkspace({ role: navRole });
+            }
+
+            waitForTableReady(taskHeader, TIMEOUT.NAV);
+
+            searchInTableWithPagination(
+                taskHeader,
+                keyword,
+                ($row) => {
+                    registerApprovalPageIntercepts();
+                    cy.wrap($row).should('be.visible').click();
+                    approveFunction(projectNamePONAME, { alreadyOnPage: true, role: navRole } as any);
+                },
+                {
+                    waitAfterNext: 2000,
+                    filterCallback: ($row) => {
+                        const rowText = $row.text().trim();
+                        return rowText.includes(keyword) && !rowText.includes('Fetching data');
+                    }
+                }
+            );
+
+            cy.log(`🏁 approveFunction จัดการครบ ${poCount} PO และ Logout ให้แล้ว — wrapper หยุด loop ที่นี่`);
+        });
+    };
+
+    const approveAllPOsLegacyLoop = (): void => {
         const approveNextPO = (index: number): void => {
             if (index >= poCount) {
                 cy.log(`✅ Approve เสร็จแล้ว ${poCount} PO — flow complete`);
                 return;
             }
+
+            const isLastPO = index === poCount - 1;
             const keyword = getKeyword(index);
             cy.log(`🔑 [Approve ${index + 1}/${poCount}] keyword: "${keyword}"`);
 
@@ -365,6 +447,11 @@ const performApprovalRole = (
                     }
                 );
 
+                if (isLastPO) {
+                    cy.log(`🏁 Last PO (${index + 1}/${poCount}) handled — final action already ran, stopping loop here`);
+                    return;
+                }
+
                 cy.then(() => {
                     waitForTableReady(taskHeader, TIMEOUT.NAV);
                     cy.wait(500);
@@ -373,6 +460,14 @@ const performApprovalRole = (
             });
         };
         approveNextPO(0);
+    };
+
+    const approveAllPOs = (): void => {
+        if (approveFunctionHandlesAllPOs) {
+            approveOnceLettingFunctionHandleAllPOs();
+        } else {
+            approveAllPOsLegacyLoop();
+        }
     };
 
     const assignNextPO = (index: number): void => {
@@ -395,70 +490,118 @@ const performApprovalRole = (
 
 export const performRoleTaskWithAssignment = (
     user: string, pass: string, assignee: string, approveFunction: ApproveFunction,
-    billingSystem: string = '', options?: { searchBy?: 'project' | 'po'; role?: NavRole }
+    billingSystem: string = '', options?: { searchBy?: 'project' | 'po'; role?: NavRole; approveFunctionHandlesAllPOs?: boolean }
 ): void => {
-    performApprovalRole(user, pass, approveFunction, { assignee, billingSystem, searchBy: options?.searchBy, role: options?.role });
+    performApprovalRole(user, pass, approveFunction, {
+        assignee, billingSystem,
+        searchBy: options?.searchBy,
+        role: options?.role,
+        approveFunctionHandlesAllPOs: options?.approveFunctionHandlesAllPOs,
+    });
 };
 
 export const performSimpleApprovalRole = (
-    user: string, pass: string, approveFunction: ApproveFunction, options?: { searchBy?: 'project' | 'po'; role?: NavRole }
+    user: string, pass: string, approveFunction: ApproveFunction, options?: { searchBy?: 'project' | 'po'; role?: NavRole; approveFunctionHandlesAllPOs?: boolean }
 ): void => {
-    performApprovalRole(user, pass, approveFunction, { searchBy: options?.searchBy, role: options?.role });
+    performApprovalRole(user, pass, approveFunction, {
+        searchBy: options?.searchBy,
+        role: options?.role,
+        approveFunctionHandlesAllPOs: options?.approveFunctionHandlesAllPOs,
+    });
 };
 
 export const performSimpleClaimAndApprovalRole = (
-    user: string, pass: string, approveFunction: ApproveFunction, options?: { searchBy?: 'project' | 'po'; role?: NavRole }
+    user: string, pass: string, approveFunction: ApproveFunction,
+    options?: { searchBy?: 'project' | 'po'; role?: NavRole; approveFunctionHandlesAllPOs?: boolean }
 ): void => {
     loginAndWaitReady(user, pass);
     const projectNamePONAME: string = getStandardProjectName();
     const poCount: number = Cypress.env('poCount') ?? 1;
-    
+    const approveFunctionHandlesAllPOs = options?.approveFunctionHandlesAllPOs ?? true;
+
     ClaimProject(projectNamePONAME, { claimBy: 'project' });
 
-    const processedRowTexts = new Set<string>();
     const currentProjectCode = (Cypress.env('currentProjectCode') as string) || '';
-
-    const approveAllPOsSimple = (index: number, effectivePoCount: number): void => {
-        if (index >= effectivePoCount) {
-            cy.log(`✅ Approve เสร็จแล้ว ${effectivePoCount} PO — flow complete`);
-            return;
-        }
+    const approveOnceLettingFunctionHandleAllPOs = (): void => {
         const keyword = currentProjectCode || projectNamePONAME;
-        cy.log(`🔑 [Approve ${index + 1}/${effectivePoCount}] keyword: "${keyword}"`);
+        cy.log(`🔑 [Approve] keyword: "${keyword}" — approveFunction จะจัดการ PO ทั้งหมด (${poCount}) เอง`);
 
         cy.url().then((currentUrl) => {
             if (currentUrl.includes('/login')) loginAndWaitReady(user, pass);
+
             waitForTableReady('To Do List', TIMEOUT.NAV);
-
-            searchInTableWithPagination(
-                'To Do List', keyword,
-                ($row) => {
-                    processedRowTexts.add($row.text().trim());
-                    registerApprovalPageIntercepts();
-                    cy.wrap($row).should('be.visible').click();
-                    approveFunction(projectNamePONAME, { alreadyOnPage: true, role: options?.role } as any);
-                },
-                {
-                    waitAfterNext: 2000,
-                    filterCallback: ($row) => {
-                        const rowText = $row.text().trim();
-                        return rowText.includes(keyword) && !rowText.includes('Fetching data') && !processedRowTexts.has(rowText);
+            resetPaginationToFirst('To Do List').then(() => {
+                searchInTableWithPagination(
+                    'To Do List', keyword,
+                    ($row) => {
+                        registerApprovalPageIntercepts();
+                        cy.wrap($row).should('be.visible').click();
+                        approveFunction(projectNamePONAME, { alreadyOnPage: true, role: options?.role } as any);
                     },
-                }
-            );
+                    {
+                        waitAfterNext: 2000,
+                        filterCallback: ($row) => {
+                            const rowText = $row.text().trim();
+                            return rowText.includes(keyword) && !rowText.includes('Fetching data');
+                        },
+                    }
+                );
 
-            cy.then(() => {
-                waitForTableReady('To Do List', TIMEOUT.NAV);
-                cy.wait(500);
-                approveAllPOsSimple(index + 1, effectivePoCount);
+                cy.log(`🏁 approveFunction จัดการครบ ${poCount} PO และ Logout ให้แล้ว — wrapper หยุด loop ที่นี่`);
             });
         });
     };
 
-    countRowsByProjectCode('To Do List', currentProjectCode).then((actualCount) => {
-        const effectivePoCount = actualCount > 0 ? actualCount : poCount;
-        approveAllPOsSimple(0, effectivePoCount);
-    });
+    const approveAllPOsSimpleLegacyLoop = (index: number): void => {
+        if (index >= poCount) {
+            cy.log(`✅ Approve เสร็จแล้ว ${poCount} PO — flow complete`);
+            return;
+        }
+
+        const isLastPO = index === poCount - 1;
+        const keyword = currentProjectCode || projectNamePONAME;
+        cy.log(`🔑 [Approve ${index + 1}/${poCount}] keyword: "${keyword}"`);
+
+        cy.url().then((currentUrl) => {
+            if (currentUrl.includes('/login')) loginAndWaitReady(user, pass);
+            
+            waitForTableReady('To Do List', TIMEOUT.NAV);
+            resetPaginationToFirst('To Do List').then(() => {
+                searchInTableWithPagination(
+                    'To Do List', keyword,
+                    ($row) => {
+                        registerApprovalPageIntercepts();
+                        cy.wrap($row).should('be.visible').click();
+                        approveFunction(projectNamePONAME, { alreadyOnPage: true, role: options?.role } as any);
+                    },
+                    {
+                        waitAfterNext: 2000,
+                        filterCallback: ($row) => {
+                            const rowText = $row.text().trim();
+                            return rowText.includes(keyword) && !rowText.includes('Fetching data');
+                        },
+                    }
+                );
+
+                if (isLastPO) {
+                    cy.log(`🏁 Last PO (${index + 1}/${poCount}) handled — final action already ran, stopping loop here`);
+                    return;
+                }
+
+                cy.then(() => {
+                    waitForTableReady('To Do List', TIMEOUT.NAV);
+                    cy.wait(500);
+                    approveAllPOsSimpleLegacyLoop(index + 1);
+                });
+            });
+        });
+    };
+
+    if (approveFunctionHandlesAllPOs) {
+        approveOnceLettingFunctionHandleAllPOs();
+    } else {
+        approveAllPOsSimpleLegacyLoop(0);
+    }
 };
 
 // ========================
@@ -592,7 +735,7 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
 
             cy.wrap($row).scrollIntoView().should('be.visible');
             cy.wrap($row).find('select.form-control.input-sm').as('assigneeDropdown').scrollIntoView().trigger('click');
-            
+
             cy.wait('@assigneeLoad', { timeout: TIMEOUT.NAV }).its('response.statusCode').should('be.oneOf', [200, 304]);
             cy.get('@assigneeDropdown').find('option').should('have.length.greaterThan', 1);
             cy.get('@assigneeDropdown').select(assignee, { force: true }).trigger('change').trigger('input');
@@ -636,7 +779,6 @@ export function assignTeamTask(taskIdentifier: string, assignee: string, uniqueK
 // PROJECT CODE ROW COUNTING / VERIFICATION
 // ========================
 
-// ✅ FIX: เพิ่ม Type Assertion เพื่อแก้ปัญหา TypeScript Strict Mode
 const resetPaginationToFirst = (headerText: string): Cypress.Chainable<void> => {
     return getSectionContainer(headerText).find('ul.pagination li').then(($items) => {
         const $firstBtn = $items.filter((_, li) => {
@@ -658,7 +800,7 @@ const resetPaginationToFirst = (headerText: string): Cypress.Chainable<void> => 
 };
 
 // ============================================================
-// GENERIC PAGINATION WALKER (Fully Chainable & Safe)
+// GENERIC PAGINATION WALKER - ✅ IMPROVED WITH BETTER WAITING
 // ============================================================
 const PAGINATION_WALK_MAX_PAGES = 5;
 
@@ -668,6 +810,10 @@ const getPaginationNextLi = (headerText: string): Cypress.Chainable<JQuery<HTMLE
         .filter((_, li) => Cypress.$(li).text().trim() === 'Next');
 };
 
+/**
+ * ✅ FIXED: ปรับปรุงการรอตารางหลังเปลี่ยนหน้า
+ * รอให้ข้อมูลจริง Render ลง DOM ก่อนดำเนินการต่อ
+ */
 const processAllPagesInTable = (
     headerText: string,
     rowAction: ($row: JQuery<HTMLElement>) => void,
@@ -679,14 +825,13 @@ const processAllPagesInTable = (
             return cy.wrap(null) as unknown as Cypress.Chainable<void>;
         }
 
-        return getTableContainer(headerText)
-            .find('tbody tr', { timeout: TIMEOUT.NAV })
-            .should(($rows) => {
-                expect($rows.text()).not.to.contain('Fetching data');
-            })
-            .then(($rows) => {
-                $rows.each((_, row) => {
-                    rowAction(Cypress.$(row));
+        // ✅ ใช้ waitForTableReady แทนการเช็คแค่ "Fetching data"
+        return waitForTableReady(headerText, TIMEOUT.NAV)
+            .then(() => {
+                return getTableContainer(headerText).find('tbody tr').then(($rows) => {
+                    $rows.each((_, row) => {
+                        rowAction(Cypress.$(row));
+                    });
                 });
             })
             .then(() => getPaginationNextLi(headerText))
@@ -705,23 +850,19 @@ const processAllPagesInTable = (
                     .then((firstRowTextBefore) => {
                         cy.wrap($nextLi).find('a').click();
 
-                        return getTableContainer(headerText)
-                            .find('tbody tr', { timeout: TIMEOUT.NAV })
-                            .should(($rows) => {
-                                expect($rows.text()).not.to.contain('Fetching data');
-                            })
-                            .then(() => {
-                                return getTableContainer(headerText)
-                                    .find('tbody tr')
-                                    .first()
-                                    .invoke('text')
-                                    .should((firstRowTextAfter) => {
-                                        expect(firstRowTextAfter, 'Row text should change after pagination').not.to.eq(firstRowTextBefore);
-                                    })
-                                    .then(() => {
-                                        return walk(pageCount + 1) as unknown as Cypress.Chainable<void>;
-                                    });
-                            });
+                        // ✅ รอให้ตารางโหลดเสร็จสมบูรณ์หลังเปลี่ยนหน้า
+                        return waitForTableReady(headerText, TIMEOUT.NAV).then(() => {
+                            return getTableContainer(headerText)
+                                .find('tbody tr')
+                                .first()
+                                .invoke('text')
+                                .should((firstRowTextAfter) => {
+                                    expect(firstRowTextAfter, 'Row text should change after pagination').not.to.eq(firstRowTextBefore);
+                                })
+                                .then(() => {
+                                    return walk(pageCount + 1) as unknown as Cypress.Chainable<void>;
+                                });
+                        });
                     });
             }) as unknown as Cypress.Chainable<void>;
     };
@@ -749,6 +890,7 @@ export const collectAllToDoProjectCodes = (): Cypress.Chainable<string[]> => {
 // ========================
 // PROJECT CODE ROW COUNTING
 // ========================
+
 export const countRowsByProjectCode = (
     headerText: TaskListHeader,
     keyword: string,
@@ -756,34 +898,58 @@ export const countRowsByProjectCode = (
 ): Cypress.Chainable<number> => {
     let count = 0;
 
-    return resetPaginationToFirst(headerText).then(() => {
-        return getTableContainer(headerText)
-            .find('tbody tr')
-            .then(($rows) => {
-                const isEmpty =
-                    $rows.length === 0 ||
-                    ($rows.length === 1 && /no data/i.test($rows.text()));
+    const countOnCurrentPageAndProceed = (currentPage: number): Cypress.Chainable<number> => {
+        if (currentPage > maxPages) {
+            return cy.wrap(count);
+        }
 
-                if (isEmpty) {
-                    cy.log(`📊 [${headerText}] ไม่มีแถวเลย (table ว่าง) — count = 0`);
-                    return cy.wrap(0);
+        return waitForTableReady(headerText, TIMEOUT.NAV).then(() => {
+            return getTableContainer(headerText).find('tbody tr').then(($rows) => {
+                let matchOnThisPage = 0;
+                $rows.each((_, row) => {
+                    if (rowMatchesKeyword(row, keyword)) {
+                        count++;
+                        matchOnThisPage++;
+                    }
+                });
+                cy.log(`📊 [${headerText}] Page ${currentPage}: พบ ${matchOnThisPage} แถว (รวมสะสม: ${count})`);
+
+                if (matchOnThisPage === 0) {
+                    cy.log(`⏹️ หยุดค้นหาหน้าถัดไป (ไม่พบ "${keyword}" ในหน้านี้แล้ว)`);
+                    return cy.wrap(count);
                 }
-
-                return processAllPagesInTable(
-                    headerText,
-                    ($row) => {
-                        if (rowMatchesKeyword($row[0], keyword)) {
-                            count++;
-                        }
-                    },
-                    maxPages
-                ).then(() => {
-                    cy.log(`📊 [${headerText}] Keyword "${keyword}" — พบ ${count} แถว`);
-                    return resetPaginationToFirst(headerText).then(() => {
+                return getPaginationNextLi(headerText).then(($nextLi) => {
+                    const isDisabled = $nextLi.length === 0 || $nextLi.hasClass('disabled');
+                    if (isDisabled) {
                         return cy.wrap(count);
+                    }
+                    return cy.wrap($nextLi).find('a').click().then(() => {
+                        return waitForTableReady(headerText, TIMEOUT.NAV).then(() => {
+                            return countOnCurrentPageAndProceed(currentPage + 1);
+                        });
                     });
                 });
             });
+        });
+    };
+
+    return resetPaginationToFirst(headerText).then(() => {
+        return getTableContainer(headerText).find('tbody tr').then(($rows) => {
+            const isEmpty =
+                $rows.length === 0 ||
+                ($rows.length === 1 && /no data/i.test($rows.text()));
+
+            if (isEmpty) {
+                cy.log(`📊 [${headerText}] ไม่มีแถวเลย (table ว่าง) — count = 0`);
+                return cy.wrap(0);
+            }
+            return countOnCurrentPageAndProceed(1).then((finalCount) => {
+                cy.log(`📊 [${headerText}] Keyword "${keyword}" — พบรวมทั้งสิ้น ${finalCount} แถว`);
+                return resetPaginationToFirst(headerText).then(() => {
+                    return cy.wrap(finalCount);
+                });
+            });
+        });
     }) as unknown as Cypress.Chainable<number>;
 };
 
@@ -799,7 +965,7 @@ export const ClaimProject = (projectName: string, options?: { claimBy?: 'project
     const RELOAD_WAIT_MS = 1000;
     const CLAIM_PAGE1_RELOAD_ATTEMPTS = 3;
 
-    cy.log(`🔁 Total PO to Claim: ${poCount} | 🔑 Claim mode: ${claimBy}`);
+    cy.log(`🔁 Total PO to Claim: ${poCount} | 🔑 Claim mode: ${claimBy}${options?.specificPoName ? ` | 🎯 Specific PO: ${options.specificPoName}` : ''}`);
 
     const searchAndClaimWithKeyword = (keyword: string, currentPage: number = 1, page1ReloadAttempt: number = 0): Cypress.Chainable<boolean> => {
         if (currentPage > MAX_PAGES) {
@@ -876,6 +1042,12 @@ export const ClaimProject = (projectName: string, options?: { claimBy?: 'project
         });
     };
 
+    const claimSpecificPO = (poName: string): void => {
+        claimWithFallback(buildSearchKeywords(projectName, poName)).then(() => {
+            cy.log(`✅ Claimed specific PO: ${poName}`);
+        });
+    };
+
     const claimAllByProjectCode = (keywords: string[]): void => {
         const keyword = keywords[0];
         getTableContainer('Unassigned Task').within(() => {
@@ -925,6 +1097,8 @@ export const ClaimProject = (projectName: string, options?: { claimBy?: 'project
 
     if (claimBy === 'project') {
         claimAllByProjectCode(buildSearchKeywords(projectName));
+    } else if (options?.specificPoName) {
+        claimSpecificPO(options.specificPoName);
     } else {
         claimByPO(poCount);
     }

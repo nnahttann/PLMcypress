@@ -179,9 +179,24 @@ const createProjectBase = (
 
     cy.get('.col-md-10 > .btn').should('be.visible').click();
 
+    // ✅ FIX: ดักจับกรณีคลิกแล้ว Session หลุด เด้งไปหน้า SSO Login (test-ids.ais.co.th)
+    cy.wait(2000);
+    cy.url().then((url) => {
+        if (url.includes('authenticationendpoint') || url.includes('login.do') || url.includes('/login')) {
+            cy.log('⚠️ Session หลุด! เด้งไปหน้า SSO Login — กำลัง Login ใหม่และกดปุ่มสร้างโปรเจคอีกครั้ง');
+            
+            // เรียก login อีกครั้ง
+            login(credentials.user, credentials.pass);
+            
+            // รอให้กลับหน้า Home แล้วกดปุ่มสร้างโปรเจคอีกครั้ง
+            cy.get('.col-md-10 > .btn', { timeout: 30000 }).should('be.visible').click();
+        }
+    });
+
     const finalProjectName = projectObject !== 'Create' ? `MOD ${projectName}` : projectName;
 
-    cy.get('input[formcontrolname="projectName"]', { timeout: 10000 })
+    // ✅ เพิ่ม timeout เป็น 30000 เพราะหน้าอาจโหลดช้าหลัง SAML redirect
+    cy.get('input[formcontrolname="projectName"]', { timeout: 30000 })
         .should('be.visible')
         .should('not.be.disabled')
         .click()
@@ -193,7 +208,6 @@ const createProjectBase = (
 
     cy.get('input[formcontrolname="projectName"]').blur();
 
-    // ✅ FIX: ใช้ {selectall}{backspace} เพื่อความเสถียรของ Angular Date Picker
     cy.get('input[aria-label="Date input field"]')
         .click()
         .type('{selectall}{backspace}')

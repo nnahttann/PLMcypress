@@ -2071,6 +2071,16 @@ const handleUnlimitedFixedSpeed = (productClass: string, subModule?: string) => 
 };
 
 const handleUnlimitedThrottling = (productClass: string, subModule?: string) => {
+    // ✅ FIX 1: เพิ่มการเช็คและติ๊ก Network Coverage Checkbox (ถ้ามี) เหมือนกับ Fixed Speed
+    cy.get('body').then($body => {
+        const $checkboxes = $body.find('[formarrayname="internetQuotaNetworkCoverageCheckBox"]').filter(':visible');
+        if ($checkboxes.length > 0) {
+            cy.wrap($checkboxes.first()).click({ force: true });
+            cy.wait(300);
+            cy.log('📌 Selected Network Coverage Checkbox');
+        }
+    });
+
     selectMatOption('*Internet Quota :', text => text.startsWith('5G'));
 
     const speedsForThrottling = INTERNET_SPEEDS.filter(s => s !== '0 Kbps');
@@ -2141,46 +2151,33 @@ const clickAddUntilDataAppears = (
     expectedRowText?: string
 ): void => {
     const checkTargetRowExists = (): Cypress.Chainable<boolean> =>
-        cy.get(tableSelector).then($tbodies => {
-            // ✅ DEBUG ขั้นสุด: ดึงข้อความของแต่ละแถว (tr) ออกมาแยกกันให้อ่านง่าย
+        cy.get(tableSelector, { log: false }).then($tbodies => {
             const allRowsText: string[] = [];
             $tbodies.each((_, tb) => {
                 Cypress.$(tb).find('tr').each((_, tr) => {
                     const cleanText = Cypress.$(tr).text().replace(/\s+/g, ' ').trim();
-                    if (cleanText.length > 5) { // กรองแถวว่างๆ ออก
+                    // ✅ FIX 2: กรอง "No data to display" ออก ไม่ต้องนับเป็นแถวข้อมูล
+                    if (cleanText.length > 5 && !cleanText.includes('No data to display.')) {
                         allRowsText.push(cleanText);
                     }
                 });
             });
 
-            cy.log(`🔍 [DEBUG] พบทั้งหมด ${allRowsText.length} แถวในตาราง:`);
+            cy.log(`🔍 [DEBUG] พบ ${allRowsText.length} แถวที่มีข้อมูลจริง (ข้าม No data)`);
             allRowsText.forEach((text, idx) => {
                 cy.log(`   [Row ${idx + 1}]: "${text.substring(0, 100)}${text.length > 100 ? '...' : ''}"`);
             });
 
             if (!expectedRowText) {
-                const hasData = allRowsText.some(text => !text.includes('No data to display.'));
-                return cy.wrap(hasData, { log: false });
+                return cy.wrap(allRowsText.length > 0, { log: false });
             }
 
-            // 1. ลองหาแบบ Exact Match ก่อน
             let found = allRowsText.some(text => text.includes(expectedRowText));
-
-            // 2. ✅ SMART FALLBACK: ถ้าหาเป๊ะๆ ไม่เจอ ให้ลองหาแบบยืดหยุ่น
-            // กรณี "Unlimited Data (Throttling Speed)" อาจจะแสดงในตารางเป็น "Unlimited (Throttling)" หรือคล้ายกัน
             if (!found && expectedRowText.includes('Unlimited') && expectedRowText.includes('Throttling')) {
                 found = allRowsText.some(text => text.includes('Unlimited') && text.includes('Throttling'));
-                if (found) {
-                    cy.log(`⚠️ [DEBUG] เจอข้อมูลแบบ Fallback! (มีคำว่า Unlimited และ Throttling ในแถวเดียวกัน)`);
-                }
             }
-
-            // 3. FALLBACK 2: ถ้ายังหาไม่เจอ ลองหาแค่คำว่า "Throttling" อย่างเดียว
             if (!found && expectedRowText.includes('Throttling')) {
                 found = allRowsText.some(text => text.includes('Throttling'));
-                if (found) {
-                    cy.log(`⚠️ [DEBUG] เจอข้อมูลแบบ Fallback 2! (มีคำว่า Throttling)`);
-                }
             }
 
             return cy.wrap(found, { log: false });
@@ -2189,48 +2186,29 @@ const clickAddUntilDataAppears = (
     const attempt = (attemptsLeft: number): void => {
         checkTargetRowExists().then(found => {
             if (found) {
-                cy.log(`✅ พบข้อมูลที่ตรงกับเงื่อนไขในตารางแล้ว (หลังจากลอง ${5 - attemptsLeft} ครั้ง)`);
+                cy.log(`✅ พบข้อมูลที่ตรงกับเงื่อนไขในตารางแล้ว`);
                 return;
             }
 
             if (attemptsLeft <= 0) {
-                // ✅ ตรวจสอบว่ามี Error Message โผล่ขึ้นมาบนหน้าจอหรือไม่
-                cy.get('body').then($body => {
-                    const hasError = $body.text().includes('Required') ||
-                        $body.text().includes('Invalid') ||
-                        $body.find('.text-danger, .mat-error, .alert-danger').length > 0;
-
-                    if (hasError) {
-                        cy.log('❌ [DEBUG] พบข้อความ Error หรือ Required บนหน้าจอ! Form อาจจะไม่ Valid จริงๆ แม้จะผ่านเช็ค ng-valid มาแล้ว');
-                    } else {
-                        cy.log('❌ [DEBUG] ไม่พบ Error บนหน้าจอ แต่ข้อมูลก็ไม่โผล่ในตาราง (อาจเป็นเพราะ API Save ล้มเหลว หรือ Form ไม่ Reset)');
-                    }
-                });
-
-                throw new Error(`❌ ไม่พบแถวที่ตรงกับ "${expectedRowText}" (หรือ Fallback) ในตาราง หลังกด Add ซ้ำครบ ${maxAttempts} ครั้ง`);
+                throw new Error(`❌ ไม่พบแถวที่ตรงกับ "${expectedRowText}" ในตาราง หลังกด Add ซ้ำครบ ${maxAttempts} ครั้ง`);
             }
 
             cy.log(`⚠️ ยังไม่พบแถวที่ต้องการ → กำลังกด Add ซ้ำ (เหลือ ${attemptsLeft} ครั้ง)`);
 
-            cy.get('body').then($body => {
-                const $addBtn = $body
-                    .find(addButtonSelector)
-                    .filter(':visible')
-                    .filter((_, el) => !Cypress.$(el).prop('disabled'))
-                    .filter((_, el) => /Add/i.test(Cypress.$(el).text().trim()));
+            // ✅ FIX 3: หาปุ่ม Add จาก Form ที่ Visible โดยไม่ใช้ force: true
+            cy.get(`${formSelector} form:visible, ${formSelector} [formgroup]:visible`)
+                .last()
+                .find(addButtonSelector)
+                .filter(':visible')
+                .filter((_, el) => !Cypress.$(el).prop('disabled'))
+                .contains(/^Add$/i)
+                .first()
+                .scrollIntoView()
+                .should('be.visible')
+                .click(); // ❌ เอา { force: true } ออก เพื่อให้ Angular รับ Event ได้ถูกต้อง
 
-                if ($addBtn.length > 0) {
-                    cy.wrap($addBtn.first())
-                        .scrollIntoView()
-                        .focus()
-                        .click({ force: true });
-                } else {
-                    cy.log('ℹ️ ไม่พบปุ่ม Add ที่กดได้');
-                }
-            });
-
-            // ✅ รอให้นานขึ้นเล็กน้อย เพื่อให้ Angular FormArray และ API ทำงานเสร็จ
-            cy.wait(1500);
+            cy.wait(2000); // ✅ รอนานขึ้นเป็น 2 วินาที
             attempt(attemptsLeft - 1);
         });
     };
@@ -2317,9 +2295,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
                 };
 
                 handlers[selectedType]?.();
-                cy.wait(500);
-
-                // ✅ FIX 5: เช็ค Form Validation ให้แม่นยำขึ้น (เช็คเฉพาะ Form ที่ Active และ Visible)
+                cy.wait(5000);
                 cy.get('app-mass-mkt-internet')
                     .find('form, [formgroup]')
                     .filter(':visible')
@@ -2340,7 +2316,7 @@ export const InternetRandom = (ProductClass: string, subModule?: string, Module?
                     'app-mass-mkt-internet table tbody',
                     'app-mass-mkt-internet button.btn-primary',
                     'app-mass-mkt-internet',
-                    5,
+                    2,
                     selectedType
                 );
 
