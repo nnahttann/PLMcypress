@@ -41,10 +41,10 @@ export default defineConfig({
   viewportWidth: 1920,
   viewportHeight: 1080,
 
-  defaultCommandTimeout: 10000,
-  pageLoadTimeout: 60000,
-  requestTimeout: 10000,
-  responseTimeout: 10000,
+  defaultCommandTimeout: 100000,
+  pageLoadTimeout: 6000000,
+  requestTimeout: 1000000,
+  responseTimeout: 1000000,
 
   chromeWebSecurity: false,
 

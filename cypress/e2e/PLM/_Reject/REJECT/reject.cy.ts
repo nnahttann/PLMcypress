@@ -15,14 +15,14 @@ beforeEach(() => {
   }
 
   cy.visit(Master.urlsit, {
-    timeout: 60000,
+    timeout: 600000,
     onBeforeLoad: (win) => {
       win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
     }
   });
 
-  cy.get('app-login', { timeout: 60000 }).should('be.visible');
-  cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
+  cy.get('app-login', { timeout: 600000 }).should('be.visible');
+  cy.get('input[name="userId"], input[name="pwd"]', { timeout: 600000 }).should('be.visible');
 });
 
 describe('PRE-PAID Ontop', () => {

@@ -1066,6 +1066,8 @@ export const VerticalApp = (): void => {
         .find('.mat-select-value')
         .should('not.contain.text', 'Please Select');
 
+    // ⏳ ให้เวลาระบบ auto-fill ค่า Commu Speed / Commu Throttling Speed
+    // ตาม Vertical App ที่เพิ่งเลือกไป ก่อนที่จะไปแตะ field พวกนี้ต่อ
     cy.wait(1500);
 
     cy.get('@vaRoot').within(() => {
@@ -1090,33 +1092,68 @@ export const VerticalApp = (): void => {
 
         cy.wait(1500);
 
-        cy.get('select[formcontrolname="commuSpeed"]', { timeout: 10000 })
-            .find('option:not([disabled])')
-            .should('have.length.greaterThan', 0)
-            .then(($options) => {
-                const randomIndex = Cypress._.random(0, $options.length - 1);
-                const val = $options.eq(randomIndex).val() as string;
-                cy.log(`⚡ Commu Speed: ${val}`);
-                cy.get('select[formcontrolname="commuSpeed"]').select(val, { force: true });
+        // ⏳ Helper: รอให้ระบบ auto-fill ค่า select ก่อน (เช็คซ้ำเป็นรอบ ๆ)
+        // ถ้าเช็คครบจำนวนรอบแล้วยังว่างจริง ๆ ค่อย fallback สุ่มเลือกเอง
+        const waitForAutoFilledSelect = (
+            selector: string,
+            label: string,
+            attempt = 1,
+            maxAttempts = 6
+        ): void => {
+            cy.get(selector, { timeout: 10000 }).should('exist');
+
+            cy.get(selector).then(($select) => {
+                const val = $select.val();
+                const isEmpty =
+                    val === '' ||
+                    val === null ||
+                    val === undefined ||
+                    String(val).includes('null');
+
+                if (!isEmpty) {
+                    cy.log(`✅ ${label} auto-filled by system: "${val}" (attempt ${attempt})`);
+                    return;
+                }
+
+                if (attempt >= maxAttempts) {
+                    cy.log(`⚠️ ${label} still empty after ${maxAttempts} attempts → fallback to manual select`);
+                    cy.wrap($select)
+                        .find('option:not([disabled])')
+                        .then(($options) => {
+                            if ($options.length > 0) {
+                                const randomIndex = Cypress._.random(0, $options.length - 1);
+                                const fillVal = $options.eq(randomIndex).val() as string;
+                                cy.log(`🎲 ${label} manual fallback value: ${fillVal}`);
+                                cy.wrap($select).select(fillVal, { force: true });
+                            } else {
+                                cy.log(`⚠️ ${label} empty but has no valid options`);
+                            }
+                        });
+                    return;
+                }
+
+                cy.log(`⏳ ${label} not loaded yet (attempt ${attempt}/${maxAttempts}), waiting...`);
+                cy.wait(500);
+                waitForAutoFilledSelect(selector, label, attempt + 1, maxAttempts);
             });
+        };
+
+        // ✅ Commu Speed: ระบบ default ค่ามาให้ตาม Vertical App ที่เลือก
+        // เช็คก่อนว่ามีค่าหรือยัง ไม่รีบสุ่มทับจนระบบ auto-fill ไม่ทัน
+        waitForAutoFilledSelect('select[formcontrolname="commuSpeed"]', 'Commu Speed');
 
         cy.get('@selectedQuotaValue').then((quotaValue) => {
             if (String(quotaValue).includes('Throttling')) {
-                cy.log(`🐢 Quota includes Throttling → selecting Throttling Speed`);
-                cy.get('select[formcontrolname="commuThrottlingSpeed"]')
-                    .should('exist')
-                    .find('option:not([disabled])', { timeout: 10000 })
-                    .should('have.length.greaterThan', 0)
-                    .then(($options) => {
-                        const randomIndex = Cypress._.random(0, $options.length - 1);
-                        const val = $options.eq(randomIndex).val() as string;
-                        cy.log(`🐢 Commu Throttling Speed: ${val}`);
-                        cy.get('select[formcontrolname="commuThrottlingSpeed"]').select(val, { force: true });
-                    });
+                cy.log(`🐢 Quota includes Throttling → checking Commu Throttling Speed`);
+                // ✅ Commu Throttling Speed: เช็คก่อนเช่นกันว่าระบบ auto-fill มาให้แล้วหรือยัง
+                waitForAutoFilledSelect(
+                    'select[formcontrolname="commuThrottlingSpeed"]',
+                    'Commu Throttling Speed'
+                );
             }
         });
 
-        cy.wait(1500);
+        cy.wait(1000);
 
         // 🔍 Guard: check every select / mat-select in scope for empty/placeholder
         // values and auto-fill them before attempting Add.

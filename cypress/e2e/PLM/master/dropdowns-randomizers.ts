@@ -703,8 +703,6 @@ export const PriceExcluding = (): void => {
 export const RandomMultiDuration = (): void => {
     function getRandomRealisticCharge(min = 100, max = 2000): string {
         const realisticPrices = [
-            10, 12, 15, 19, 20, 25, 29, 30, 35, 39, 40, 45, 49, 50,
-            55, 59, 60, 65, 69, 70, 75, 79, 80, 85, 89, 90, 95, 99,
             109, 119, 129, 139, 149, 159, 169, 179, 189, 199,
             219, 229, 239, 249, 259, 269, 279, 289, 299,
             319, 329, 339, 349, 359, 369, 379, 389, 399,
@@ -716,14 +714,41 @@ export const RandomMultiDuration = (): void => {
             919, 929, 939, 949, 959, 969, 979, 989, 999,
             1049, 1099, 1149, 1199, 1249, 1299, 1349, 1399,
             1449, 1499, 1549, 1599, 1649, 1699, 1749, 1799,
-            1849, 1899, 1949, 1999
+            1849, 1899, 1949, 1999,
         ];
-        const validPrices = realisticPrices.filter(p => p >= min && p <= max);
-        const price = validPrices.length > 0
-            ? validPrices[Math.floor(Math.random() * validPrices.length)]
+        const valid = realisticPrices.filter(p => p >= min && p <= max);
+        const price = valid.length > 0
+            ? valid[Math.floor(Math.random() * valid.length)]
             : Math.floor(Math.random() * (max - min) + min);
         return price.toFixed(2);
     }
+
+    /** นับแถวจริงในตาราง Multi Duration (ไม่นับ "No data to display.") */
+    const countTableRows = (): Cypress.Chainable<number> =>
+        cy.get('body').then($body => {
+            const $rows = $body
+                .find('.col-md-8.col-md-offset-2 table.table-hover tbody tr')
+                .filter((_, el) => !/No data to display/i.test(el.textContent || ''));
+            return $rows.length;
+        });
+
+    /** ฟอร์มกรอกเปิดอยู่ไหม (มี durationFrom ที่ visible) */
+    const isFormOpen = (): Cypress.Chainable<boolean> =>
+        cy.get('body').then($body =>
+            $body.find('input[formcontrolname="durationFrom"]:visible').length > 0
+        );
+
+    const typeInto = (selector: string, value: string): void => {
+        cy.get(`${selector}:visible`)
+            .first()
+            .should('be.visible')
+            .and('not.be.disabled')
+            .type('{selectall}{backspace}')
+            .type(value)
+            .trigger('input')
+            .trigger('change')
+            .should('have.value', value);
+    };
 
     cy.contains('label.text-danger.pull-right', 'Multi Duration')
         .closest('.form-group')
@@ -749,82 +774,113 @@ export const RandomMultiDuration = (): void => {
             cy.log(`🎲 Multi Duration: randomly creating ${rowCount} row(s)`);
 
             const step = Math.max(1, Math.floor(packageDuration / rowCount));
-            let currentFrom = 1;
 
-            for (let row = 0; row < rowCount; row++) {
+            /** เพิ่ม 1 แถว แล้วรอให้ตารางเพิ่มจริงก่อนไปต่อ */
+            const addRow = (row: number, currentFrom: number): void => {
+                if (row >= rowCount) {
+                    cy.log('✅ Multi Duration: เพิ่มครบทุกแถวแล้ว');
+                    return;
+                }
+
                 cy.log(`📦 Multi Duration row ${row + 1}/${rowCount}`);
 
-                cy.get('.col-md-8.col-md-offset-2 > .btn-primary').click();
+                countTableRows().then((before) => {
+                    // 1) เปิดฟอร์ม (ถ้ายังไม่เปิด)
+                    isFormOpen().then((open) => {
+                        if (!open) {
+                            cy.get('.col-md-8.col-md-offset-2 > .btn-primary')
+                                .filter(':visible')
+                                .first()
+                                .click();
+                        } else {
+                            cy.log('ℹ️ ฟอร์มเปิดอยู่แล้ว — ไม่กดปุ่ม +');
+                        }
+                    });
 
-                const fromValue = Math.min(currentFrom, packageDuration);
-                cy.log(`   durationFrom: ${fromValue}`);
+                    cy.get('input[formcontrolname="durationFrom"]:visible', { timeout: 15000 })
+                        .should('have.length.at.least', 1);
 
-                // ✅ FIX: เพิ่ม .eq(row) เพื่อเจาะจง input ของ row ปัจจุบัน ป้องกันการ Fail จาก Multiple Elements
-                cy.get('input[formcontrolname="durationFrom"]')
-                    .eq(row)
-                    .should('be.visible')
-                    .type('{selectall}{backspace}')
-                    .type(fromValue.toString())
-                    .trigger('input')
-                    .trigger('change')
-                    .should('have.value', fromValue.toString());
+                    // 2) durationFrom
+                    const fromValue = Math.min(currentFrom, packageDuration);
+                    cy.log(`   durationFrom: ${fromValue}`);
+                    typeInto('input[formcontrolname="durationFrom"]', fromValue.toString());
 
-                cy.get('input[formcontrolname="durationTo"]').eq(row).then($el => {
-                    if ($el.prop('disabled')) {
-                        cy.log('🔒 POST path — durationTo disabled (auto-calculated)');
-                    } else {
-                        cy.log('ℹ️ PRE path — durationTo enabled, skipping input');
-                    }
+                    // 3) durationTo — กรอกเฉพาะตอน enabled
+                    const toValue = Math.min(fromValue + step - 1, packageDuration);
+                    cy.get('input[formcontrolname="durationTo"]:visible').first().then(($to) => {
+                        if ($to.prop('disabled')) {
+                            cy.log('🔒 durationTo disabled (auto-calculated) — skip');
+                        } else {
+                            cy.log(`   durationTo: ${toValue}`);
+                            typeInto('input[formcontrolname="durationTo"]', toValue.toString());
+                        }
+                    });
+
+                    // 4) ✅ FIX: durationUnit ต้องเลือก ไม่งั้นค้างที่ "Please Select"
+                    cy.get('select[formcontrolname="durationUnit"]:visible')
+                        .first()
+                        .then(($sel) => {
+                            const current = String($sel.val() ?? '').trim();
+                            if (current && !/please select/i.test(current)) {
+                                cy.log(`✅ durationUnit มีค่าแล้ว: ${current} — ไม่ทับ`);
+                                return;
+                            }
+                            const opts = $sel
+                                .find('option:not([disabled])')
+                                .toArray()
+                                .map(o => (o as HTMLOptionElement).value)
+                                .filter(Boolean);
+
+                            if (opts.length === 0) {
+                                cy.log('⚠️ durationUnit ไม่มี option ให้เลือก');
+                                return;
+                            }
+                            const pick = opts[Math.floor(Math.random() * opts.length)];
+                            cy.wrap($sel).select(pick, { force: true });
+                            cy.log(`🗓️ durationUnit = ${pick}`);
+                        });
+
+                    // 5) ราคา
+                    const exc = getRandomRealisticCharge();
+                    const inc = (parseFloat(exc) * 1.07).toFixed(2);
+                    cy.log(`   chargeExcVat: ${exc}, chargeIncVat: ${inc}`);
+                    typeInto('input[formcontrolname="chargeExcVat"]', exc);
+                    typeInto('input[formcontrolname="chargeIncVat"]', inc);
+
+                    // 6) กด Add แล้ว "รอแถวเพิ่มจริง"
+                    cy.contains('button', 'Add')
+                        .filter(':visible')
+                        .first()
+                        .should('not.be.disabled')
+                        .click();
+
+                    cy.get('.col-md-8.col-md-offset-2 table.table-hover tbody tr', { timeout: 15000 })
+                        .should(($rows) => {
+                            const real = $rows.toArray()
+                                .filter(el => !/No data to display/i.test(el.textContent || ''));
+                            expect(real.length, `แถวควรเพิ่มจาก ${before}`).to.be.greaterThan(before);
+                        })
+                        .then(() => {
+                            const nextFrom = Math.min(currentFrom + step, packageDuration);
+                            addRow(row + 1, nextFrom);
+                        });
                 });
+            };
 
-                const randomChargeExc = getRandomRealisticCharge();
-                const randomChargeInc = (parseFloat(randomChargeExc) * 1.07).toFixed(2);
-                cy.log(`   chargeExcVat: ${randomChargeExc}, chargeIncVat: ${randomChargeInc}`);
-
-                cy.get('input[formcontrolname="chargeExcVat"]')
-                    .eq(row)
-                    .should('be.visible')
-                    .type('{selectall}{backspace}')
-                    .type(randomChargeExc)
-                    .trigger('input')
-                    .trigger('change')
-                    .should('have.value', randomChargeExc);
-
-                cy.get('input[formcontrolname="chargeIncVat"]')
-                    .eq(row)
-                    .should('be.visible')
-                    .type('{selectall}{backspace}')
-                    .type(randomChargeInc)
-                    .trigger('input')
-                    .trigger('change')
-                    .should('have.value', randomChargeInc);
-
-                // ✅ FIX: Scope การกดปุ่ม Add ให้อยู่ใน row ปัจจุบัน ป้องกันการกดผิดปุ่ม
-                cy.get('input[formcontrolname="chargeIncVat"]')
-                    .eq(row)
-                    .closest('.row, .form-group, .panel-body') 
-                    .find('button')
-                    .contains('Add')
-                    .click();
-
-                currentFrom = Math.min(currentFrom + step, packageDuration);
-            }
-
+            addRow(0, 1);
+        })
+        .then(() => {
             cy.get('body').then($body => {
-                const hasRowCountAlert = $body
+                const hasAlert = $body
                     .find('.alert-danger label')
                     .toArray()
                     .some(el => el.textContent?.includes('must have more than one row'));
-
-                if (hasRowCountAlert) {
-                    cy.log('⚠️ Row count validation message still present after adding rows');
-                } else {
-                    cy.log('✅ Multi Duration row count requirement satisfied');
-                }
+                cy.log(hasAlert
+                    ? '⚠️ ยังมี validation "must have more than one row"'
+                    : '✅ Multi Duration row count requirement satisfied');
             });
         });
 };
-
 // ========================
 // SELECT TARGET GROUP
 // ========================

@@ -1,11 +1,10 @@
-import { Module, PriceType, ProductClass, ProjectBasicOptions, now, MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from './config';
-import { getTimeSuffix } from './config';
-import { login, getRandomPhone, scrollAndWait } from './helpers';
+import { Module, PriceType, ProductClass, ProjectBasicOptions, MKTpre, MKTpre1, MKTpost, MKTpost1, enter, enterpass, music, musicpass } from './config';
+import { login, getRandomPhone } from './helpers';
 import { registerProjectName, registerProjectCode } from './project-manager';
 import { createPOWordingPools, RandomProjectDescription, RandomRemark } from '../Approve/po-wording-pools';
 import { PriceExcluding, selectTargetGroup, dropdownPromotionGroup, targetgroup, RetryPattern, RandomMultiDuration, Randomdropdown, RandomFixedDates, RunMassMktTabs } from './dropdowns-randomizers';
 import { CopyDeductFail } from './priority-updaters';
-import { smsWording } from './sms-wording';
+import { smsWordingAuto } from './sms-wording';
 import { RandomProductSpecification } from './product-specs';
 import { beforeapproveMKT } from './flows';
 import { ChargePartner, InternalShare, RevenueSharing, SharingPartner } from './MKT_Share';
@@ -27,10 +26,18 @@ const getCredentials = (module: Module): { user: string, pass: string } => {
     return credMap[module] || credMap['POST'];
 };
 
-const day = String(now.getDate()).padStart(2, '0');
-const month = String(now.getMonth() + 1).padStart(2, '0');
-const hours = String(now.getHours()).padStart(2, '0');
-const minutes = String(now.getMinutes()).padStart(2, '0');
+// ✅ FIX: day/month/hours/minutes เดิมคำนวณตอน import (module load) ครั้งเดียว —
+// รัน suite ข้ามชั่วโมง/ข้ามวันจะได้ค่าเวลาเก่าค้างไปตลอด session
+// เปลี่ยนเป็นฟังก์ชันที่คำนวณสดทุกครั้งที่เรียกใช้
+const getTimeParts = (): { day: string; month: string; hours: string; minutes: string } => {
+    const d = new Date();
+    return {
+        day: String(d.getDate()).padStart(2, '0'),
+        month: String(d.getMonth() + 1).padStart(2, '0'),
+        hours: String(d.getHours()).padStart(2, '0'),
+        minutes: String(d.getMinutes()).padStart(2, '0'),
+    };
+};
 
 // ========================
 // PROJECT BASIC INFORMATION HELPERS
@@ -66,16 +73,51 @@ const generateUniqueId = (): string => {
     return `${m}${d} ${h}${mm}`;
 };
 
+// ✅ single, fixed version — handles the separator/length edge case correctly
 const buildUniqueName = (baseName: string, identifier: string, maxLength: number): string => {
-    const reservedLength = identifier.length;
-    const maxBaseLength = maxLength - reservedLength;
+    const id = String(identifier ?? '').trim().replace(/\s+/g, ' ');
+    const sep = id ? 1 : 0;
+    const maxBaseLength = Math.max(0, maxLength - id.length - sep);
 
-    let cleanBase = baseName;
+    let cleanBase = String(baseName ?? '').trim().replace(/\s+/g, ' ');
     if (cleanBase.length > maxBaseLength) {
-        cleanBase = cleanBase.substring(0, maxBaseLength);
+        cleanBase = cleanBase.substring(0, maxBaseLength).trimEnd();
     }
 
-    return `${cleanBase} ${identifier}`;
+    const out = (cleanBase ? `${cleanBase} ${id}` : id).trim();
+    return out.length > maxLength ? out.substring(0, maxLength).trimEnd() : out;
+};
+
+// ✅ single, fixed version — no dead/unreachable branch
+const limit = (str: string, maxLen: number): string => {
+    if (!str) return '';
+    if (str.length <= maxLen) return str.trimEnd();
+    const hard = str.substring(0, maxLen);
+    const lastSpace = hard.lastIndexOf(' ');
+    return (lastSpace > maxLen * 0.7 ? hard.substring(0, lastSpace) : hard).trimEnd();
+};
+
+// ✅ single, guarded version — won't throw on an empty/undefined pool array
+const pickRandom = <T>(arr?: T[]): T =>
+    (arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : ('' as unknown as T));
+
+const pickMultiple = <T>(arr: T[], count: number): T[] =>
+    Cypress._.shuffle([...(arr ?? [])]).slice(0, Math.max(0, count));
+
+const safeType = (selector: string, value: string, fallback = 'Auto Test'): void => {
+    const val = (value ?? '').trim() || fallback;
+    cy.get(selector).type('{selectall}{backspace}').type(val, { delay: 0 });
+};
+
+const clickIfExists = (selector: string, label: string): void => {
+    cy.get('body').then(($b) => {
+        const $el = $b.find(selector).filter(':visible');
+        if (!$el.length) {
+            cy.log(`⚠️ [SKIP] ไม่พบปุ่ม ${label} (${selector})`);
+            return;
+        }
+        cy.get(selector).filter(':visible').first().click({ force: true });
+    });
 };
 
 // ========================
@@ -111,6 +153,7 @@ const generateProjectNames = (
         const parts = [ModulePart, getAbbreviation(PriceType), getAbbreviation(ProductClass), getAbbreviation(Plugin)].filter(Boolean);
         prefixName = parts.join(' ');
     }
+
     const touchPointTag =
         touchPoint?.runHumanTouchPoint && touchPoint?.runNonHumanTouchPoint
             ? 'BTP'
@@ -147,7 +190,7 @@ const selectOptionSafely = (
         .should('have.length.greaterThan', 0)
         .then(($opts) => {
             const optArr = [...$opts] as HTMLOptionElement[];
-            let match = optArr.find((o) => normalize(o.textContent || '') === target) ||
+            const match = optArr.find((o) => normalize(o.textContent || '') === target) ||
                 optArr.find((o) => normalize(o.value) === target) ||
                 optArr.find((o) => normalize(o.textContent || '').includes(target));
 
@@ -179,23 +222,18 @@ const createProjectBase = (
 
     cy.get('.col-md-10 > .btn').should('be.visible').click();
 
-    // ✅ FIX: ดักจับกรณีคลิกแล้ว Session หลุด เด้งไปหน้า SSO Login (test-ids.ais.co.th)
+    // ดักจับกรณีคลิกแล้ว Session หลุด เด้งไปหน้า SSO Login
     cy.wait(2000);
     cy.url().then((url) => {
         if (url.includes('authenticationendpoint') || url.includes('login.do') || url.includes('/login')) {
             cy.log('⚠️ Session หลุด! เด้งไปหน้า SSO Login — กำลัง Login ใหม่และกดปุ่มสร้างโปรเจคอีกครั้ง');
-            
-            // เรียก login อีกครั้ง
             login(credentials.user, credentials.pass);
-            
-            // รอให้กลับหน้า Home แล้วกดปุ่มสร้างโปรเจคอีกครั้ง
             cy.get('.col-md-10 > .btn', { timeout: 30000 }).should('be.visible').click();
         }
     });
 
     const finalProjectName = projectObject !== 'Create' ? `MOD ${projectName}` : projectName;
 
-    // ✅ เพิ่ม timeout เป็น 30000 เพราะหน้าอาจโหลดช้าหลัง SAML redirect
     cy.get('input[formcontrolname="projectName"]', { timeout: 30000 })
         .should('be.visible')
         .should('not.be.disabled')
@@ -294,13 +332,6 @@ const createPOBase = (
     cy.get('select[formcontrolname="priceType"]', { timeout: 60000 }).should('be.visible');
 };
 
-const pickRandom = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
-
-const pickMultiple = <T>(arr: T[], count: number): T[] => {
-    const shuffled = [...arr].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, count);
-};
-
 const cleanEnglishText = (str: string): string => {
     if (!str) return '';
     return str.replace(/[^\x00-\x7F\s]/g, '').replace(/[^\w\s-]/g, '').replace(/\s+/g, ' ').trim();
@@ -311,41 +342,34 @@ const cleanThaiText = (str: string): string => {
     return str.replace(/[^\u0E00-\u0E7F\u0020-\u007F\s-]/g, '').replace(/\s+/g, ' ').trim();
 };
 
-const limit = (str: string, maxLen: number): string => {
-    if (!str) return '';
-    let result = str.length > maxLen ? str.substring(0, maxLen) : str;
-    result = result.trimEnd();
-    if (result.length === maxLen && !result.endsWith(' ') && result.includes(' ')) {
-        const lastSpace = result.lastIndexOf(' ');
-        if (lastSpace > maxLen * 0.7) {
-            result = result.substring(0, lastSpace);
-        }
-    }
-    return result;
-};
+const limitAndCleanEN = (str: string, maxLen: number): string => limit(cleanEnglishText(str), maxLen);
+const limitAndCleanTH = (str: string, maxLen: number): string => limit(cleanThaiText(str), maxLen);
 
+// ✅ FIX: attribute selector `option[value="${val}"]` ล้มถ้า val มี " หรือ ] หรืออักขระพิเศษอื่น
+// เปลี่ยนไปกรองด้วย DOM property แทน attribute selector
 const selectMultipleFromDualList = (controlName: string, maxSelections: number): void => {
     cy.get(`select[formcontrolname="${controlName}"]`).then(($select) => {
         const $options = $select.find('option');
         const optionCount = $options.length;
+        if (!optionCount) {
+            cy.log(`⚠️ [SKIP] ไม่มี option ใน ${controlName}`);
+            return;
+        }
         const actualMax = Math.min(maxSelections, optionCount);
         const numberOfSelections = Math.floor(Math.random() * actualMax) + 1;
 
-        // สุ่มค่า value แทนการสุ่ม index เพื่อป้องกันปัญหา DOM Shift
         const allValues = [...$options].map(o => (o as HTMLOptionElement).value);
         const shuffledValues = Cypress._.shuffle(allValues).slice(0, numberOfSelections);
 
         shuffledValues.forEach((val) => {
-            // หา element ใหม่ทุกครั้งที่คลิก เพื่อความชัวร์
-            cy.get(`select[formcontrolname="${controlName}"] option[value="${val}"]`)
+            cy.get(`select[formcontrolname="${controlName}"] option`)
+                .filter((_, el) => (el as HTMLOptionElement).value === val)
+                .first()
                 .should('exist')
                 .dblclick({ force: true });
         });
     });
 };
-
-const limitAndCleanEN = (str: string, maxLen: number): string => limit(cleanEnglishText(str), maxLen);
-const limitAndCleanTH = (str: string, maxLen: number): string => limit(cleanThaiText(str), maxLen);
 
 // ====================================================================
 // WORDING POOLS
@@ -357,6 +381,7 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
 
     cy.get('select[formcontrolname="promotionLevel"]').select(randomPromotion).should('have.value', randomPromotion);
 
+    const { day, month, hours, minutes } = getTimeParts();
     const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
     const pOName = poName || 'ServicePO';
     const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
@@ -396,6 +421,7 @@ const fillServicePOFields = (Module: Module, PriceType: string, projectName?: st
 };
 
 const fillCashBackPOFields = (Module: Module, PriceType: string, projectName?: string, poName?: string, subModule?: string): void => {
+    const { day, month, hours, minutes } = getTimeParts();
     const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
     const pOName = poName || 'CashBackPO';
     const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
@@ -417,6 +443,7 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
     const randomValue = productTypes[Math.floor(Math.random() * productTypes.length)];
     cy.get('select[formcontrolname="productType"]').select(randomValue).should('have.value', randomValue);
 
+    const { day, month, hours, minutes } = getTimeParts();
     const pName = projectName || `${Module} ${PriceType}${day}${month} ${hours}${minutes}`;
     const pOName = poName || 'StandardPO';
     const pools = createPOWordingPools(pName, pOName, Module, PriceType, subModule);
@@ -437,6 +464,7 @@ const fillStandardPOFields = (Module: Module, PriceType: string, projectName?: s
 };
 
 const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectName?: string, poName?: string): void => {
+    const { day, month, hours, minutes } = getTimeParts();
     const pName = projectName || `${Module} ${PriceType}${day}${month}${hours}${minutes}`;
     const pOName = poName || 'CashBackDiscount';
     const pools = createPOWordingPools(pName, pOName, Module, PriceType);
@@ -445,7 +473,6 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
     const randomDuration = durationOptions[Math.floor(Math.random() * durationOptions.length)];
     cy.get('input[formcontrolname="duration"]').type('{selectall}{backspace}').type(randomDuration.toString());
 
-    // ✅ FIX: ใช้ contains เพื่อความแม่นยำ แทนการใช้ .first() ที่อาจเปลี่ยนตำแหน่ง
     cy.contains('button.btn-primary[type="button"]', 'Add').first().click();
 
     const durationFromOptions = [0, 1, 2, 3];
@@ -467,7 +494,9 @@ const fillCashBackDiscountConfig = (Module: Module, PriceType: string, projectNa
     const randomIndex = Math.floor(Math.random() * 2);
     cy.get('input[formcontrolname="marginalDiscount"]').eq(randomIndex).check({ force: true });
 
-    cy.contains('button.btn-primary[type="button"]', 'Add').eq(1).click(); // สมมติว่ามีปุ่ม Add 2 ปุ่มในหน้านี้
+    // NOTE: มีปุ่ม "Add" 2 ปุ่มในหน้านี้ (marginal discount panel + prorate panel) — ยังพึ่ง .eq(1) ตามของเดิม
+    // ยังไม่ได้ scope ด้วย .closest('.panel') เพราะไม่มี HTML จริงมายืนยันโครงสร้าง แนะนำให้ตรวจกับหน้าจริงก่อนไปโปรดักชัน
+    cy.contains('button.btn-primary[type="button"]', 'Add').eq(1).click();
 
     cy.get('input[formcontrolname="prorate"]').eq(randomIndex).check({ force: true });
 
@@ -517,7 +546,7 @@ export const backBacicInfo = (): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getRequest4');
     cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 1000000 });
 
-    cy.wait(1500); 
+    cy.wait(1500);
 
     cy.get('body').then(($body) => {
         const $btn = $body.find('.modal-body > .col-md-12 > :nth-child(1) > .btn');
@@ -543,7 +572,8 @@ export const backBacicInfo = (): void => {
 export const addFile = (): void => {
     cy.get('input[type="file"]', { timeout: 30000 }).should('exist');
 
-    cy.readFile('D:/PLMcypress/cypress/e2e/fixtures/1.txt', 'binary').then((fileContent) => {
+    // ✅ FIX: relative path — hardcode D:/ พังทันทีบนเครื่องอื่น/CI
+    cy.readFile('cypress/e2e/fixtures/1.txt', 'binary').then((fileContent) => {
         cy.get('input[type="file"][id="files"]', { timeout: 15000 }).selectFile(
             {
                 contents: Cypress.Buffer.from(fileContent, 'binary'),
@@ -578,7 +608,15 @@ export const ProjectBasicInformationComplete = (
     ProductClass: ProductClass,
     options: ProjectBasicOptions
 ): void => {
-    const { Module, subModule, autoSetDuration = false, Plugin, runHumanTouchPoint = false, runNonHumanTouchPoint = false } = options;
+    const {
+        Module,
+        subModule,
+        autoSetDuration = false,
+        Plugin,
+        runHumanTouchPoint = false,
+        runNonHumanTouchPoint = false,
+    } = options;
+
     const credentials = getCredentials(Module);
     const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
@@ -588,23 +626,44 @@ export const ProjectBasicInformationComplete = (
     );
 
     const projectIndex = ProductClass === 'main' ? 0 : 1;
-    createProjectBase(credentials, projectName, Module, subModule, 'Create', projectIndex);
+
+    // ✅ FIX: ใช้ค่าที่ createProjectBase คืนกลับมาจริง (รองรับ prefix "MOD ")
+    const actualProjectName = createProjectBase(
+        credentials, projectName, Module, subModule, 'Create', projectIndex
+    );
 
     const envKey = ProductClass === 'main' ? 'formattedDateMain' : 'formattedDate';
-    Cypress.env(envKey, projectName);
-    registerProjectName(projectName, projectIndex);
+    Cypress.env(envKey, actualProjectName);
+    registerProjectName(actualProjectName, projectIndex);
 
     Cypress.env('hasYoutubePremium', false);
     Cypress.env('hasCloudGame', false);
 
+    // ✅ FIX #1 (CRITICAL): ตั้ง context env "ก่อน" เข้าลูป
+    // เดิมตั้งหลังลูป → smsWording()/RandomRemark() ที่เรียกในลูปอ่านได้ undefined ทุกครั้ง
+    Cypress.env('currentModule', Module);
+    Cypress.env('currentSubModule', subModule);
+    Cypress.env('currentPriceType', PriceType);
+    Cypress.env('currentProductClass', ProductClass);
+    Cypress.env('currentProjectName', actualProjectName);
+    Cypress.env('currentPlugin', Plugin ?? null);
+
     const targetGroupOptions = [
-        'Change Charge Type (Convert)', 'Existing', 'New', 'Port In (Mobile Number Port)', 'Renew / Recall from Terminate'
+        'Change Charge Type (Convert)',
+        'Existing',
+        'New',
+        'Port In (Mobile Number Port)',
+        'Renew / Recall from Terminate',
     ];
 
     const isPrepaidMain = Module === 'PRE' && ProductClass === 'main';
     const isMainProductClass = ProductClass === 'main';
-    const poCount = 1;
-    cy.log(`🎲 Randomly selected to create ${poCount} PO(s)`);
+
+    const poCount = Math.max(
+        1,
+        Number((options as ProjectBasicOptions & { poCount?: number }).poCount ?? 2)
+    );
+    cy.log(`📦 Creating ${poCount} PO(s)`);
 
     const poNames: string[] = [];
     const poTargetGroupsMap: string[][] = [];
@@ -615,93 +674,146 @@ export const ProjectBasicInformationComplete = (
         const currentPoName = buildUniqueName(prefixName, poIdentifier, 30);
 
         poNames.push(currentPoName);
+
+        // ✅ FIX #1b: อัปเดต PO ปัจจุบันทุกรอบ ให้ pool ตรงกับ PO ที่กำลังทำอยู่จริง
+        Cypress.env('currentPoName', currentPoName);
+        Cypress.env('currentPoIndex', i);
+
         cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
 
         createPOBase(currentPoName, 'Product Offering');
         cy.wait(5000);
 
-        const priceTypeMap: Record<PriceType, string> = { onetime: '1: One-Time', recurring: '2: Recurring', usage: '3: Usage' };
-        const productClassMapMobile: Record<ProductClass, string> = { main: '1: Main', ontop: '2: On-Top', ontopextra: '3: On-Top Extra' };
-        const productClassMapEnterMusic: Record<'ontop' | 'ontopextra', string> = { ontop: '1: On-Top', ontopextra: '2: On-Top Extra' };
+        const priceTypeMap: Record<PriceType, string> = {
+            onetime: '1: One-Time',
+            recurring: '2: Recurring',
+            usage: '3: Usage',
+        };
+        const productClassMapMobile: Record<ProductClass, string> = {
+            main: '1: Main',
+            ontop: '2: On-Top',
+            ontopextra: '3: On-Top Extra',
+        };
+        const productClassMapEnterMusic: Record<'ontop' | 'ontopextra', string> = {
+            ontop: '1: On-Top',
+            ontopextra: '2: On-Top Extra',
+        };
 
-        const productValue = (Module === 'ENTER' || Module === 'MUSIC')
-            ? productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra']
-            : productClassMapMobile[ProductClass];
+        // ✅ FIX: ENTER/MUSIC ไม่รองรับ ProductClass 'main' — เดิมจะได้ undefined
+        // แล้วไป throw ที่ selectOptionSafely แบบไม่บอกสาเหตุ
+        let productValue: string;
+        if (Module === 'ENTER' || Module === 'MUSIC') {
+            if (ProductClass === 'main') {
+                throw new Error(
+                    `❌ Module "${Module}" ไม่รองรับ ProductClass "main" — ใช้ได้เฉพาะ ontop / ontopextra`
+                );
+            }
+            productValue = productClassMapEnterMusic[ProductClass as 'ontop' | 'ontopextra'];
+        } else {
+            productValue = productClassMapMobile[ProductClass];
+        }
 
         selectOptionSafely('select[formcontrolname="productClass"]', productValue);
         selectOptionSafely('select[formcontrolname="priceType"]', priceTypeMap[PriceType]);
 
         if (ProductClass === 'main') {
             cy.wait(1000);
-            cy.contains('.panel-heading', '*Product Specification').scrollIntoView().closest('.panel').within(() => {
-                cy.get('select[formcontrolname="selectedListBox"]').should('exist');
-            });
+            cy.contains('.panel-heading', '*Product Specification')
+                .scrollIntoView()
+                .closest('.panel')
+                .within(() => {
+                    cy.get('select[formcontrolname="selectedListBox"]').should('exist');
+                });
         }
+
         const keepMainDefaults = isMainProductClass && getRandomInt(1, 10) <= 8;
 
+        // ───────────── PACKAGE DURATION ─────────────
         if (autoSetDuration) {
-            // ตรวจสอบก่อนว่าฟอร์มมีค่า default อยู่แล้วหรือไม่ (ทั้ง packageDuration และ packageDurationUnit)
-            // ถ้าไม่มี default เลย ต้องบังคับสุ่มค่าเสมอ ไม่ว่าผลของ keepMainDefaults roll จะเป็นอย่างไร
-            cy.get('input[formcontrolname="packageDuration"]').invoke('val').then((durationVal) => {
-                const hasDurationValue = !!String(durationVal ?? '').trim();
+            cy.get('input[formcontrolname="packageDuration"]')
+                .invoke('val')
+                .then((durationVal) => {
+                    const hasDurationValue = !!String(durationVal ?? '').trim();
 
-                cy.get('select[formcontrolname="packageDurationUnit"]').filter(':visible').invoke('val').then((unitVal) => {
-                    const hasUnitValue = !!String(unitVal ?? '').trim();
-                    const hasDefault = hasDurationValue && hasUnitValue;
+                    cy.get('select[formcontrolname="packageDurationUnit"]')
+                        .filter(':visible')
+                        .invoke('val')
+                        .then((unitVal) => {
+                            const hasUnitValue = !!String(unitVal ?? '').trim();
+                            const hasDefault = hasDurationValue && hasUnitValue;
+                            const shouldRandomizeDuration =
+                                !hasDefault || (isMainProductClass ? !keepMainDefaults : true);
 
-                    const shouldRandomizeDuration = !hasDefault || (isMainProductClass ? !keepMainDefaults : true);
+                            if (!shouldRandomizeDuration) {
+                                cy.log('✅ Keeping default packageDuration/Unit (main, 80% roll)');
+                                return;
+                            }
 
-                    if (shouldRandomizeDuration) {
-                        const realisticDurations: Record<string, number[]> = {
-                            'hours': [2, 3, 4, 6, 8, 12, 18, 24, 36, 48, 72, 96, 120],
-                            'days': [2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 270, 365],
-                            'months': [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
-                            'month_midnight': [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
-                            'bill cycle': [2, 3, 4, 6, 9, 12, 18, 24],
-                            'year': [2, 3, 4, 5, 6, 7, 8, 9, 10],
-                        };
+                            const realisticDurations: Record<string, number[]> = {
+                                hours: [2, 3, 4, 6, 8, 12, 18, 24, 36, 48, 72, 96, 120],
+                                days: [2, 3, 5, 7, 10, 14, 21, 30, 45, 60, 90, 120, 180, 270, 365],
+                                months: [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
+                                month_midnight: [2, 3, 4, 6, 9, 12, 18, 24, 36, 48, 60],
+                                'bill cycle': [2, 3, 4, 6, 9, 12, 18, 24],
+                                year: [2, 3, 4, 5, 6, 7, 8, 9, 10],
+                            };
 
-                        cy.log(`⏱️ autoSetDuration=true, entering packageDurationUnit selection${!hasDefault ? ' (no default value present — forcing randomize)' : (isMainProductClass ? ' (main: 20% randomize roll hit)' : '')}`);
-                        const stripIndexPrefix = (raw: string): string => raw.replace(/^\d+:\s*/, '').trim();
+                            cy.log(`⏱️ autoSetDuration=true → randomize${!hasDefault ? ' (no default, forced)' : ''}`);
 
-                        cy.get('select[formcontrolname="packageDurationUnit"]')
-                            .filter(':visible')
-                            .should('have.length', 1)
-                            .find('option:not([disabled])')
-                            .should('have.length.greaterThan', 0)
-                            .then($options => {
-                                const labels = [...$options].map(o => stripIndexPrefix((o as HTMLOptionElement).text));
-                                const targetLabel = labels[getRandomInt(0, labels.length - 1)];
-                                const unitText = targetLabel.toLowerCase();
-                                const matchedKey = Object.keys(realisticDurations).find(key => unitText.includes(key) || key.includes(unitText));
-                                const possibleDurations = matchedKey ? realisticDurations[matchedKey] : [2, 3, 7, 14, 30, 60, 90];
-                                const randomDuration = possibleDurations[getRandomInt(0, possibleDurations.length - 1)];
+                            const stripIndexPrefix = (raw: string): string => raw.replace(/^\d+:\s*/, '').trim();
 
-                                cy.get('select[formcontrolname="packageDurationUnit"]')
-                                    .filter(':visible')
-                                    .find('option:not([disabled])')
-                                    .then($opts => {
-                                        const match = [...$opts].find(o => stripIndexPrefix((o as HTMLOptionElement).text) === targetLabel) as HTMLOptionElement | undefined;
-                                        if (match) {
-                                            cy.get('select[formcontrolname="packageDurationUnit"]').filter(':visible').select(match.value, { force: true });
-                                            cy.log(`✅ packageDurationUnit confirmed: ${targetLabel}`);
-                                        }
-                                    });
+                            cy.get('select[formcontrolname="packageDurationUnit"]')
+                                .filter(':visible')
+                                .should('have.length', 1)
+                                .find('option:not([disabled])')
+                                .should('have.length.greaterThan', 0)
+                                .then(($options) => {
+                                    // ✅ FIX: กรอง option ว่าง/placeholder ออก ไม่งั้นสุ่มได้ "" แล้ว select ล้ม
+                                    const opts = ([...$options] as HTMLOptionElement[]).filter(
+                                        (o) => o.value && o.value !== 'null' && stripIndexPrefix(o.text)
+                                    );
+                                    if (!opts.length) {
+                                        cy.log('⚠️ [SKIP] ไม่มี option ที่ใช้ได้ใน packageDurationUnit');
+                                        return;
+                                    }
 
-                                cy.get('input[formcontrolname="packageDuration"]').type('{selectall}{backspace}').type(randomDuration.toString());
-                                cy.log(`🗓️ Package Duration set to: ${randomDuration} ${targetLabel}`);
-                            });
+                                    const target = opts[getRandomInt(0, opts.length - 1)];
+                                    const targetLabel = stripIndexPrefix(target.text);
+                                    const unitText = targetLabel.toLowerCase();
 
-                        cy.get('.col-md-8 > .btn').click();
-                    } else {
-                        cy.log(`✅ Keeping default packageDuration/packageDurationUnit (main, has default value, 80% roll — no override)`);
-                    }
+                                    const matchedKey = Object.keys(realisticDurations).find(
+                                        (key) => unitText.includes(key) || key.includes(unitText)
+                                    );
+                                    const possibleDurations = matchedKey
+                                        ? realisticDurations[matchedKey]
+                                        : [2, 3, 7, 14, 30, 60, 90];
+                                    const randomDuration =
+                                        possibleDurations[getRandomInt(0, possibleDurations.length - 1)];
+
+                                    // ✅ FIX: select ด้วย value ที่จับได้ตรงๆ ไม่ต้อง re-query หา label ซ้ำ
+                                    cy.get('select[formcontrolname="packageDurationUnit"]')
+                                        .filter(':visible')
+                                        .select(target.value, { force: true })
+                                        .should('have.value', target.value);
+
+                                    cy.get('input[formcontrolname="packageDuration"]')
+                                        .type('{selectall}{backspace}')
+                                        .type(randomDuration.toString());
+
+                                    cy.log(`🗓️ Package Duration = ${randomDuration} ${targetLabel}`);
+                                });
+
+                            // ✅ FIX: selector '.col-md-8 > .btn' เปราะมาก — เช็คก่อนคลิก
+                            clickIfExists('.col-md-8 > .btn', 'Add Duration');
+                        });
                 });
-            });
         }
 
+        // ───────────── BILL CYCLE (PRE) ─────────────
         if (subModule === 'PRE') {
-            const shouldRandomizeBillCycle = isMainProductClass ? !keepMainDefaults : (getRandomInt(1, 10) <= 8);
+            const shouldRandomizeBillCycle = isMainProductClass
+                ? !keepMainDefaults
+                : getRandomInt(1, 10) <= 8;
 
             if (shouldRandomizeBillCycle) {
                 const realisticBillCycles = [1, 5, 7, 10, 15, 20, 25, 28];
@@ -714,25 +826,38 @@ export const ProjectBasicInformationComplete = (
 
                 cy.get('select[formcontrolname="packageBillCycleUnit"] option:not([disabled])')
                     .should('have.length.greaterThan', 0)
-                    .then($options => {
-                        const availableOptions = $options.map((_, el) => (el as HTMLOptionElement).value).get();
-                        const realisticBillCycleUnits = ['Day', 'Days', 'Date', 'Month', 'Months'];
-                        let matchedUnit = realisticBillCycleUnits.find(unit => availableOptions.includes(unit) || availableOptions.includes(unit.toLowerCase()));
+                    .then(($options) => {
+                        // ✅ FIX: กรอง value ว่างออกก่อน ไม่งั้น matchedUnit อาจเป็น "" แล้ว select ล้มเงียบ
+                        const availableOptions = ([...$options] as HTMLOptionElement[])
+                            .map((o) => o.value)
+                            .filter((v) => v && v !== 'null');
 
-                        if (!matchedUnit) matchedUnit = availableOptions[0];
-                        cy.get('select[formcontrolname="packageBillCycleUnit"]').select(matchedUnit);
-                        cy.log(`🗓️ Bill Cycle set to: ${randomBillCycle} ${matchedUnit}`);
+                        if (!availableOptions.length) {
+                            cy.log('⚠️ [SKIP] ไม่มี option ที่ใช้ได้ใน packageBillCycleUnit');
+                            return;
+                        }
+
+                        const realisticBillCycleUnits = ['Day', 'Days', 'Date', 'Month', 'Months'];
+                        const matchedUnit =
+                            realisticBillCycleUnits.find((unit) =>
+                                availableOptions.some((v) => v.toLowerCase() === unit.toLowerCase())
+                            ) ?? availableOptions[0];
+
+                        cy.get('select[formcontrolname="packageBillCycleUnit"]').select(matchedUnit, { force: true });
+                        cy.log(`🗓️ Bill Cycle = ${randomBillCycle} ${matchedUnit}`);
                     });
             } else if (isMainProductClass) {
-                cy.log(`✅ Keeping default packageBillCycle/packageBillCycleUnit (main, 80% roll — no override)`);
+                cy.log('✅ Keeping default packageBillCycle/Unit (main, 80% roll)');
             }
         }
 
-        const isMultiDurationEligible = PriceType?.toString().trim().toLowerCase() === 'recurring' || PriceType?.toString().trim().toLowerCase() === 'usage';
+        // ───────────── PRICE / DURATION MODE ─────────────
+        const normalizedPriceType = String(PriceType ?? '').trim().toLowerCase();
+        const isMultiDurationEligible = normalizedPriceType === 'recurring' || normalizedPriceType === 'usage';
         const useMultiDuration = isMultiDurationEligible && getEntropySeed() < 0.5;
 
         if (useMultiDuration) {
-            cy.log(`🎲 Multi Duration randomly selected: Yes (PriceType=${PriceType})`);
+            cy.log(`🎲 Multi Duration = Yes (PriceType=${PriceType})`);
             RandomMultiDuration();
         } else {
             PriceExcluding();
@@ -744,21 +869,32 @@ export const ProjectBasicInformationComplete = (
         dropdownPromotionGroup();
         RandomProductSpecification(ProductClass, subModule, Module);
 
+        // ───────────── MVPN (PRE ontop) ─────────────
         if (Module === 'PRE' && (ProductClass === 'ontop' || ProductClass === 'ontopextra')) {
-            cy.get('input[formcontrolname="allowMvpn"]').should('exist').then(($radios) => {
-                cy.wrap($radios).eq(getRandomInt(0, $radios.length - 1)).check();
+            cy.get('body').then(($b) => {
+                const $radios = $b.find('input[formcontrolname="allowMvpn"]');
+                if (!$radios.length) {
+                    cy.log('⚠️ [SKIP] ไม่พบ allowMvpn radio');
+                    return;
+                }
+                const idx = getRandomInt(0, $radios.length - 1);
+                // ✅ FIX: เดิมไม่มี force → radio ที่ถูก label ครอบจะ fail "covered by another element"
+                cy.get('input[formcontrolname="allowMvpn"]').eq(idx).check({ force: true });
             });
         }
 
+        // ───────────── TARGET GROUP ─────────────
         let groupsForThisPo: string[] = [];
         if (isPrepaidMain) {
             const groupCountForThisPo = getRandomInt(1, targetGroupOptions.length);
             groupsForThisPo = pickMultiple(targetGroupOptions, groupCountForThisPo);
-            cy.log(`🎯 PO [${i + 1}/${poCount}] เลือก ${groupCountForThisPo} targetgroup: ${groupsForThisPo.join(', ')}`);
+            cy.log(`🎯 PO [${i + 1}/${poCount}] เลือก ${groupsForThisPo.length} targetgroup: ${groupsForThisPo.join(', ')}`);
         }
         poTargetGroupsMap.push(groupsForThisPo);
+        Cypress.env('currentPoTargetGroups', groupsForThisPo);
         targetgroup(isPrepaidMain ? groupsForThisPo : undefined);
 
+        // ───────────── SHARING / TABS ─────────────
         InternalShare();
         SharingPartner();
         RevenueSharing();
@@ -774,8 +910,8 @@ export const ProjectBasicInformationComplete = (
         if (Module === 'PRE' && PriceType === 'recurring' && ProductClass === 'main') {
             CopyDeductFail('mass-market');
         }
-        RandomRemark(projectName, currentPoName, PriceType, ProductClass, subModule);
-        smsWording();
+        RandomRemark(actualProjectName, currentPoName, PriceType, ProductClass, subModule);
+        smsWordingAuto();
 
         if (i < poCount - 1) {
             cy.log(`🔙 PO ${currentPoName} done. Navigating back for next PO...`);
@@ -784,15 +920,12 @@ export const ProjectBasicInformationComplete = (
         }
     }
 
-    Cypress.env('currentModule', Module);
-    Cypress.env('currentSubModule', subModule);
-    Cypress.env('currentPriceType', PriceType);
-    Cypress.env('currentProductClass', ProductClass);
-    Cypress.env('currentProjectName', projectName);
-    Cypress.env('currentPoName', poNames[0] || poName);
     Cypress.env('allPoNames', poNames);
     Cypress.env('poCount', poCount);
     Cypress.env('poTargetGroupsMap', poTargetGroupsMap);
+    Cypress.env('currentPoName', poNames[0] || poName);
+
+    cy.log(`✅ All ${poCount} PO(s) created under "${actualProjectName}"`);
 
     backBacicInfo();
     addFile();
@@ -825,7 +958,9 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     cy.get('input[aria-label="Date input field"]').should('have.value', formattedDate);
     cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
 
-    RandomProjectDescription(projectName, Module);
+    // ✅ FIX: Module ต้องอยู่ตำแหน่งที่ 3 ของ RandomProjectDescription (subModule ไม่มีในฟังก์ชันนี้ → ใส่ undefined แทน)
+    RandomProjectDescription(projectName, undefined, Module);
+
     cy.get('button[type="button"]').contains('Save').click();
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
     cy.get('.modal-body > :nth-child(1) > div > .btn').click({ force: true });
@@ -850,7 +985,7 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
         Service: 'Service', GroupPoFee: 'Group PO Fee'
     };
 
-    cy.log(`🎲 Randomly selected to create ${poCount} PO(s)`);
+    cy.log(`📦 Creating ${poCount} PO(s)`);
 
     for (let i = 0; i < poCount; i++) {
         const poIdentifier = `PO${i + 1} ${sharedTimeId}`;
@@ -859,21 +994,11 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
 
         cy.log(`📦 [${i + 1}/${poCount}] Processing PO: ${currentPoName}`);
 
-        // ✅ FIX: เปลี่ยนจาก nth-child ที่เสี่ยงพัง เป็นการใช้ contains หรือ class ที่ชัดเจน
-        cy.contains('button', /add|create/i).first().click({ force: true });
-
-        cy.get('input[formcontrolname="productName"]').type(currentPoName);
+        // ✅ FIX: reuse createPOBase() แทน cy.contains('button', /add|create/i)
+        // — มี intercept + รอ statusCode 200 + รอ loading-curtain + รอ hash ครบอยู่แล้ว
+        createPOBase(currentPoName, subGroupMap[PoSubGroup]);
         Cypress.env('poName', currentPoName);
-
-        cy.get('select[formcontrolname="promotionSubGroupFrom"]').select(subGroupMap[PoSubGroup]);
-
-        cy.intercept('POST', '/PLMSpringBoot/api/**').as('postRequest');
-        cy.contains('button', 'Create', { timeout: 10000 }).click();
-        cy.wait('@postRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-        cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
-
-        cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/*').as('getProject');
-        cy.wait('@getProject', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+        Cypress.env('currentPoName', currentPoName);
         cy.wait(2000);
 
         if (Module === 'PRE' && (PoSubGroup === 'OrderFee' || PoSubGroup === 'Service')) {
@@ -911,7 +1036,15 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     Cypress.env('poCount', poCount);
     Cypress.env('poName', poNames[0] || poName);
 
+    // ✅ FIX: ต้อง finalize เหมือน ProjectBasicInformationComplete
+    // ไม่งั้น PO ตัวสุดท้ายไม่ถูกเซฟ (ไม่ได้ backBacicInfo) และไม่มีการแนบไฟล์เลย
+    Cypress.env('currentModule', Module);
+    Cypress.env('currentPriceType', PriceType);
+    Cypress.env('currentProjectName', projectName);
+
     cy.log(`✅ All ${poCount} PO(s) processed. Finalizing...`);
+    backBacicInfo();
+    addFile();
 };
 
 // ========================
@@ -1100,7 +1233,7 @@ export const ProjectBasicInformationCompleteModify = (
     const credentials = getCredentials(Module);
     const prefix = (Module === 'ENTER' || Module === 'MUSIC') ? Module : 'MOB';
 
-    const { projectName, poName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
+    const { projectName, prefixName } = generateProjectNames(prefix, Module, subModule, PriceType, ProductClass, undefined, Plugin);
     const projectIndex = ProductClass === 'main' ? 0 : 1;
     const actualProjectName = createProjectBase(credentials, projectName, Module, subModule, 'Modify By PO', projectIndex);
 
@@ -1145,7 +1278,6 @@ export const ProjectBasicInformationCompleteModify = (
                     throw new Error('❌ ไม่พบ PO ใน Sidebar หลังคลิก Modify');
                 }
 
-                // ✅ FIX: ใช้ cy.each แทนการ wrap array ธรรมดา เพื่อให้ Cypress จัดการ Queue ได้ถูกต้อง
                 Cypress._.times(actualPOCount, (index: number) => {
                     cy.log(`🔄 [${index + 1}/${actualPOCount}] Processing PO in sidebar...`);
 

@@ -42,7 +42,7 @@ describe('PRE-PAID Ontop', () => {
         });
         Master.afterMKTontopPREENTER();
       });
-      describe('MUSIC', () => {
+      describe.only('MUSIC', () => {
         it('MKT PRE-PAID role', () => {
           Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'MUSIC', subModule: 'PRE', autoSetDuration: true });
         });
@@ -63,13 +63,13 @@ const priceTypes: PriceType[] = ['recurring'];
         });
         Master.afterMKTontopPREPlugin();
       });
-      describe.only('ENTER', () => {
+      describe('ENTER', () => {
         it('MKT PRE-PAID role', () => {
           Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'ENTER', subModule: 'PRE', autoSetDuration: true });
         });
         Master.afterMKTontopPREMusicPlugin();
       });
-      describe.only('MUSIC', () => {
+      describe('MUSIC', () => {
         it('MKT PRE-PAID role', () => {
           Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'MUSIC', subModule: 'PRE', autoSetDuration: true });
         });

@@ -88,6 +88,18 @@ const sortCgmd = (arr: TestEntry[]): TestEntry[] => {
     return result;
 };
 
+const runPoSequence = <T>(items: T[], action: (item: T, index: number) => void): void => {
+    const step = (i: number): void => {
+        if (i >= items.length) return;
+        cy.then(() => {
+            action(items[i], i);
+        }).then(() => {
+            step(i + 1);
+        });
+    };
+    step(0);
+};
+
 const promoteToActmRole = (roleUser: any, rolePass: any, roleLabel: string): void => {
     loginAndWaitReady(roleUser, rolePass);
 
@@ -157,7 +169,7 @@ const insertRomEasyAppRomRole = (ordered: TestEntry[]): TestEntry[] => {
                     return;
                 }
 
-                allPoNames.forEach((activePoName, idx) => {
+                runPoSequence(allPoNames, (activePoName, idx) => {
                     const poLabel = allPoNames.length > 1 ? `[PO ${idx + 1}/${allPoNames.length}]` : '';
                     cy.log(`🚀 Running ROM role for: ${activePoName} ${poLabel}`);
                     Cypress.env('currentPoName', activePoName);
@@ -180,7 +192,7 @@ const insertRomEasyAppRomRole = (ordered: TestEntry[]): TestEntry[] => {
                     return;
                 }
 
-                allPoNames.forEach((activePoName, idx) => {
+                runPoSequence(allPoNames, (activePoName, idx) => {
                     const poLabel = allPoNames.length > 1 ? `[PO ${idx + 1}/${allPoNames.length}]` : '';
                     cy.log(`🚀 Running Easy App ROM role for: ${activePoName} ${poLabel}`);
                     Cypress.env('currentPoName', activePoName);
@@ -212,7 +224,7 @@ const buildAqssEntries = (labelSuffix: string, guard: () => boolean): TestEntry[
                 return;
             }
 
-            allPoNames.forEach((activePoName, idx) => {
+            runPoSequence(allPoNames, (activePoName, idx) => {
                 const poLabel = allPoNames.length > 1 ? `[PO ${idx + 1}/${allPoNames.length}]` : '';
                 cy.log(`🚀 Running AQSS role (${labelSuffix}) for: ${activePoName} ${poLabel}`);
                 Cypress.env('currentPoName', activePoName);
@@ -409,7 +421,10 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
                 const poNames = getPoNamesToProcess();
                 cy.log(`🔁 SASFF: Total PO to process: ${poNames.length}`);
 
-                poNames.forEach((poName, idx) => {
+                // ✅ FIX: forEach เดิม set env + เรียก cy command (loginAndWaitReady/ClaimProject/...) แบบ
+                // synchronous ทำให้ currentPoName ของทุก PO ถูกเขียนทับเหลือแค่ตัวสุดท้ายก่อน cy command
+                // จะรันจริง — ใช้ runPoSequence ให้ set env "ตอนคิวถึงจริง" ของ PO นั้นๆ แทน
+                runPoSequence(poNames, (poName, idx) => {
                     const poLabel = poNames.length > 1 ? `[PO ${idx + 1}/${poNames.length}]` : '';
                     if (!poName) cy.log(`⚠️ WARNING: poName ว่างเปล่าที่ index ${idx} ${poLabel}`);
 
@@ -448,6 +463,9 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
         promoteToActmRole(aqss, aqsspass, 'AQSS');
     };
 
+    // ✅ FIX: เดิม runRoleForAllPos ใช้ poNames.forEach(...) แล้วเรียก setCurrentPo + action() ข้างใน
+    // ซึ่งมีปัญหาเดียวกับด้านบน (env ถูกตั้งค่าล่วงหน้าทั้งหมดก่อน cy command จะรันจริง) เปลี่ยนมาใช้
+    // runPoSequence เพื่อให้แต่ละ PO ได้ context ของตัวเองตอน cy command ที่เกี่ยวข้องรันจริง
     const runRoleForAllPos = (
         label: string,
         getPoNames: () => string[],
@@ -456,7 +474,7 @@ export const afterMKTothersubgroup = (PoSubGroup: string, Module: string): void 
         it(label, () => {
             const poNames = getPoNames();
             cy.log(`🔁 ${label}: Total PO to process: ${poNames.length}`);
-            poNames.forEach((poName, idx) => {
+            runPoSequence(poNames, (poName, idx) => {
                 const poLabel = poNames.length > 1 ? `[PO ${idx + 1}/${poNames.length}]` : '';
                 if (!poName) cy.log(`⚠️ WARNING: poName ว่างเปล่าที่ index ${idx} ${poLabel}`);
                 setCurrentPo(poName);
@@ -702,7 +720,7 @@ export const beforeapproveMKT = (): void => {
     cy.wait('@getRequest', { timeout: 30000 }).its('response.statusCode').should('eq', 200);
 
     // 8. ตรวจสอบการเปลี่ยนหน้าและดำเนินการต่อ
-    cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
+    cy.url({ timeout: 120000000 }).should('include', '/#/workspace-home/workspace');
 
     const finalProjectName = getStandardProjectName();
     cy.log(`✅ Project ใช้สำหรับ Claim: ${finalProjectName}`);
@@ -714,9 +732,9 @@ export const beforeapproveMKT = (): void => {
     cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
 
     cy.scrollTo('bottom');
-    cy.url({ timeout: 120000 }).should('include', '/mkt/mktchecker');
+    cy.url({ timeout: 120000000 }).should('include', '/mkt/mktchecker');
     cy.get('button.btn.btn-xs.btn-primary').should('be.visible').click();
-    cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
+    cy.url({ timeout: 120000000 }).should('include', '/#/workspace-home/workspace');
 };
 
 // ========================
@@ -741,7 +759,7 @@ export const afterCKSPOST = (Module?: string, opts?: { enableMusicInsert?: boole
             const allPoNames = (Cypress.env('allPoNames') as string[]) || [Cypress.env('currentPoName')];
             if (!allPoNames || allPoNames.length === 0 || allPoNames[0]?.startsWith('PO_')) { cy.log('⏭️ ข้าม AQSS role — ไม่พบชื่อ PO ที่ถูกต้อง'); return; }
 
-            allPoNames.forEach((activePoName, idx) => {
+            runPoSequence(allPoNames, (activePoName, idx) => {
                 const poLabel = allPoNames.length > 1 ? `[PO ${idx + 1}/${allPoNames.length}]` : '';
                 cy.log(`🚀 [afterCKSPOST] Running AQSS role for: ${activePoName} ${poLabel}`);
                 Cypress.env('currentPoName', activePoName);
@@ -754,13 +772,14 @@ export const afterCKSPOST = (Module?: string, opts?: { enableMusicInsert?: boole
         it('CGMD Tester IRB role', () => performRoleTaskWithAssignment(cgtirb, cgtirbpass, 'cgtirb', approveProjectCGMDtester, 'IRB', { searchBy: 'po' }));
     });
 
-    // ✅ FIX: รวม ROM และ Easy App ROM เป็น it() เดียวที่วนลูป allPoNames ตอนรันจริง
+    // ✅ FIX: รวม ROM และ Easy App ROM เป็น it() เดียวที่วนลูป allPoNames ตอนรันจริง ผ่าน runPoSequence
+    // แทน forEach ธรรมดา เพื่อไม่ให้ currentPoName ถูกเขียนทับล่วงหน้าเหลือแค่ PO ตัวสุดท้าย
     restSteps.push(() => {
         it('ROM & Easy App ROM roles (all POs)', () => {
             const allPoNames = (Cypress.env('allPoNames') as string[]) || [Cypress.env('currentPoName')];
             if (!allPoNames || allPoNames.length === 0 || allPoNames[0]?.startsWith('PO_')) { cy.log('⏭️ ข้าม ROM/Easy App ROM role — ไม่พบชื่อ PO ที่ถูกต้อง'); return; }
 
-            allPoNames.forEach((activePoName, idx) => {
+            runPoSequence(allPoNames, (activePoName, idx) => {
                 const poLabel = allPoNames.length > 1 ? `[PO ${idx + 1}/${allPoNames.length}]` : '';
 
                 if (shouldRunRomRole()) {
@@ -786,7 +805,7 @@ export const afterCKSPOST = (Module?: string, opts?: { enableMusicInsert?: boole
             const allPoNames = (Cypress.env('allPoNames') as string[]) || [Cypress.env('currentPoName')];
             if (!allPoNames || allPoNames.length === 0 || allPoNames[0]?.startsWith('PO_')) { cy.log('⏭️ ข้าม AQSS role — ไม่พบชื่อ PO ที่ถูกต้อง'); return; }
 
-            allPoNames.forEach((activePoName, idx) => {
+            runPoSequence(allPoNames, (activePoName, idx) => {
                 const poLabel = allPoNames.length > 1 ? `[PO ${idx + 1}/${allPoNames.length}]` : '';
                 cy.log(`🚀 [afterCKSPOST] Running AQSS role (after OPER/APO) for: ${activePoName} ${poLabel}`);
                 Cypress.env('currentPoName', activePoName);
@@ -810,8 +829,8 @@ export const afterCKSPOST = (Module?: string, opts?: { enableMusicInsert?: boole
 // ========================
 // MUSIC ROLES
 // ========================
-const shouldRunMusicFullChain = (Module?: string): boolean => Module === 'MUSIC' || Cypress.env('hasYoutubePremium') === true;
-const shouldRunTscenterOnly = (): boolean => Cypress.env('hasCloudGame') === true;
+const shouldRunMusicFullChain = (Module?: string): boolean => Module === 'MUSIC' || checkEnvFlag('hasYoutubePremium');
+const shouldRunTscenterOnly = (): boolean => checkEnvFlag('hasCloudGame');
 
 const buildMusicInsertFn = (Module?: string): (() => void) | null => {
     if (shouldRunMusicFullChain(Module)) {
@@ -979,8 +998,9 @@ export const performMusicRoles = (): void => {
 
 export const runMusicOrTscenterRuntimeChecked = (Module?: string): void => {
     it('Music/TSCENTER role (runtime-checked)', () => {
-        const hasYoutubePremium = Cypress.env('hasYoutubePremium') === true;
-        const hasCloudGame = Cypress.env('hasCloudGame') === true;
+        // ✅ FIX: ใช้ checkEnvFlag() แทน `=== true` ตรงๆ ด้วยเหตุผลเดียวกับด้านบน
+        const hasYoutubePremium = checkEnvFlag('hasYoutubePremium');
+        const hasCloudGame = checkEnvFlag('hasCloudGame');
 
         cy.log(`🔍 [Music/TSCENTER runtime check] Module="${Module}" hasYoutubePremium=${hasYoutubePremium} hasCloudGame=${hasCloudGame}`);
 

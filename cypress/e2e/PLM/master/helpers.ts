@@ -5,46 +5,26 @@ import { Module } from './config';
 // ========================
 
 export const selectRandomOption = (labelName: string): void => {
-    // Escape special characters (เช่น วงเล็บ) เพื่อป้องกัน Regex Error
-    const escapedLabel = labelName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    cy.contains('label', new RegExp(`^\\s*${escapedLabel}\\s*:?\\s*$`))
+    cy.contains('label', labelName)
         .parent()
         .next('div')
         .find('mat-select')
         .click()
         .then(() => {
-            // รอให้ Angular Material Overlay Render ตัวเลือกออกมา
-            cy.get('cdk-overlay-container mat-option')
-                .should('be.visible')
-                .then(($options) => {
-                    // กรองตัวเลือกที่เป็น Placeholder, ค่าว่าง, หรือ Disabled ทิ้งไป
-                    const validOptions = $options.toArray().filter((opt) => {
-                        const text = (opt.textContent || '').trim().toLowerCase();
-                        const isDisabled = opt.classList.contains('mat-option-disabled');
-                        return !isDisabled &&
-                            text.length > 0 &&
-                            !text.includes('select') &&
-                            !text.includes('please') &&
-                            !text.includes('choose') &&
-                            !text.startsWith('--');
-                    });
-
-                    if (validOptions.length === 0) {
-                        throw new Error(`No valid options found for "${labelName}" (all might be placeholders or empty).`);
-                    }
-                    const randomIndex = Math.floor(Math.random() * validOptions.length);
-                    cy.wrap(validOptions[randomIndex]).click({ force: true });
-                });
+            cy.get('mat-option').filter(':visible').then($options => {
+                const randomIndex = Math.floor(Math.random() * $options.length);
+                cy.wrap($options[randomIndex]).click({ force: true });
+            });
         });
 };
+
 export const handleAddToUSMP = (): void => {
     cy.get('body').then(($body) => {
         if ($body.find('button:contains("Add to USMP")').length > 0) {
             cy.log('🟢 Found Add to USMP button, clicking...');
             cy.contains('button', 'Add to USMP').click();
             cy.wait(5000);
-
+            
             cy.get('.modal.fade.in, .mat-dialog-container', { timeout: 10000 })
                 .last()
                 .should('be.visible')
@@ -169,7 +149,7 @@ export const searchInTableWithPagination = (
                 if ($firstBtn.length > 0) {
                     cy.log(`⏮️ Reset pagination ไปยังหน้าแรกสำหรับ "${sectionHeader}" ก่อนเริ่มค้นหา`);
                     cy.wrap($firstBtn.first()).find('a').click();
-
+                    
                     cy.get('h3')
                         .contains(sectionHeader)
                         .parent()
