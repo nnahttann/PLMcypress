@@ -1,42 +1,37 @@
 import * as Master from '../../Master';
-
 type PriceType = 'onetime' | 'recurring' | 'usage';
-
 let isFirstRun = true;
-
 beforeEach(() => {
-  if (isFirstRun) {
-    cy.clearLocalStorage();
-    cy.clearCookies();
-    cy.window().then((win) => {
-      win.sessionStorage.clear();
-    });
-    isFirstRun = false;
-  }
-
-  cy.visit(Master.urlsit, {
-    timeout: 60000,
-    onBeforeLoad: (win) => {
-      win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
+    if (isFirstRun) {
+        cy.clearLocalStorage();
+        cy.clearCookies();
+        cy.window().then((win) => {
+            win.sessionStorage.clear();
+        });
+        isFirstRun = false;
     }
-  });
-
-  cy.get('app-login', { timeout: 60000 }).should('be.visible');
-  cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
-});
-
-describe('POST-PAID Main', () => {
-  const priceTypes: PriceType[] = ['onetime'];
-  priceTypes.forEach((priceType) => {
-    describe(`MKT POSTPAID ${priceType}`, () => {
-      it('MKT POSTPAID role', () => {
-        Master.ProjectBasicInformationComplete(priceType, 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
-      });
-      if (priceType === 'usage') {
-        Master.afterMKTMainUsagePOST();
-      } else {
-        Master.afterMKTMAINPOST();
-      }
+    cy.visit(Master.urlsit, {
+        timeout: 60000,
+        onBeforeLoad: (win) => {
+            win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
+        }
     });
-  });
+    cy.get('app-login', { timeout: 60000 }).should('be.visible');
+    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
+});
+describe('POST-PAID Main', () => {
+    const priceTypes: PriceType[] = ['onetime'];
+    priceTypes.forEach((priceType) => {
+        describe(`MKT POSTPAID ${priceType}`, () => {
+            it('MKT POSTPAID role', () => {
+                Master.ProjectBasicInformationComplete(priceType, 'main', { Module: 'POST', subModule: 'POST', autoSetDuration: true });
+            });
+            if (priceType === 'usage') {
+                Master.afterMKTMainUsagePOST();
+            }
+            else {
+                Master.afterMKTMAINPOST();
+            }
+        });
+    });
 });

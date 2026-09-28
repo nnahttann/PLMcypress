@@ -1,382 +1,349 @@
-// ========================
-// RANDOM HUMAN TOUCH POINT
-// ========================
+import { sanitizePoName } from './project-creation';
+
+const ALL_TOUCHPOINT_ABBRS = [
+  'RM', 'ES RM', 'AIS SHOP', 'ASP', 'CC', 'DS', 'EVT', 'MT', 'TS', 'TWZ', 'SEL CH',
+  'USSD', 'BANK', 'IVR', 'MOT', 'PCM', 'RLP', 'SFF', 'WS', 'MPAY', 'HTP', 'NHTP',
+];
+
+const PO_ID_RE = /(PO\d+\s+\d{3,4}\s+\d{3,4})\s*$/i;
+
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * ลบ touch-point abbr ที่ต่อท้ายชื่อออกทั้งหมดในครั้งเดียว
+ * (เดิมวนลบทีละ abbr ตามลำดับความยาว ทำให้ "RM ES RM EVT" ถูกลบไม่หมด เหลือ "RM ES")
+ * ต้องมีช่องว่างนำหน้าทุก abbr เพื่อ match เป็น token เต็ม
+ */
+const stripTrailingAbbrs = (name: string): string => {
+  const alt = [...ALL_TOUCHPOINT_ABBRS]
+    .sort((a, b) => b.length - a.length)
+    .map((a) => escapeRegExp(a).replace(/\s+/g, '\\s+'))
+    .join('|');
+  const re = new RegExp(`(?:\\s+(?:${alt}))+\\s*$`, 'i');
+  return String(name ?? '').trim().replace(re, '').trim();
+};
+
+const resolveProductNameMaxLength = (): Cypress.Chainable<number> => {
+  return cy.get('body').then(($body) => {
+    const $input = $body.find('input[formcontrolname="productName"]').first();
+    const counterText = $input.siblings('small').first().text().trim();
+    const m = counterText.match(/(\d+)\s*\/\s*(\d+)/);
+
+    if (m) {
+      const max = Number(m[2]);
+      if (Number.isFinite(max) && max > 0) return cy.wrap(max, { log: false });
+    }
+
+    const $specPanel = $body
+      .find('h3')
+      .filter((_, el) => /product\s*specification/i.test(el.textContent || ''))
+      .first()
+      .closest('.panel');
+
+    const selectedSpecs = $specPanel
+      .find('select[formcontrolname="selectedListBox"]')
+      .first()
+      .find('option')
+      .map((_, o) => Cypress.$(o).text().trim())
+      .get();
+
+    const hasInternet = selectedSpecs.some((t) => /^internet$/i.test(t));
+    return cy.wrap(hasInternet ? 40 : 100, { log: false });
+  }) as unknown as Cypress.Chainable<number>;
+};
+
+const buildNameWithinLimit = (strippedName: string, abbr: string, maxLen: number): string => {
+  const base = String(strippedName ?? '').trim().replace(/\s+/g, ' ');
+  const tag = String(abbr ?? '').trim();
+  const full = tag ? `${base} ${tag}` : base;
+  if (full.length <= maxLen) return full;
+
+  const idMatch = base.match(PO_ID_RE);
+  const poId = idMatch ? idMatch[1].trim() : '';
+  const head = idMatch ? base.slice(0, idMatch.index).trim() : base;
+  const mustKeep = [poId, tag].filter(Boolean).join(' ');
+
+  if (mustKeep.length >= maxLen) {
+    return (poId || base).substring(0, maxLen).trimEnd();
+  }
+
+  const roomForHead = maxLen - mustKeep.length - (mustKeep ? 1 : 0);
+  let trimmedHead = head.substring(0, Math.max(0, roomForHead)).trimEnd();
+  if (trimmedHead.length && head.length > trimmedHead.length) {
+    const ls = trimmedHead.lastIndexOf(' ');
+    if (ls > roomForHead * 0.5) trimmedHead = trimmedHead.substring(0, ls);
+  }
+
+  const out = [trimmedHead, mustKeep].filter(Boolean).join(' ').trim();
+  return out.length > maxLen ? out.substring(0, maxLen).trimEnd() : out;
+};
 
 export const RandomHumanTouchPoint = (subModule?: string): void => {
-    // ✅ Reset env ทุกครั้งที่เริ่มประมวลผล PO ใหม่ ป้องกันค่าเก่าจาก PO ก่อนหน้าค้าง
-    Cypress.env('hasRom', false);
-    Cypress.env('hasEasyAppRom', false);
-    Cypress.env('touchPointAbbr', '');
+  Cypress.env('hasRom', false);
+  Cypress.env('hasEasyAppRom', false);
+  Cypress.env('touchPointAbbr', '');
 
-    cy.contains('.scrollmenu a', 'Selling Location & Channel', { timeout: 30000 })
-        .scrollIntoView()
-        .click({ force: true });
+  cy.contains('.scrollmenu a', 'Selling Location & Channel', { timeout: 30000 })
+    .scrollIntoView()
+    .click({ force: true });
 
-    cy.get('app-mass-mkt-human-touch-point', { timeout: 30000 })
-        .should('exist')
-        .and('be.visible');
+  cy.get('app-mass-mkt-human-touch-point', { timeout: 30000 })
+    .first()
+    .should('exist')
+    .and('be.visible');
 
-    // ✅ สร้าง meaningful text arrays แทน random string
-    const descriptionTexts = [
-        'Marketing campaign for Q3 2026',
-        'Promotional offer for new customers',
-        'Special discount program',
-        'Customer retention initiative',
-        'Seasonal promotion event',
-        'Loyalty reward program',
-        'Product launch campaign',
-        'Brand awareness initiative',
-        'Customer engagement program',
-        'Targeted marketing strategy',
-        'Digital marketing campaign',
-        'Customer acquisition program',
-        'Value-added service offer',
-        'Premium package promotion',
-        'Exclusive member benefits'
+  const descriptionTexts = [
+    'Marketing campaign for Q3 2026',
+    'Promotional offer for new customers',
+    'Special discount program',
+    'Exclusive deal for existing subscribers'
+  ];
+
+  const attachmentDescriptionTexts = [
+    'Campaign brochure PDF',
+    'Promotional materials document'
+  ];
+
+  const generateAccessNumber = (): string => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const pick = (n: number) =>
+      Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const rnd = (min: number, max: number) => Math.floor(Math.random() * (max - min) + min);
+    const formats = [
+      () => '*' + rnd(10000, 100000) + '*#',
+      () => '*' + pick(3) + '*#',
+      () => '*' + rnd(100, 1000) + pick(2) + '*#'
     ];
+    return formats[Math.floor(Math.random() * formats.length)]();
+  };
 
-    const attachmentDescriptionTexts = [
-        'Campaign brochure PDF',
-        'Promotional materials document',
-        'Marketing collateral file',
-        'Product information sheet',
-        'Customer guide document',
-        'Service agreement template',
-        'Terms and conditions',
-        'Promotion details document',
-        'Marketing presentation',
-        'Campaign guidelines PDF',
-        'Product catalog document',
-        'Service brochure file',
-        'Promotional flyer document',
-        'Customer information pack',
-        'Marketing asset file'
-    ];
+  const touchPointAbbrMap: Record<string, string> = {
+    'ROM': 'RM',
+    'Easy App ROM': 'ES RM',
+    'AIS Shop': 'AIS SHOP',
+    'AIS Shop by Partner (ASP)': 'ASP',
+    'Call Center': 'CC',
+    'Direct Sales': 'DS',
+    'Event': 'EVT',
+    'Modern Trade': 'MT',
+    'Telesales': 'TS',
+    'Telewiz': 'TWZ',
+    'Selective Channel/Location': 'SEL CH'
+  };
 
-    // ✅ สร้าง multiple formats สำหรับ access number
-    const generateAccessNumberWithFormat = (): string => {
-        const formats: (() => string)[] = [
-            // Format 1: *ตัวเลข 3-5 หลัก*#
-            () => {
-                const num = Math.floor(Math.random() * 90000 + 10000);
-                return `*${num}*#`;
-            },
-            // Format 2: *ตัวอักษร 3 ตัว*#
-            () => {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letters = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-                return `*${letters}*#`;
-            },
-            // Format 3: *ตัวเลข 3 หลัก + ตัวอักษร 2 ตัว*#
-            () => {
-                const num = Math.floor(Math.random() * 900 + 100);
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letters = Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-                return `*${num}${letters}*#`;
-            },
-            // Format 4: *ตัวอักษร 2 ตัว + ตัวเลข 4 หลัก*#
-            () => {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letters = Array.from({ length: 2 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-                const num = Math.floor(Math.random() * 9000 + 1000);
-                return `*${letters}${num}*#`;
-            },
-            // Format 5: *ตัวเลข 6 หลัก*#
-            () => {
-                const num = Math.floor(Math.random() * 900000 + 100000);
-                return `*${num}*#`;
-            },
-            // Format 6: *ตัวอักษร 4 ตัว + ตัวเลข 2 หลัก*#
-            () => {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letters = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-                const num = Math.floor(Math.random() * 90 + 10);
-                return `*${letters}${num}*#`;
-            },
-            // Format 7: *ตัวเลข 2 หลัก + ตัวอักษร 3 ตัว + ตัวเลข 2 หลัก*#
-            () => {
-                const num1 = Math.floor(Math.random() * 90 + 10);
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letters = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-                const num2 = Math.floor(Math.random() * 90 + 10);
-                return `*${num1}${letters}${num2}*#`;
-            },
-            // Format 8: *ตัวอักษร 1 ตัว + ตัวเลข 5 หลัก*#
-            () => {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letter = chars[Math.floor(Math.random() * chars.length)];
-                const num = Math.floor(Math.random() * 90000 + 10000);
-                return `*${letter}${num}*#`;
-            },
-            // Format 9: *ตัวเลข 4 หลัก + ตัวอักษร 1 ตัว + ตัวเลข 2 หลัก*#
-            () => {
-                const num1 = Math.floor(Math.random() * 9000 + 1000);
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letter = chars[Math.floor(Math.random() * chars.length)];
-                const num2 = Math.floor(Math.random() * 90 + 10);
-                return `*${num1}${letter}${num2}*#`;
-            },
-            // Format 10: *ตัวอักษร 5 ตัว*#
-            () => {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-                const letters = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-                return `*${letters}*#`;
-            }
-        ];
+  type FieldGroup = 'rom' | 'desc' | 'access' | 'none';
+  const channelFieldMap: Record<string, FieldGroup[]> = {
+    'ROM': ['rom', 'desc'],
+    'Easy App ROM': ['rom', 'desc'],
+    'Event': ['desc'],
+    'Selective Channel/Location': ['desc'],
+    'AIS Shop': ['desc'],
+    'AIS Shop by Partner (ASP)': ['desc'],
+    'Direct Sales': ['desc'],
+    'Modern Trade': ['desc'],
+    'Telesales': ['desc'],
+    'Telewiz': ['desc'],
+  };
 
-        // สุ่มเลือก format
-        const randomFormat = formats[Math.floor(Math.random() * formats.length)];
-        return randomFormat();
-    };
+  // ── helpers ────────────────────────────────────────────────────────────────
 
-    const touchPointAbbrMap: Record<string, string> = {
-        'ROM': 'RM',
-        'Easy App ROM': 'ES RM',
-    };
-
-    let finalSelection: string[] = [];
-    let touchPointAbbr = '';
-
-    // -----------------------------------------------------------
-    // STEP 1: วิเคราะห์และเลือกตัวเลือกจาก Dual List Box
-    // -----------------------------------------------------------
-    cy.get('app-mass-mkt-human-touch-point').within(() => {
-        cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
-            .find('option')
-            .then($options => {
-                const allOptions = [...$options].map(opt => opt.innerText.trim()).filter(t => t !== '');
-                const mandatoryTargets = ['ROM', 'Easy App ROM'];
-                const availableTargets = mandatoryTargets.filter(target => allOptions.includes(target));
-
-                let itemsToSelect: string[] = [];
-
-                // ✅ ถ้าไม่มีทั้งคู่ → Fail ทันที
-                if (availableTargets.length === 0) {
-                    throw new Error('❌ Critical Error: Neither ROM nor Easy App ROM is available in the list!');
-                }
-
-                // ✅ ถ้ามีให้เลือกได้ทั้ง ROM และ Easy App ROM (list มีทั้ง 2 ตัว)
-                // → สุ่มว่าจะเลือกทั้งคู่ หรือเลือกแค่ตัวเดียว
-                // ถ้า list มีแค่ตัวเดียว (อีกตัวไม่มีใน DOM) → เลือกตัวที่มีเลย ไม่ต้องสุ่ม
-                if (availableTargets.length >= 2) {
-                    const pickBoth = Cypress._.random(0, 1) === 1;
-
-                    if (pickBoth) {
-                        itemsToSelect = [...availableTargets];
-                        cy.log(`🎲 Logic Selected: BOTH (${itemsToSelect.join(', ')})`);
-                    } else {
-                        const singlePick = Cypress._.sample(availableTargets) ?? '';
-                        itemsToSelect = [singlePick];
-                        cy.log(`🎲 Logic Selected: SINGLE (${singlePick})`);
-                    }
-                } else {
-                    itemsToSelect = [...availableTargets];
-                    cy.log(`🎲 Logic Selected: SINGLE ONLY - อีกตัวไม่มีใน list (${itemsToSelect[0]})`);
-                }
-
-                if (itemsToSelect.length === 0) {
-                    throw new Error('❌ Critical Error: Failed to select ROM or Easy App ROM!');
-                }
-
-                const hasRom = itemsToSelect.includes('ROM');
-                const hasEasyAppRom = itemsToSelect.includes('Easy App ROM');
-                Cypress.env('hasRom', hasRom);
-                Cypress.env('hasEasyAppRom', hasEasyAppRom);
-
-                touchPointAbbr = itemsToSelect
-                    .map(item => touchPointAbbrMap[item])
-                    .filter(Boolean)
-                    .join(' ');
-                Cypress.env('touchPointAbbr', touchPointAbbr);
-
-                cy.log(`🏷️ Touch Point Abbr (stored): ${touchPointAbbr}`);
-
-                const otherOptions = allOptions.filter(opt => !mandatoryTargets.includes(opt));
-                // ป้องกันการสุ่มมากกว่าจำนวนตัวเลือกที่มีอยู่จริง
-                const maxRandom = Math.min(2, otherOptions.length);
-                const randomOthers = Cypress._.sampleSize(otherOptions, Cypress._.random(0, maxRandom));
-
-                // เก็บผลลัพธ์สุดท้ายไว้ในตัวแปรนอก .within() เพื่อนำไปใช้ต่อ
-                finalSelection = [...itemsToSelect, ...randomOthers];
-
-                cy.log(`✅ Final Selection (stored, not applied yet): ${finalSelection.join(', ')}`);
-            });
+  /** รอจนฟอร์ม Edit เปิดจริง (เห็นปุ่ม Update) แทน cy.wait(500) แบบเดา */
+  const waitForEditFormOpen = (): void => {
+    cy.get('button:visible', { timeout: 10000, withinSubject: null }).should(($btns) => {
+      const has = $btns.toArray().some((el) => (el.textContent || '').trim() === 'Update');
+      expect(has, 'ฟอร์ม Edit ต้องแสดงปุ่ม Update').to.equal(true);
     });
+  };
 
-      // -----------------------------------------------------------
-    // STEP 2: อัปเดตชื่อ PO Name (ถ้ามีการเลือก ROM / Easy App ROM)
-    // -----------------------------------------------------------
-    cy.then(() => {
-        if (!touchPointAbbr) {
-            cy.log('ℹ️ No ROM/Easy App ROM selected — skip PO Name update');
-            return;
+  /** รอจนฟอร์ม Edit ปิด (ปุ่ม Update หาย) — ถ้าไม่ปิดแปลว่า Update ไม่สำเร็จ เช่น validation ไม่ผ่าน */
+  const waitForEditFormClosed = (): void => {
+    cy.get('body', { withinSubject: null, timeout: 10000 }).should(($body) => {
+      const stillOpen = $body
+        .find('button:visible')
+        .toArray()
+        .some((el) => (el.textContent || '').trim() === 'Update');
+      expect(stillOpen, 'ฟอร์ม Edit ควรปิดหลังกด Update (ถ้ายังเปิดอยู่ ค่าอาจไม่ถูกบันทึก)').to.equal(false);
+    });
+  };
+
+  /** ช่องที่ "ต้องมี" — retry จนเจอ, type, แล้วยืนยันว่าค่าเข้าจริง ไม่เจอ = fail */
+  const typeRequired = (selector: string, value: string): void => {
+    cy.get(`${selector}:visible`, { timeout: 10000, withinSubject: null })
+      .first()
+      .clear({ force: true })
+      .type(value, { force: true })
+      .should('have.value', value);
+  };
+
+  /** ช่องที่ "อาจไม่มี" ตาม channel — ถ้าไม่เจอให้ log เตือน (ไม่ข้ามเงียบ) */
+  const typeIfVisible = (selector: string, value: string): void => {
+    cy.document({ log: false }).then((doc) => {
+      const $el = Cypress.$(selector, doc).filter(':visible');
+      if ($el.length === 0) {
+        cy.log(`⚠️ ไม่พบช่อง ${selector} — ข้าม`);
+        return;
+      }
+      cy.wrap($el.first()).clear({ force: true }).type(value, { force: true });
+    });
+  };
+
+  const clickUpdateButton = (): void => {
+    cy.get('button:visible', { timeout: 10000, withinSubject: null })
+      .filter((_, el) => (el.textContent || '').trim() === 'Update')
+      .first()
+      .should('not.be.disabled')
+      .click({ force: true });
+  };
+
+  const fillChannelFields = (channelName: string): void => {
+    const groups: FieldGroup[] = channelFieldMap[channelName] || ['none'];
+
+    const needAccessNumber =
+      groups.indexOf('access') !== -1 ||
+      (subModule === 'PRE' && (channelName === 'ROM' || channelName === 'Easy App ROM'));
+
+    if (needAccessNumber) {
+      const sub = generateAccessNumber();
+      let unsub = generateAccessNumber();
+      while (unsub === sub) unsub = generateAccessNumber();
+
+      typeRequired('input[formcontrolname="subscribeAccessNumber"]', sub);
+      typeRequired('input[formcontrolname="unsubscribeAccessNumber"]', unsub);
+      cy.log(`📞 ${channelName}: subscribe=${sub} | unsubscribe=${unsub}`);
+    }
+
+    if (groups.indexOf('rom') !== -1) {
+      typeIfVisible('input[formcontrolname="romPrice"]', (Math.random() * 990 + 10).toFixed(2));
+      typeIfVisible('textarea[formcontrolname="description"]', Cypress._.sample(descriptionTexts) || '');
+      cy.document({ log: false }).then((doc) => {
+        const $file = Cypress.$('input[type="file"]', doc);
+        if ($file.length > 0) {
+          cy.wrap($file.first()).selectFile('cypress/fixtures/file.pdf', { force: true });
+          cy.wait(300);
+          typeIfVisible('textarea[formcontrolname="attachmentDescription"]', Cypress._.sample(attachmentDescriptionTexts) || '');
+        }
+      });
+    }
+
+    if (groups.indexOf('desc') !== -1 && groups.indexOf('rom') === -1) {
+      typeIfVisible('textarea[formcontrolname="description"]', Cypress._.sample(descriptionTexts) || '');
+    }
+  };
+
+  // ── 1) สุ่มเลือก touch point ────────────────────────────────────────────────
+
+  let finalSelection: string[] = [];
+  let touchPointAbbr = '';
+
+  cy.get('app-mass-mkt-human-touch-point').first().within(() => {
+    cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
+      .first()
+      .find('option')
+      .then($options => {
+        const allOptions = Array.from($options).map(opt => opt.innerText.trim()).filter(t => t !== '');
+        const mandatoryTargets = ['ROM', 'Easy App ROM'];
+        const availableTargets = mandatoryTargets.filter(t => allOptions.indexOf(t) !== -1);
+        let mandatorySelection: string[] = [];
+
+        if (availableTargets.length === 0) {
+          mandatorySelection = Cypress._.sampleSize(allOptions, Math.min(2, allOptions.length));
+        } else if (availableTargets.length >= 2) {
+          mandatorySelection = Cypress._.random(0, 1) === 1 ? [...availableTargets] : [Cypress._.sample(availableTargets) || ''];
+        } else {
+          mandatorySelection = [...availableTargets];
         }
 
-        cy.get('input[formcontrolname="productName"]', { timeout: 20000 })
-            .scrollIntoView()
-            .should('be.visible')
-            .and('not.be.disabled')
-            .invoke('val')
-            .then(currentVal => {
-                const currentName = (currentVal as string) || '';
+        Cypress.env('hasRom', mandatorySelection.indexOf('ROM') !== -1);
+        Cypress.env('hasEasyAppRom', mandatorySelection.indexOf('Easy App ROM') !== -1);
 
-                // ✅ ลบ abbr เก่า (RM / ES RM) ที่อาจติดค้างจาก PO ก่อนหน้าออกก่อนเสมอ
-                const knownAbbrs = Object.values(touchPointAbbrMap);
-                const strippedName = knownAbbrs
-                    .reduce((name, abbr) => name.replace(new RegExp(`\\s*${abbr}\\s*$`), ''), currentName)
-                    .trim();
+        const otherOptions = allOptions.filter(opt => mandatorySelection.indexOf(opt) === -1);
+        const extraCount = Math.min(Cypress._.random(0, 2), otherOptions.length);
+        const extraSelection = Cypress._.sampleSize(otherOptions, extraCount);
 
-                const newName = `${strippedName} ${touchPointAbbr}`.trim();
+        finalSelection = mandatorySelection.concat(extraSelection).filter(Boolean);
 
-                // ✅ แก้ไข: Chain .blur() ต่อท้าย .type() โดยตรง เพื่อป้องกัน Error "not focused"
-                cy.get('input[formcontrolname="productName"]')
-                    .clear()
-                    .type(newName, { delay: 20 })
-                    .blur();
+        touchPointAbbr = finalSelection.map(item => touchPointAbbrMap[item]).filter(Boolean).join(' ');
+        if (!touchPointAbbr) touchPointAbbr = 'HTP';
+        Cypress.env('touchPointAbbr', touchPointAbbr);
+      });
+  });
 
-                // ✅ สำคัญมาก: อัปเดตทั้ง currentPoName และ poName
-                // — นี่คือ key ที่ promoteToActmRole (ROM / Easy App ROM role) อ่านค่า
-                //   PO ล่าสุดเพื่อ Claim/Approve อยู่แล้ว ไม่ต้อง sync กลับเข้า
-                //   ProjectManager (getStandardProjectName) เพราะ ProjectManager
-                //   เก็บ "ชื่อ Project" (index เดียวกับตอน registerProjectName ใน
-                //   project-creation.ts) — ถ้าเรียก updateProjectName(newName) ที่นี่
-                //   จะเขียนทับชื่อ Project จริงด้วยชื่อ PO (...RM) ทันที ทำให้
-                //   cksDoerFinalStep / ClaimProject(claimBy: 'project') รอบสุดท้าย
-                //   หา Project ไม่เจอ (ดู bugfix note ด้านล่าง)
-                Cypress.env('currentPoName', newName);
-                Cypress.env('poName', newName);
+  // ── 2) ปรับชื่อ PO ────────────────────────────────────────────────────────
 
-                // ❌ เดิมมีบรรทัด updateProjectName(newName) ตรงนี้ — ถูกลบออกแล้ว
-                //    เพราะมันเขียนทับชื่อ Project ตัวจริงใน ProjectManager Map
-                //    (index เดียวกับที่ registerProjectName ตั้งไว้ตอนสร้าง Project)
-                //    ด้วยชื่อ PO ที่เพิ่ง rename (มี suffix RM/ES RM) ส่งผลให้
-                //    getStandardProjectName() ที่จุดอื่น (เช่น cksDoerFinalStep,
-                //    performMusicRoles, performTscenterRoleOnly) คืนชื่อ PO แทน
-                //    ชื่อ Project จริง → ClaimProject(claimBy: 'project') หา row
-                //    ไม่เจอใน Unassigned Task แล้ว timeout ตอนกด Next page
-                //
-                //    promoteToActmRole (ที่ใช้กับ ROM / Easy App ROM) อ่านค่าจาก
-                //    Cypress.env('currentPoName') อยู่แล้วเป็นค่าแรก (บรรทัดด้านบน
-                //    set ไว้ครบแล้ว) จึงไม่จำเป็นต้อง sync เข้า ProjectManager อีก
+  cy.then(() => {
+    if (!touchPointAbbr) return;
+    resolveProductNameMaxLength().then((maxLen) => {
+      cy.get('input[formcontrolname="productName"]', { timeout: 20000 })
+        .first()
+        .should('be.visible')
+        .invoke('val')
+        .then(currentVal => {
+          const currentName = String(currentVal ?? '');
+          const strippedName = stripTrailingAbbrs(currentName);
 
-                cy.log(`✅ PO Name updated (fresh): ${newName}`);
-            });
+          const prevAbbr = Cypress.env('nonHumanTouchPointAbbr') || '';
+          const combinedAbbr = [prevAbbr, touchPointAbbr].filter(Boolean).join(' ');
+          const newName = buildNameWithinLimit(strippedName, combinedAbbr, maxLen);
+
+          cy.get('input[formcontrolname="productName"]')
+            .first()
+            .clear({ force: true })
+            .type(newName, { force: true, delay: 0 })
+            .should('have.value', newName)
+            .blur();
+
+          Cypress.env('currentPoName', newName);
+          Cypress.env('poName', newName);
+        });
+    });
+  });
+
+  // ── 3) เลือก touch point เข้า dual list แล้ว Edit ทีละแถว ───────────────────
+
+  cy.get('app-mass-mkt-human-touch-point').first().within(() => {
+    cy.then(() => {
+      if (finalSelection.length === 0) return;
+      cy.get('select[formcontrolname="availableListBox"]').first().select(finalSelection, { force: true });
+      cy.get('ng2-dual-list-box button.str').first().should('not.be.disabled').click({ force: true });
+      cy.get('select[formcontrolname="selectedListBox"]').first().find('option').should('have.length.at.least', 1);
     });
 
-    // -----------------------------------------------------------
-    // STEP 3: เลือกตัวเลือกใน Dual List Box และกดปุ่มย้าย (>)
-    // -----------------------------------------------------------
-    cy.get('app-mass-mkt-human-touch-point').within(() => {
-        cy.then(() => {
-            // ป้องกัน Error กรณีไม่มีรายการให้เลือกเลย (ปุ่ม str จะ disabled ตลอดเวลา)
-            if (finalSelection.length === 0) {
-                cy.log('⚠️ No items to select, skipping dual list box action');
-                return;
-            }
+    const processedChannels = new Set<string>();
 
-            cy.get('select[formcontrolname="availableListBox"]', { timeout: 20000 })
-                .should('exist')
-                .select(finalSelection, { force: true });
+    const editNextRow = (iter = 0): void => {
+      if (iter > 25) throw new Error('❌ วน Edit แถว Human Touch Point เกินรอบที่กำหนด');
 
-            cy.get('ng2-dual-list-box button.str', { timeout: 20000 })
-                .should('exist')
-                .and('not.be.disabled')
-                .click({ force: true });
+      cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 }).then($rows => {
+        const rowsArray = Array.from($rows);
+        const targetIdx = rowsArray.findIndex(row => {
+          const text = Cypress.$(row).find('td').first().text().trim();
+          return finalSelection.includes(text) && !processedChannels.has(text);
         });
 
-        // -----------------------------------------------------------
-        // STEP 4: Loop เพื่อกรอกข้อมูล (Edit) ในแต่ละแถว
-        // -----------------------------------------------------------
-        const editNextApplicableRow = (): void => {
-            cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 }).then($rows => {
-                const nextRow = [...$rows].find($row => {
-                    const firstCellText = $row.querySelector('td')?.textContent?.trim() ?? '';
-                    return (
-                        firstCellText === 'ROM' ||
-                        firstCellText === 'Easy App ROM' ||
-                        firstCellText === 'Event' ||
-                        firstCellText === 'Selective Channel/Location'
-                    );
-                });
+        if (targetIdx === -1) {
+          const missed = finalSelection.filter(c => !processedChannels.has(c));
+          if (missed.length > 0) cy.log(`⚠️ ไม่พบแถวสำหรับ: ${missed.join(', ')}`);
+          return;
+        }
 
-                if (!nextRow) {
-                    cy.log('✅ No remaining applicable rows to edit');
-                    return;
-                }
+        const $target = Cypress.$(rowsArray[targetIdx]);
+        const targetChannel = $target.find('td').first().text().trim();
+        processedChannels.add(targetChannel);
 
-                const channel = nextRow.querySelector('td')?.textContent?.trim() ?? '';
-                if (!channel) {
-                    cy.log('⚠️ Skipping empty row after re-query');
-                    return;
-                }
+        const $editBtn = $target.find('button[title="Edit"]');
+        if ($editBtn.length === 0) {
+          throw new Error(`❌ ไม่พบปุ่ม Edit ของแถว "${targetChannel}"`);
+        }
+        ($editBtn[0] as HTMLElement).click();
 
-                cy.log(`✏️ Edit Human Touch Point: ${channel}`);
-
-                cy.wrap(nextRow)
-                    .find('button[title="Edit"]', { timeout: 20000 })
-                    .should('be.visible')
-                    .click({ force: true });
-
-                if (channel === 'ROM' || channel === 'Easy App ROM') {
-                    if (subModule === 'PRE') {
-                        let sub = '';
-                        let unsub = '';
-
-                        do {
-                            sub = generateAccessNumberWithFormat();
-                            unsub = generateAccessNumberWithFormat();
-                        } while (sub === unsub);
-
-                        cy.get('input[formcontrolname="subscribeAccessNumber"]', { timeout: 20000 })
-                            .should('be.visible')
-                            .clear()
-                            .type(sub);
-
-                        cy.get('input[formcontrolname="unsubscribeAccessNumber"]', { timeout: 20000 })
-                            .should('be.visible')
-                            .clear()
-                            .type(unsub);
-
-                        cy.log(`📱 Subscribe: ${sub}, Unsubscribe: ${unsub}`);
-                    }
-
-                    const randomDescription = Cypress._.sample(descriptionTexts) ?? '';
-                    cy.get('textarea[formcontrolname="description"]', { timeout: 20000 })
-                        .should('be.visible')
-                        .clear()
-                        .type(randomDescription);
-
-                    cy.get('input[type="file"]', { timeout: 20000 })
-                        .should('exist')
-                        .selectFile('cypress/fixtures/file.pdf', { force: true });
-
-                    const randomAttachmentDesc = Cypress._.sample(attachmentDescriptionTexts) ?? '';
-                    cy.get('textarea[formcontrolname="attachmentDescription"]', { timeout: 20000 })
-                        .should('be.visible')
-                        .clear()
-                        .type(randomAttachmentDesc);
-                }
-
-                if (channel === 'Event' || channel === 'Selective Channel/Location') {
-                    const randomDescription = Cypress._.sample(descriptionTexts) ?? '';
-                    cy.get('textarea[formcontrolname="description"]', { timeout: 20000 })
-                        .should('be.visible')
-                        .clear()
-                        .type(randomDescription);
-                }
-
-                cy.contains('button', 'Update', { timeout: 20000 })
-                    .should('be.visible')
-                    .click({ force: true });
-
-                cy.wait(500);
-                editNextApplicableRow();
-            });
-        };
-
-        cy.get('table tbody tr.ng-star-inserted', { timeout: 30000 })
-            .should('have.length.greaterThan', 0);
-
-        editNextApplicableRow();
-    });
+        waitForEditFormOpen();
+        fillChannelFields(targetChannel);
+        clickUpdateButton();
+        waitForEditFormClosed();
+        cy.wait(600);
+        editNextRow(iter + 1);
+      });
+    };
+    editNextRow();
+  });
 };

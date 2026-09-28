@@ -1,9 +1,6 @@
 import * as Master from '../../../Master';
-
 type PriceType = 'onetime' | 'recurring' | 'usage';
-
 let isFirstRun = true;
-
 beforeEach(() => {
     if (isFirstRun) {
         cy.clearLocalStorage();
@@ -13,24 +10,17 @@ beforeEach(() => {
         });
         isFirstRun = false;
     }
-
     cy.visit(Master.urlsit, {
         timeout: 60000,
         onBeforeLoad: (win) => {
             win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
         }
     });
-
     cy.get('app-login', { timeout: 60000 }).should('be.visible');
     cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
 });
-
-// ========================
-// USSD (Non-Human Touch Point) - Main
-// ========================
 describe('USSD - POST-PAID Main', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
-
     priceTypes.forEach((priceType) => {
         describe(`Standard ${priceType}`, () => {
             describe('Mobile', () => {
@@ -44,20 +34,16 @@ describe('USSD - POST-PAID Main', () => {
                 });
                 if (priceType === 'usage') {
                     Master.afterMKTMainUsagePOST();
-                } else {
+                }
+                else {
                     Master.afterMKTMAINPOST();
                 }
             });
         });
     });
 });
-
-// ========================
-// USSD (Non-Human Touch Point) - Ontop
-// ========================
 describe('USSD - POST-PAID Ontop', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
-
     priceTypes.forEach((priceType) => {
         describe(`${priceType}`, () => {
             describe('Mobile', () => {
@@ -96,13 +82,8 @@ describe('USSD - POST-PAID Ontop', () => {
         });
     });
 });
-
-// ========================
-// USSD (Non-Human Touch Point) - OntopExtra
-// ========================
 describe('USSD - POST-PAID OntopExtra', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
-
     priceTypes.forEach((priceType) => {
         describe(`${priceType}`, () => {
             describe('Mobile', () => {

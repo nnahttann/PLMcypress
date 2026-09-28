@@ -1,9 +1,6 @@
 import * as Master from '../../Master';
-
 type PriceType = 'onetime' | 'recurring' | 'usage';
-
 let isFirstRun = true;
-
 beforeEach(() => {
     if (isFirstRun) {
         cy.clearLocalStorage();
@@ -13,19 +10,15 @@ beforeEach(() => {
         });
         isFirstRun = false;
     }
-
     cy.visit(Master.urlsit, {
         timeout: 60000,
         onBeforeLoad: (win) => {
             win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
         }
     });
-
     cy.get('app-login', { timeout: 60000 }).should('be.visible');
     cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
 });
-
-// ===== PRE-PAID Main =====
 describe('PRE-PAID Main', () => {
     const priceTypes: PriceType[] = ['onetime'];
     priceTypes.forEach((priceType) => {
@@ -47,11 +40,8 @@ describe('PRE-PAID Main', () => {
         });
     });
 });
-
-// ===== PRE-PAID Ontop =====
 describe('PRE-PAID Ontop', () => {
     const priceTypes: PriceType[] = ['onetime'];
-
     priceTypes.forEach((priceType) => {
         describe(`Standard ${priceType}`, () => {
             describe('Mobile', () => {
@@ -75,10 +65,8 @@ describe('PRE-PAID Ontop', () => {
         });
     });
 });
-
 describe('PRE-PAID Ontop Plugin', () => {
     const priceTypes: PriceType[] = ['recurring'];
-
     priceTypes.forEach((priceType) => {
         describe(`Standard ${priceType}`, () => {
             describe('Mobile', () => {
@@ -102,11 +90,8 @@ describe('PRE-PAID Ontop Plugin', () => {
         });
     });
 });
-
-// ===== PRE-PAID OntopEx =====
 describe('PRE-PAID OntopEx', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
-
     priceTypes.forEach((priceType) => {
         describe(`Standard ${priceType}`, () => {
             describe('Mobile', () => {
@@ -129,7 +114,6 @@ describe('PRE-PAID OntopEx', () => {
             });
         });
     });
-
     priceTypes.forEach((priceType) => {
         describe(`PlugIN ${priceType}`, () => {
             describe('Mobile', () => {
