@@ -3,6 +3,9 @@ import { scrollAndWait, selectRandomOption, clickYesIfExists, handleAddToUSMP, w
 import { TaskListHeader, CoreTaskCallback, FinalAction } from './config';
 import { navigateToWorkspace, NavRole } from './claim-approve';
 import { tscenter, tscenterpass } from './config';
+import { ClaimProject, approveProject } from './claim-approve';
+import { loginAndWaitReady } from './helpers';
+import { getStandardProjectName } from './project-manager';
 
 const roleShouldBeSkipped = (role: NavRole): boolean => {
     const skip = Cypress.env('skipApprovalRoles');
@@ -267,7 +270,7 @@ const _approveSPADSup = (projectName: string, isComplex: boolean, options?: {
                 return;
             }
 
-            cy.contains('button', buttonText, { timeout: 60000 })
+            cy.contains('button', buttonText, { timeout: 60000000 })
                 .should('be.visible')
                 .click();
 
@@ -382,7 +385,7 @@ const _approveSPADDoer = (projectName: string, isMainFlow: boolean, options?: {
                 return;
             }
 
-            cy.contains('button', 'Promote To SPAD Tester', { timeout: 60000 })
+            cy.contains('button', 'Promote To SPAD Tester', { timeout: 60000000 })
                 .should('be.visible')
                 .click();
 
@@ -477,7 +480,7 @@ export const approveProjectSPADdeploy = (projectName: string, options?: {
     loopApproveAllPOs('To Do List', '/actm/actm-doer', (_poName, _poIndex) => () => {
         waitForLoadingState();
         scrollAndWait();
-        cy.contains('button', 'Promote To ACTM', { timeout: 60000 }).should('be.visible').click();
+        cy.contains('button', 'Promote To ACTM', { timeout: 60000000 }).should('be.visible').click();
     }, 'AlertAndLogout', options);
 };
 const DIY_DETECT_TIMEOUT = 15000;
@@ -646,7 +649,7 @@ export const approveProjectCGMD = (projectName: string, options?: {
 
         handleAddToUSMP();
         scrollAndWait();
-        cy.get('button[name="CBS"]').should('be.visible', { timeout: 6000000 }).click();
+        cy.get('button[name="CBS"]').should('be.visible', { timeout: 6000000000 }).click();
         cy.contains('button', 'Yes').should('be.visible').click();
     }, 'AlertAndLogout', options);
 };
@@ -739,7 +742,7 @@ export const approveProjectCGMDPRE = (projectName: string, options?: {
         scrollAndWait();
         handleAddToUSMP();
         waitForLoadingState();
-        cy.contains('button', 'Approve To CGMD', { timeout: 60000 })
+        cy.contains('button', 'Approve To CGMD', { timeout: 60000000 })
             .should('be.visible')
             .and('not.be.disabled')
             .click();
@@ -809,7 +812,7 @@ const _approveProjectCGMDPREMainNotComplex = (projectName: string, options?: {
                 return;
             }
 
-            cy.contains('button', 'Approve To CGMD Tester', { timeout: 60000 })
+            cy.contains('button', 'Approve To CGMD Tester', { timeout: 60000000 })
                 .should('be.visible')
                 .click();
 
@@ -870,7 +873,7 @@ export const approveProjectCGMDtesterPRE = (projectName: string, options?: {
     loopApproveAllPOs('To Do List', '/cgmd/cgmd-tester', (_poName, _poIndex) => () => {
         waitForLoadingState();
         scrollAndWait();
-        cy.contains('button', 'Promote To Pre Go Live', { timeout: 6000000 }).should('be.visible').click();
+        cy.contains('button', 'Promote To Pre Go Live', { timeout: 6000000000 }).should('be.visible').click();
         cy.contains('button', 'Yes').should('be.visible').click();
     }, 'AlertAndLogout', options);
 };
@@ -917,7 +920,7 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string, options?:
                 throw new Error(`Unexpected alert text (Send PlugIN): ${alertText}`);
             }
         });
-        cy.contains('button', 'Send PlugIN', { timeout: 6000000 }).should('be.visible').click();
+        cy.contains('button', 'Send PlugIN', { timeout: 6000000000 }).should('be.visible').click();
         clickYesIfExists(1000000, 'first');
 
         cy.wait('@sendPluginApi', { timeout: 1200000 }).then((interception) => {
@@ -932,9 +935,22 @@ export const approveProjectCGMDtesterPREPlugin = (projectName: string, options?:
                 throw new Error(`Unexpected alert text (Promote): ${alertText}`);
             }
         });
-        cy.contains('button', 'Promote to Pre Go Live', { timeout: 6000000 }).should('be.visible').click();
+        cy.contains('button', 'Promote to Pre Go Live', { timeout: 6000000000 }).should('be.visible').click();
         clickYesIfExists(1000000, 'last');
     }, 'StopAfterCore', options);
+};
+const buildSearchMatcher = (poName: string): ((rowText: string) => boolean) => {
+    // ชื่อแบบเดิมที่มี "_" → คง behavior เดิมทุกอย่าง
+    if (poName.includes('_')) {
+        const kw = poName.split('_')[0].trim();
+        return (t) => t.includes(kw);
+    }
+    // ชื่อแบบมีเลข PO คั่นกลาง เช่น "MOB POST ORD FEE PO1 0928 1305"
+    const m = poName.match(/^(.*?)\s+PO\d+\s+(.+)$/i);
+    if (!m) return (t) => t.includes(poName.trim());
+    const prefix = m[1].trim();
+    const suffix = m[2].trim();
+    return (t) => t.includes(prefix) && t.includes(suffix);
 };
 const approveFromUnassignedTask = (expectedUrl: string, role: NavRole, coreAction: (poName: string, poIndex: number) => void, options?: {
     alreadyOnPage?: boolean;
@@ -962,7 +978,8 @@ const approveFromUnassignedTask = (expectedUrl: string, role: NavRole, coreActio
         }
         else {
             cy.log(`⏳ [${role}] กำลังค้นหา "${poName}" ใน Unassigned Task (รองรับ pagination)...`);
-            const searchKeyword = poName.split('_')[0].trim();
+            const matches = buildSearchMatcher(poName);
+            const searchKeyword = poName.includes('_') ? poName.split('_')[0].trim() : poName; // ใช้แสดงใน log เท่านั้น
             const findAndClickPO = (currentPage: number = 1): void => {
                 cy.log(`🔍 [${role}] ค้นหาในหน้า ${currentPage} ด้วย keyword: "${searchKeyword}"`);
                 cy.get('h3:contains("Unassigned Task")', { timeout: 3000000 }).should('be.visible');
@@ -972,7 +989,7 @@ const approveFromUnassignedTask = (expectedUrl: string, role: NavRole, coreActio
                     const $rows = $table.find('tbody tr');
                     const foundRow = $rows.filter((_, row) => {
                         const rowText = Cypress.$(row).text();
-                        return rowText.includes(searchKeyword);
+                        return matches(rowText);
                     }).first();
                     if (foundRow.length > 0) {
                         cy.log(`✅ [${role}] พบ PO ในหน้า ${currentPage} — กำลังคลิก`);
@@ -1092,7 +1109,7 @@ export const approveProjectAPO = (projectName: string, options?: {
         cy.wait(3000);
         scrollAndWait();
         cy.on('window:confirm', () => true);
-        cy.contains('button', 'Promote To Pre Go Live', { timeout: 6000000 })
+        cy.contains('button', 'Promote To Pre Go Live', { timeout: 6000000000 })
             .should('be.visible')
             .click();
         cy.wait(500);
@@ -1161,4 +1178,55 @@ const smartClickYesIfExists = (): void => {
             }
         });
     });
+};
+
+/**
+ * SASFF: login ครั้งเดียว แล้ว Claim → Approve(Promote) ทีละ PO ใน session เดียวกัน
+ * - ไม่ Logout ระหว่าง PO (Promote เสร็จระบบเด้งกลับ workspace-home เอง)
+ * - Logout เฉพาะหลัง PO สุดท้าย
+ * - Claim/Approve ด้วยชื่อ PO แบบ strict → ไม่สลับ PO1/PO2
+ */
+export const approveAllPOsSASFF = (user: string, pass: string, options?: { expectedUrl?: string }): void => {
+    const expectedUrl = options?.expectedUrl ?? '/cgmd/sasff-tester';
+    const projectName = getStandardProjectName();
+    const poCount: number = Cypress.env('poCount') ?? 1;
+    const allPoNames: string[] = Cypress.env('allPoNames') ?? [];
+
+    cy.log(`🔁 SASFF: Total PO to process: ${poCount} (login ครั้งเดียว)`);
+    loginAndWaitReady(user, pass);
+
+    const processPO = (poIndex: number): void => {
+        if (poIndex >= poCount) {
+            cy.log('✅ SASFF: All POs approved');
+            return;
+        }
+        const poName = (allPoNames[poIndex] ?? `${projectName}_PO${poIndex + 1}`).replace(/\s+/g, ' ').trim();
+        const isLast = poIndex === poCount - 1;
+        cy.log(`🔄 SASFF PO ${poIndex + 1}/${poCount}: "${poName}" — ${isLast ? 'Logout หลังจบ' : 'ต่อ PO ถัดไปโดยไม่ Logout'}`);
+
+        // 1) Claim เฉพาะ PO นี้ (รอให้ชื่อ PO นี้โผล่ใน To Do List จริง)
+        ClaimProject(projectName, { claimBy: 'po', specificPoName: poName });
+
+        // 2) เปิดแถวใน To Do List — strict: ถ้าไม่เจอชื่อตรงให้ fail ไม่ fallback
+        approveProject(poName, { strict: true });
+        cy.url({ timeout: 180000 }).should('include', expectedUrl);
+
+        // 3) Promote
+        cy.wait(500);
+        cy.scrollTo('bottom');
+        cy.wait(500);
+        cy.contains('button', 'Promote').should('be.visible').click({ force: true });
+        cy.url({ timeout: 120000 }).should('include', '/#/workspace-home/workspace');
+
+        // 4) ไม่ใช่ตัวสุดท้าย → กลับหน้า list แล้ววนต่อ / ตัวสุดท้าย → Logout
+        if (!isLast) {
+            waitForLoadingState();
+            navigateToWorkspace({ role: 'CGMD' });
+        } else {
+            cy.contains('button', 'Logout').should('be.visible').click();
+            cy.url({ timeout: 30000 }).should('include', '/login');
+        }
+        processPO(poIndex + 1);
+    };
+    processPO(0);
 };

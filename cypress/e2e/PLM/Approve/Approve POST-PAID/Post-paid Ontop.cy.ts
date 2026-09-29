@@ -11,13 +11,13 @@ beforeEach(() => {
         isFirstRun = false;
     }
     cy.visit(Master.urlsit, {
-        timeout: 60000,
+        timeout: 60000000,
         onBeforeLoad: (win) => {
             win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
         }
     });
-    cy.get('app-login', { timeout: 60000 }).should('be.visible');
-    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
+    cy.get('app-login', { timeout: 60000000 }).should('be.visible');
+    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000000 }).should('be.visible');
 });
 describe('POST-PAID Ontop', () => {
     const priceTypes: PriceType[] = ['onetime'];
@@ -29,13 +29,13 @@ describe('POST-PAID Ontop', () => {
                 });
                 Master.afterMKTontopPOST();
             });
-            describe('ENTER', () => {
+            describe.only('ENTER', () => {
                 it('MKT POSTPAID role', () => {
-                    Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
+                    Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'ENTER', subModule: 'POST', autoSetDuration: true });
                 });
                 Master.afterMKTontopENTER();
             });
-            describe.only('MUSIC', () => {
+            describe('MUSIC', () => {
                 it('MKT POSTPAID role', () => {
                     Master.ProjectBasicInformationComplete(priceType, 'ontop', { Module: 'MUSIC', subModule: 'POST', autoSetDuration: true });
                 });

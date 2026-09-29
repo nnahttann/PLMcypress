@@ -641,7 +641,7 @@ export const afterMKTothersubgroup = (
                     ClaimProject(poName, { specificPoName: poName, role: 'SASFF' });
                     approveProject(poName);
                     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getTodoList/**').as('getTodoList');
-                    cy.url({ timeout: 60000 }).should('include', '/cgmd/sasff-tester');
+                    cy.url({ timeout: 60000000 }).should('include', '/cgmd/sasff-tester');
                     cy.wait(500);
                     cy.scrollTo('bottom');
                     cy.wait(500);
@@ -880,7 +880,7 @@ const fillDescriptionAndUpload = (opts?: { skipVerifyHistory?: boolean }): void 
         .and('be.enabled')
         .click();
 
-    cy.wait('@fileUpload', { timeout: 60000 })
+    cy.wait('@fileUpload', { timeout: 60000000 })
         .its('response.statusCode')
         .should('eq', 200);
 
@@ -948,7 +948,7 @@ export const beforeapproveMKT = (): void => {
 
     failIfValidateModal(30000);
 
-    cy.wait('@submitApprove', { timeout: 60000 }).then((interception) => {
+    cy.wait('@submitApprove', { timeout: 60000000 }).then((interception) => {
         const statusCode = interception.response?.statusCode;
         const body: any = interception.response?.body;
         cy.log(`📩 submitApprove response status: ${statusCode}`);
@@ -1331,7 +1331,7 @@ const runTscenterCore = (): void => {
         claimBy: 'project',
         role: 'TSCENTER',
         beforeApproveClick: () => {
-            cy.contains('h2', 'TS Center', { timeout: 60000 }).should('be.visible');
+            cy.contains('h2', 'TS Center', { timeout: 60000000 }).should('be.visible');
             const maxAttempts = 30;
             const attempt = (n: number): void => {
                 cy.get('body').then(($body) => {

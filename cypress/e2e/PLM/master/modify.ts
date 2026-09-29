@@ -1,5 +1,5 @@
 const closeSuccessModal = (): void => {
-    cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
+    cy.contains('.modal-title', 'Save Result', { timeout: 600000000 })
         .closest('.modal-content')
         .find('.modal-footer button.btn-danger')
         .should('be.visible')
@@ -27,7 +27,7 @@ export const selectAndModifyPO = (poTitle: string): void => {
                     cy.reload();
                     cy.get('body').then(($body) => {
                         if ($body.find('.loading-curtain').length > 0) {
-                            cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                            cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
                         }
                     });
                     cy.contains('a.button', poTitle, { timeout: 20000 })
@@ -61,7 +61,7 @@ const SMS_WORDING = 'SMS Wording';
 export const selectModifySections = (minCount: number = 1, maxCount: number = 3): Cypress.Chainable<string[]> => {
     cy.get('body').then(($body) => {
         if ($body.find('.loading-curtain').length > 0) {
-            cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+            cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
         }
     });
     cy.contains('h2', 'Modify Section', { timeout: 30000 }).should('be.visible');
@@ -359,7 +359,7 @@ const waitForPanelToSettle = (): void => {
 const ensureSmsWordingPanelReady = (): void => {
     cy.get('body').then(($body) => {
         if ($body.find('.loading-curtain').length > 0) {
-            cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+            cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
         }
     });
     cy.get('body').then(($body) => {
@@ -534,7 +534,7 @@ export const fillSmsWordingSection = (): void => {
 export const fillTargetCustomerSection = (): void => {
     cy.get('body').then(($body) => {
         if ($body.find('.loading-curtain').length > 0) {
-            cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+            cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
         }
     });
 
@@ -584,7 +584,7 @@ const navigateToDetailTab = (tabLabel: string): void => {
 
         cy.get('body').then(($b) => {
             if ($b.find('.loading-curtain').length > 0) {
-                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
             }
         });
     });

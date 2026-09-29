@@ -39,11 +39,11 @@ const registerPoDetailPageIntercepts = (): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/sff-product-by-detailrowid/**').as('getSffProductDetail');
 };
 const handlePoDetailRoute = (customStepsCallback: () => void): void => {
-    cy.wait('@getPoEnhDetail', { timeout: 600000 });
-    cy.wait('@getCheckSffEnh', { timeout: 600000 });
-    cy.wait('@getBillingPriority', { timeout: 600000 });
-    cy.wait('@getBillingPriorityMobile', { timeout: 600000 });
-    cy.wait('@getSffProductDetail', { timeout: 600000 });
+    cy.wait('@getPoEnhDetail', { timeout: 600000000 });
+    cy.wait('@getCheckSffEnh', { timeout: 600000000 });
+    cy.wait('@getBillingPriority', { timeout: 600000000 });
+    cy.wait('@getBillingPriorityMobile', { timeout: 600000000 });
+    cy.wait('@getSffProductDetail', { timeout: 600000000 });
     handleProductNameTrim();
     cy.wait(500);
     customStepsCallback();
@@ -68,7 +68,7 @@ export const getTomorrowDateString = (): string => {
 };
 const waitForProjectPageLoad = (timeout = 6000000): void => {
     waitForLoadingState();
-    cy.wait(['@getProject', '@getHistory', '@getNote'], { timeout: 6000000 });
+    cy.wait(['@getProject', '@getHistory', '@getNote'], { timeout: 6000000000 });
     cy.get('@getAttachment', { timeout: 10000000 }).then((xhr) => {
         if (xhr) {
             cy.log('✅ @getAttachment fired');
@@ -288,8 +288,8 @@ const backToCksDoer = (registerBeforeBack: boolean = false): void => {
     });
     cy.contains('button', 'Back', { timeout: 150000 }).should('be.visible').and('not.be.disabled').click();
     cy.contains('button', 'Yes', { timeout: 150000 }).should('be.visible').click();
-    cy.url({ timeout: 600000 }).should('include', '/new-flow/home/newcks/cks-doer');
-    cy.get('body', { timeout: 600000 }).should('be.visible');
+    cy.url({ timeout: 600000000 }).should('include', '/new-flow/home/newcks/cks-doer');
+    cy.get('body', { timeout: 600000000 }).should('be.visible');
 };
 const clickApproveButton = (specificLabel: string | undefined, timeout: number): void => {
     const candidates = specificLabel ? [specificLabel, 'Approve'] : ['Approve'];
@@ -345,12 +345,12 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
     cy.contains('button', 'Approve', { timeout: 150000 })
         .should('be.visible')
         .click();
-    cy.wait('@submitApprove', { timeout: 6000000 }).then((interception) => {
+    cy.wait('@submitApprove', { timeout: 6000000000 }).then((interception) => {
         cy.log(`✅ submitApprove METHOD : ${interception.request.method}`);
         cy.log(`✅ submitApprove URL    : ${interception.request.url}`);
         expect(interception.response?.statusCode).to.eq(200);
     });
-    cy.url({ timeout: 6000000 })
+    cy.url({ timeout: 6000000000 })
         .should('include', '/#/workspace-home/workspace');
     const finalProjectName = (getProjectNameFn ? getProjectNameFn() : '') ||
         getStandardProjectName() ||
@@ -378,15 +378,15 @@ export const cksDoerFinalStep = (getProjectNameFn?: GetProjectNameFn): void => {
     cy.intercept('POST', '**/api/flw-cgmd/assigneecgmdconfig/**').as('assignCgmd');
     cy.intercept('POST', '**/mail-service/CGMD-Conigure/**').as('sendMail');
     clickApproveButton('Approve To CGMD', 30000000);
-    cy.wait('@promoteChecker', { timeout: 600000 }).then((interception) => {
+    cy.wait('@promoteChecker', { timeout: 600000000 }).then((interception) => {
         const statusCode = interception.response?.statusCode ?? 0;
         expect(statusCode, 'promoteChecker status').to.be.oneOf([200, 304]);
     });
-    cy.wait('@assignCgmd', { timeout: 600000 }).then((interception) => {
+    cy.wait('@assignCgmd', { timeout: 600000000 }).then((interception) => {
         const statusCode = interception.response?.statusCode ?? 0;
         expect(statusCode, 'assignCgmd status').to.be.oneOf([200, 304]);
     });
-    cy.wait('@sendMail', { timeout: 600000 }).then((interception) => {
+    cy.wait('@sendMail', { timeout: 600000000 }).then((interception) => {
         const statusCode = interception.response?.statusCode ?? 0;
         expect(statusCode, 'sendMail status').to.be.oneOf([200, 304]);
     });

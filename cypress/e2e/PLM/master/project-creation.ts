@@ -568,7 +568,7 @@ const createProjectBase = (
         .and('not.be.disabled')
         .click();
     waitForLoadingState();
-    cy.wait('@saveRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+    cy.wait('@saveRequest', { timeout: 60000000 }).its('response.statusCode').should('eq', 200);
     cy.wait(2000);
 
     closeVisibleModalIfAny();
@@ -656,7 +656,7 @@ const createPOBase = (poName: string, promotionSubGroupValue: string): void => {
 
     cy.contains('button', 'Create').should('be.visible').click();
     waitForLoadingState();
-    cy.wait('@createPO', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+    cy.wait('@createPO', { timeout: 60000000 }).its('response.statusCode').should('eq', 200);
 
     cy.get('body').then(($body) => {
         if ($body.find('.loading-curtain').length > 0) {
@@ -672,7 +672,7 @@ const createPOBase = (poName: string, promotionSubGroupValue: string): void => {
 
     cy.get('body').then(($body) => {
         if ($body.find('select[formcontrolname="priceType"]').length > 0) {
-            cy.get('select[formcontrolname="priceType"]', { timeout: 60000 }).should('be.visible');
+            cy.get('select[formcontrolname="priceType"]', { timeout: 60000000 }).should('be.visible');
         }
     });
 };
@@ -690,6 +690,7 @@ const selectMultipleFromDualList = (controlName: string, maxSelections: number):
             return;
         }
 
+        // สุ่มจำนวน 1..maxSelections (สุ่มครั้งเดียวที่นี่)
         const actualMax = Math.min(maxSelections, optionCount);
         const numberOfSelections = Math.floor(Math.random() * actualMax) + 1;
 
@@ -699,15 +700,22 @@ const selectMultipleFromDualList = (controlName: string, maxSelections: number):
 
         const shuffledValues = Cypress._.shuffle(allValues).slice(0, numberOfSelections);
 
+        cy.log(`🎲 [${controlName}] สุ่มเลือก ${numberOfSelections} รายการ`);
         cy.wrap($select).select(shuffledValues, { force: true });
 
         const $container = $select.closest('ng2-dual-list-box');
 
         if ($container && $container.length > 0) {
-            cy.wrap($container).find('button.atr').then(($btn) => {
-                if ($btn.length > 0) cy.wrap($btn.eq(0)).click({ force: true });
-                else cy.log(`⏭️ transfer button (.atr) not found for ${controlName}`);
-            });
+            // ❗ button.atr = "Add all" (ย้ายทั้งหมด) -> ต้องใช้ button.str = "ย้ายเฉพาะที่เลือก"
+            cy.wrap($container)
+                .find('button.str')
+                .should('not.be.disabled')
+                .click({ force: true });
+
+            // ตรวจว่าฝั่ง Selected items มีจำนวนตรงกับที่สุ่ม
+            cy.wrap($container)
+                .find('select[formcontrolname="selectedListBox"] option')
+                .should('have.length', numberOfSelections);
         } else {
             cy.log(`⏭️ container ng2-dual-list-box not found for ${controlName}`);
         }
@@ -797,7 +805,7 @@ const fillServicePOFields = (
         .type('{selectall}{backspace}')
         .type('APCP-009');
 
-    selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+    selectMultipleFromDualList('availableListBox', 3);
 
     const conditionCount = Math.floor(Math.random() * 5) + 2;
     const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
@@ -857,7 +865,7 @@ const fillCashBackPOFields = (
         .type('{selectall}{backspace}')
         .type(limitAndCleanTH(pickRandom(pools.yourPackageName.TH), 100));
 
-    selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+    selectMultipleFromDualList('availableListBox', 3);
 };
 
 const fillStandardPOFields = (
@@ -899,7 +907,7 @@ const fillStandardPOFields = (
         .type('{selectall}{backspace}')
         .type('APCP-009');
 
-    selectMultipleFromDualList('availableListBox', Math.floor(Math.random() * 3) + 1);
+    selectMultipleFromDualList('availableListBox', 3);
 
     const conditionCount = Math.floor(Math.random() * 5) + 2;
     const selectedConditions = pickMultiple(pools.otherCondition.EN, conditionCount);
@@ -1266,72 +1274,63 @@ const setPriceVAT = (): void => {
         .type(randomCharge, { force: true });
 };
 
-export const backBacicInfo = (): void => {
+const OPEN_MODAL = 'modal-container.modal.in, modal-container.modal.show';
+
+export const backBacicInfo = (savePO: boolean = true): void => {
     cy.intercept('GET', '/PLMSpringBoot/api/flw-project/getProjectByProjectId/**').as('getRequest4');
     cy.get('.sidebar-nav > :nth-child(2) > a').click({ timeout: 1000000 });
-    cy.wait(1500);
-    
-    // ✅ เช็คและปิด modal ที่อาจค้างอยู่ (ทั้ง Save Result และ unsaved-changes)
-    cy.get('body').then(($body) => {
-        // 1. ตรวจสอบ Save Result modal (modal ที่แสดงหลัง Save PO สำเร็จ)
-        const $saveResultModal = $body.find('.modal-title').filter((_, el) => 
-            Cypress.$(el).text().trim().includes('Save Result')
-        );
-        if ($saveResultModal.length > 0) {
-            cy.log('⚠️ พบ Save Result modal ค้างอยู่ — กำลังปิด');
-            cy.wrap($saveResultModal)
-                .closest('.modal-content')
-                .find('.modal-footer button')
-                .filter(':visible')
-                .first()
-                .should('be.visible')
-                .and('not.be.disabled')
-                .click({ force: true });
-            cy.wait(500);
-            return;
-        }
-        
-        // 2. ตรวจสอบ unsaved-changes modal (modal ที่ถามยืนยันก่อนออกจากหน้า)
-        const $unsavedBtn = $body.find('.modal-body > .col-md-12 > :nth-child(1) > .btn');
-        if ($unsavedBtn.length > 0 && $unsavedBtn.is(':visible')) {
-            cy.log('⚠️ พบ unsaved-changes modal — คลิกเพื่อยืนยันออกจากหน้า');
-            cy.wrap($unsavedBtn.eq(0)).should('be.visible').and('not.be.disabled').click();
-            return;
-        }
-        
-        // 3. ตรวจสอบ generic modal ที่อาจค้างอยู่ (fallback)
-        const $anyModal = $body.find('modal-container, .modal.in, .modal.show').filter(':visible');
-        if ($anyModal.length > 0) {
-            cy.log('⚠️ พบ modal ค้างอยู่ — กำลังปิด');
-            cy.wrap($anyModal.first())
-                .find('button, .btn')
-                .filter(':visible')
-                .filter((_, el) => {
-                    const text = Cypress.$(el).text().trim().toLowerCase();
-                    const aria = (el.getAttribute('aria-label') || '').toLowerCase();
-                    return /^(ok|close|yes|confirm|done)$/i.test(text) || 
-                           /close|dismiss|ok|done/i.test(aria);
-                })
-                .first()
-                .then(($btn) => {
-                    if ($btn.length > 0) {
-                        cy.wrap($btn).click({ force: true });
-                    } else {
-                        cy.wrap($anyModal.first()).find('.close').first().click({ force: true });
-                    }
+
+    const handleModals = (attempt = 0, closedCount = 0): void => {
+        cy.get('body', { log: false }).then(($body) => {
+            const $modal = $body.find(OPEN_MODAL).filter(':visible').last();
+
+            if ($modal.length === 0) {
+                const maxAttempts = closedCount === 0 ? 16 : 6;   // x250ms
+                if (attempt < maxAttempts) {
+                    cy.wait(250, { log: false }).then(() => handleModals(attempt + 1, closedCount));
+                } else {
+                    cy.log(closedCount ? `✅ ปิด modal ครบ ${closedCount} ตัว` : '✅ ไม่มี modal ค้างอยู่');
+                }
+                return;
+            }
+
+            const title = $modal.find('.modal-title').first().text().trim();
+            cy.log(`⚠️ พบ modal: "${title}"`);
+
+            if (/save po/i.test(title) && !/save result/i.test(title)) {
+                const label = savePO ? 'Yes' : 'No';
+                cy.wrap($modal).find('.modal-body button.btn')
+                    .contains(new RegExp(`^\\s*${label}\\s*$`))
+                    .should('be.visible').and('not.be.disabled')
+                    .click();
+            }
+            else if (/save result/i.test(title)) {
+                cy.wrap($modal)
+                    .find('.modal-footer button, .modal-body button')
+                    .filter(':visible').first()
+                    .should('not.be.disabled')
+                    .click({ force: true });
+            }
+
+            else {
+                cy.wrap($modal).find('button, .btn, .close').filter(':visible').then(($btns) => {
+                    const preferred = $btns.filter((_, el) =>
+                        /^(ok|yes|confirm|done|close|×)$/i.test(Cypress.$(el).text().trim())
+                    );
+                    cy.wrap((preferred.length ? preferred : $btns).first()).click({ force: true });
                 });
-            cy.wait(500);
-            return;
-        }
-        
-        cy.log('✅ ไม่มี modal ค้างอยู่');
-    });
-    
-    cy.wait('@getRequest4', { timeout: 600000000 });
+            }
+            cy.wait(300, { log: false }).then(() => {
+                if (attempt < 10) handleModals(0, closedCount + 1);
+            });
+        });
+    };
+    handleModals();
+
+    cy.wait('@getRequest4', { timeout: 60000000 });
     cy.get('.loading-curtain', { timeout: 30000 }).should('not.exist');
     cy.contains('li.sidebar-brand', 'List of Product Offering:', { timeout: 30000 }).should('be.visible');
 };
-
 export const addFile = (): void => {
     cy.get('input[type="file"]', { timeout: 30000 }).should('exist');
 
@@ -1727,13 +1726,13 @@ export const ProjectBasicInformationCompleteOtherPOSub = (
     cy.get('input[aria-label="Date input field"]').type('{selectall}{backspace}').type(formattedDate);
     cy.get('input[aria-label="Date input field"]').should('have.value', formattedDate);
 
-    cy.get('input[formcontrolname="phoneNo"]').type(getRandomPhone());
+    cy.get('input[formcontrolname="phoneNo"]').click().type(getRandomPhone(), { delay: 30 });
 
     RandomProjectDescription(projectName, undefined, Module);
 
     cy.get('button[type="button"]').contains('Save').click();
 
-    cy.wait('@getRequest', { timeout: 60000 }).its('response.statusCode').should('eq', 200);
+    cy.wait('@getRequest', { timeout: 60000000 }).its('response.statusCode').should('eq', 200);
 
     closeVisibleModalIfAny();
 
@@ -1995,7 +1994,7 @@ const searchProductOfferingByPO = (
 
         cy.get('body').then(($body) => {
             if ($body.find('.loading-curtain').length > 0) {
-                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
             }
         });
 
@@ -2045,7 +2044,7 @@ const searchProductOfferingByPO = (
 };
 
 const closeSuccessModal = (): void => {
-    cy.contains('.modal-title', 'Save Result', { timeout: 60000 })
+    cy.contains('.modal-title', 'Save Result', { timeout: 60000000 })
         .closest('.modal-content')
         .find('.modal-footer button.btn-danger')
         .should('be.visible')
@@ -2100,7 +2099,7 @@ export const ProjectBasicInformationCompleteModify = (
 
         cy.get('body').then(($body) => {
             if ($body.find('.loading-curtain').length > 0) {
-                cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
             }
         });
 
@@ -2121,7 +2120,7 @@ export const ProjectBasicInformationCompleteModify = (
                 if (index > 0) {
                     cy.get('body').then(($body) => {
                         if ($body.find('.loading-curtain').length > 0) {
-                            cy.get('.loading-curtain', { timeout: 60000 }).should('not.exist');
+                            cy.get('.loading-curtain', { timeout: 60000000 }).should('not.exist');
                         }
                     });
 

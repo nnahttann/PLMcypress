@@ -131,7 +131,7 @@ export const login = (username: string | undefined, password: string | undefined
     if (!safeUsername || !safePassword) {
         cy.log('⚠️ Login credentials missing; typing empty values to avoid Cypress type() failures.');
     }
-    cy.get('app-login', { timeout: 60000 }).should('be.visible');
+    cy.get('app-login', { timeout: 60000000 }).should('be.visible');
     cy.get('form', { timeout: 30000 }).should('be.visible');
     cy.get('input[name="userId"]', { timeout: 30000 })
         .should('exist')

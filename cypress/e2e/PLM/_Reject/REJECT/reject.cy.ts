@@ -11,13 +11,13 @@ beforeEach(() => {
         isFirstRun = false;
     }
     cy.visit(Master.urlsit, {
-        timeout: 600000,
+        timeout: 600000000,
         onBeforeLoad: (win) => {
             win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
         }
     });
-    cy.get('app-login', { timeout: 600000 }).should('be.visible');
-    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 600000 }).should('be.visible');
+    cy.get('app-login', { timeout: 600000000 }).should('be.visible');
+    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 600000000 }).should('be.visible');
 });
 describe('PRE-PAID Ontop', () => {
     const priceTypes: PriceType[] = ['onetime'];

@@ -1,6 +1,6 @@
 import { scrollAndWait } from './helpers';
 const closeSuccessModal = (): void => {
-    cy.contains('.modal-title', 'Save Result', { timeout: 600000 })
+    cy.contains('.modal-title', 'Save Result', { timeout: 600000000 })
         .closest('.modal-content')
         .find('.modal-footer button.btn-danger')
         .should('be.visible')

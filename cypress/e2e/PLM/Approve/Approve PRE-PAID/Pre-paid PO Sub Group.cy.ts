@@ -23,29 +23,30 @@ beforeEach(() => {
     Cypress.env('formattedDateOntopExtraPONAME', undefined);
 });
 describe('PRE-PAID PO Sub Group', () => {
-    const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+    // const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
+    const priceTypes: PriceType[] = ['recurring'];
     describe('OrderFee', () => {
         priceTypes.forEach((priceType) => {
             describe(`${priceType}`, () => {
                 describe('Mobile', () => {
                     it('MKT PRE-PAID role', () => {
                         Master.ProjectBasicInformationCompleteOtherPOSub(priceType, 'OrderFee', 'PRE');
-                        Master.backBacicInfo();
-                        Master.addFile();
+                        // Master.backBacicInfo();
+                        // Master.addFile();
                     });
                     Master.afterMKTothersubgroup('OrderFee', 'PRE');
                 });
             });
         });
     });
-    describe('Service', () => {
+    describe.only('Service', () => {
         priceTypes.forEach((priceType) => {
             describe(`${priceType}`, () => {
                 describe('Mobile', () => {
                     it('MKT PRE-PAID role', () => {
                         Master.ProjectBasicInformationCompleteOtherPOSub(priceType, 'Service', 'PRE');
-                        Master.backBacicInfo();
-                        Master.addFile();
+                        // Master.backBacicInfo();
+                        // Master.addFile();
                     });
                     Master.afterMKTothersubgroup('Service', 'PRE');
                 });

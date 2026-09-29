@@ -158,12 +158,15 @@ const waitForKeywordInToDo = (
 // ─────────────────────────────────────────────────────────────────────────────
 // ✅ แก้ไข approveProject: เพิ่ม wait + บังคับใช้ specific match
 // ─────────────────────────────────────────────────────────────────────────────
-export const approveProject = (projectName: string): void => {
+export const approveProject = (projectName: string, options?: { strict?: boolean }): void => {
+    // ✅ strict = true → ต้องเจอแถวที่ชื่อตรงเท่านั้น (ห้าม fallback ไปคลิกแถวอื่นที่มี project code เดียวกัน)
+    const strict = options?.strict ?? false;
     const keywords = buildSearchKeywords(projectName);
     const normalizeSpaces = (t: string): string => String(t ?? '').replace(/\s+/g, ' ').trim();
     const specific = normalizeSpaces(projectName);
 
     const rowMatchesAnyKeyword = ($row: JQuery<HTMLElement>): boolean => {
+        if (strict) return rowMatchesSpecific($row);
         const rowText = $row.text();
         return keywords.some(k => rowText.includes(k));
     };
@@ -186,6 +189,9 @@ export const approveProject = (projectName: string): void => {
         });
 
         const useSpecific = dataRows.some((row) => rowMatchesSpecific(Cypress.$(row)));
+        if (strict && !useSpecific) {
+            throw new Error(`❌ [approveProject] strict: ไม่เจอแถวที่ตรงชื่อ "${specific}" ใน To Do List — หยุดเพื่อไม่ให้ approve PO ผิดตัว`);
+        }
         const rowMatches = useSpecific ? rowMatchesSpecific : rowMatchesAnyKeyword;
 
         cy.log(useSpecific
@@ -760,7 +766,7 @@ export const assignAllPOsThenNavigate = (projectName: string, assignee: string, 
 };
 
 const TEAM_TASK_RELOAD_ATTEMPTS = 3;
-const TEAM_TASK_ASSIGN_LOOP_LIMIT = 3;
+const TEAM_TASK_ASSIGN_LOOP_LIMIT = 30;
 const TEAM_TASK_MAX_PAGES = 3;
 
 const normalizeTeamTaskText = (text: string): string => text.replace(/\s+/g, ' ').trim();
@@ -1050,7 +1056,10 @@ export const ClaimProject = (
                 return getTableContainer('Unassigned Task').find('tbody tr').then(($rows) => {
                     const foundRowIndex = $rows.toArray().findIndex((row) => rowMatchesKeyword(row, keyword));
                     return getTableContainer('Unassigned Task').find('tbody tr').eq(foundRowIndex).find('button.claim-top').should('be.visible').and('not.be.disabled').click().then(() => {
-                        const waitKeywords = buildRoleSearchKeywords(projectName, options?.role, keyword);
+                        // ✅ specific PO → รอเฉพาะชื่อ PO นั้น (ห้ามรวม project code เพราะทุก PO ในโปรเจกต์เดียวกันมีโค้ดเดียวกัน → ผ่านทันทีแม้ claim ผิดตัว)
+                        const waitKeywords = options?.specificPoName
+                            ? [options.specificPoName.replace(/\s+/g, ' ').trim()]
+                            : buildRoleSearchKeywords(projectName, options?.role, keyword);
                         waitForKeywordInToDo(waitKeywords);
                         return cy.wrap<boolean>(true, { log: false });
                     });
@@ -1108,7 +1117,8 @@ export const ClaimProject = (
     };
 
     const claimSpecificPO = (poName: string): void => {
-        const keywords = buildRoleSearchKeywords(projectName, options?.role, poName);
+        // ✅ ใช้ชื่อ PO อย่างเดียว — เดิมมี project code นำหน้า ทำให้ match แถวแรก (eq 0) ซึ่งอาจเป็น PO อื่น
+        const keywords = [poName.replace(/\s+/g, ' ').trim()];
         claimWithFallback(keywords).then(() => cy.log(`✅ Claimed specific PO: ${poName}`));
     };
 

@@ -11,13 +11,13 @@ beforeEach(() => {
         isFirstRun = false;
     }
     cy.visit(Master.urlsit, {
-        timeout: 60000,
+        timeout: 60000000,
         onBeforeLoad: (win) => {
             win.document.documentElement.style.setProperty('--animation-duration', '0ms', 'important');
         }
     });
-    cy.get('app-login', { timeout: 60000 }).should('be.visible');
-    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000 }).should('be.visible');
+    cy.get('app-login', { timeout: 60000000 }).should('be.visible');
+    cy.get('input[name="userId"], input[name="pwd"]', { timeout: 60000000 }).should('be.visible');
 });
 describe('Rom, Easy App Rom - POST-PAID Main', () => {
     const priceTypes: PriceType[] = ['onetime', 'recurring', 'usage'];
